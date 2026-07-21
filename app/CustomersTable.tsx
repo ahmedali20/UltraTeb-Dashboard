@@ -181,11 +181,8 @@ export default function CustomersTable({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <h1 style={{ margin: 0 }}>{t.title}</h1>
-          
-            href="/sales"
-            style={{ fontSize: 14, color: "#2563eb", textDecoration: "none" }}
-          >
-            {lang === "ar" ? "→ المبيعات" : "Sales →"}
+          <a href="/sales" style={{ fontSize: 14, color: "#2563eb", textDecoration: "none" }}>
+            {lang === "ar" ? "المبيعات" : "Sales"}
           </a>
         </div>
         <button
