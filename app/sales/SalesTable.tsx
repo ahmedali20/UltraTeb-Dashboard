@@ -423,4 +423,8 @@ function Td({
   align: string;
 }) {
   return (
-    <td style={{ padding: "8px 14px", fontSize: 13, textAlign:
+<td style={{ padding: "8px 14px", fontSize: 13, textAlign: align as any }}>
+      {children}
+    </td>
+  );
+}
