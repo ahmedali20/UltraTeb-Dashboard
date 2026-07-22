@@ -3,6 +3,8 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
+import Header from "../Header";
+import Footer from "../Footer";
 
 type SaleRow = {
   id: string;
@@ -172,47 +174,10 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
   }
 
   return (
-    <main
-      dir={dir}
-      style={{
-        padding: 32,
-        maxWidth: 1300,
-        margin: "0 auto",
-        fontFamily: "Arial, 'Segoe UI', Tahoma, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 4,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <h1 style={{ margin: 0 }}>{t.title}</h1>
-          <a href="/" style={{ fontSize: 14, color: "#2563eb", textDecoration: "none" }}>
-            {lang === "ar" ? "الرئيسية" : "Home"}
-          </a>
-          <a href="/customers" style={{ fontSize: 14, color: "#2563eb", textDecoration: "none" }}>
-            {t.backToCustomers}
-          </a>
-        </div>
-        <button
-          onClick={() => setLang(lang === "en" ? "ar" : "en")}
-          style={{
-            padding: "8px 16px",
-            borderRadius: 6,
-            border: "1px solid #ccc",
-            background: "#2d3748",
-            color: "#fff",
-            cursor: "pointer",
-            fontSize: 14,
-          }}
-        >
-          {t.switchTo}
-        </button>
-      </div>
+    <div dir={dir} style={{ fontFamily: "Arial, 'Segoe UI', Tahoma, sans-serif", minHeight: "100vh", background: "#f5f6f8" }}>
+      <Header active="sales" lang={lang} onToggleLang={() => setLang(lang === "en" ? "ar" : "en")} />
+      <main style={{ padding: "0 32px", maxWidth: 1300, margin: "0 auto" }}>
+        <h1 style={{ margin: 0 }}>{t.title}</h1>
 
       <p style={{ color: "#666", marginBottom: 20 }}>
         {t.total} {sales.length}
@@ -400,7 +365,9 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
           </tbody>
         </table>
       </div>
-    </main>
+      </main>
+      <Footer lang={lang} />
+    </div>
   );
 }
 
