@@ -192,6 +192,9 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <h1 style={{ margin: 0 }}>{t.title}</h1>
           <a href="/" style={{ fontSize: 14, color: "#2563eb", textDecoration: "none" }}>
+            {lang === "ar" ? "الرئيسية" : "Home"}
+          </a>
+          <a href="/customers" style={{ fontSize: 14, color: "#2563eb", textDecoration: "none" }}>
             {t.backToCustomers}
           </a>
         </div>
@@ -423,7 +426,7 @@ function Td({
   align: string;
 }) {
   return (
-<td style={{ padding: "8px 14px", fontSize: 13, textAlign: align as any }}>
+    <td style={{ padding: "8px 14px", fontSize: 13, textAlign: align as any }}>
       {children}
     </td>
   );
