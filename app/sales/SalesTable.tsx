@@ -183,6 +183,10 @@ export default function SalesTable({
         normalizeSalesRep(sale.sales_rep) === recordRepFilter) &&
       (recordMonthFilter === "All" || sale.month === recordMonthFilter)
   );
+  const displayedSalesTotal = displayedSales.reduce(
+    (total, sale) => total + Number(sale.total_sales || 0),
+    0
+  );
 
   function calculateTax(itemTotal: string, mode: "14" | "5" | "manual") {
     if (mode === "manual") return form.tax;
@@ -1011,7 +1015,14 @@ export default function SalesTable({
         <div>
           <strong>{lang === "ar" ? "كل الفواتير" : "All Records"}</strong>
           <span>
-            {displayedSales.length} {lang === "ar" ? "سجل" : "records"}
+            {lang === "ar" ? "إجمالي الفواتير" : "Total Invoices"}:{" "}
+            {displayedSales.length}
+            {" · "}
+            {lang === "ar" ? "إجمالي المبيعات" : "Total Sales"}:{" "}
+            {displayedSalesTotal.toLocaleString(
+              lang === "ar" ? "ar-EG" : "en-US",
+              { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+            )}
           </span>
         </div>
         <label>
