@@ -154,6 +154,53 @@ input::placeholder {
   box-shadow: 0 0 0 3px rgba(23, 138, 107, 0.16);
 }
 
+.entry-form__input:read-only {
+  background: var(--surface-muted);
+  cursor: default;
+}
+
+.tax-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--input-border);
+  border-radius: 11px;
+  background: var(--surface-muted);
+}
+
+.tax-options__button {
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tax-options__button:hover {
+  color: var(--text-primary);
+}
+
+.tax-options__button--active {
+  background: #178a6b;
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(23, 138, 107, 0.22);
+}
+
+.tax-options__button--active:hover {
+  color: #ffffff;
+}
+
+.tax-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .entry-form__actions {
   display: flex;
   justify-content: flex-end;
