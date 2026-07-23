@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Header from "../Header";
 import Footer from "../Footer";
 
@@ -25,11 +26,22 @@ function normalizeSalesRep(value: string | null, fallback: string) {
     .replace(/\b[a-z]/g, (letter) => letter.toLocaleUpperCase());
 }
 
-export default function SalesRepsClient({ sales }: { sales: RepSale[] }) {
+type ManagedRep = { id: number; name: string };
+
+export default function SalesRepsClient({
+  sales,
+  managedReps,
+}: {
+  sales: RepSale[];
+  managedReps: ManagedRep[];
+}) {
+  const router = useRouter();
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [selectedRep, setSelectedRep] = useState<string | null>(null);
   const [hospitalFilter, setHospitalFilter] = useState("All");
   const [monthFilter, setMonthFilter] = useState("All");
+  const [newRepName, setNewRepName] = useState("");
+  const [savingRep, setSavingRep] = useState(false);
   const dir = lang === "ar" ? "rtl" : "ltr";
 
   const reps = useMemo(() => {
@@ -89,11 +101,21 @@ export default function SalesRepsClient({ sales }: { sales: RepSale[] }) {
   const months = Array.from(
     new Set(repSales.map((sale) => sale.month).filter(Boolean))
   ).sort((a, b) => b.localeCompare(a));
-  const visibleSales = repSales.filter(
-    (sale) =>
-      (hospitalFilter === "All" || sale.customer_name === hospitalFilter) &&
-      (monthFilter === "All" || sale.month === monthFilter)
-  );
+  const visibleSales = repSales
+    .filter(
+      (sale) =>
+        (hospitalFilter === "All" || sale.customer_name === hospitalFilter) &&
+        (monthFilter === "All" || sale.month === monthFilter)
+    )
+    .sort((a, b) => {
+      const dateComparison = a.sales_date.localeCompare(b.sales_date);
+      if (dateComparison !== 0) return dateComparison;
+
+      return a.invoice_no.localeCompare(b.invoice_no, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    });
   const visibleTotal = visibleSales.reduce(
     (sum, sale) => sum + Number(sale.total_sales || 0),
     0
@@ -108,6 +130,49 @@ export default function SalesRepsClient({ sales }: { sales: RepSale[] }) {
         .getElementById("rep-sales-details")
         ?.scrollIntoView({ behavior: "smooth", block: "start" })
     );
+  }
+
+  async function addSalesRep() {
+    if (!newRepName.trim()) return;
+    setSavingRep(true);
+    const res = await fetch("/api/sales-reps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newRepName.trim() }),
+    });
+    const json = await res.json();
+    setSavingRep(false);
+
+    if (!res.ok) {
+      alert(json.error || "Error adding sales representative");
+      return;
+    }
+
+    setNewRepName("");
+    router.refresh();
+  }
+
+  async function deleteSalesRep(rep: ManagedRep) {
+    if (
+      !confirm(
+        lang === "ar"
+          ? `حذف المندوب ${rep.name}؟`
+          : `Delete sales representative ${rep.name}?`
+      )
+    ) return;
+
+    const res = await fetch(`/api/sales-reps?id=${rep.id}`, {
+      method: "DELETE",
+    });
+    const json = await res.json();
+
+    if (!res.ok) {
+      alert(json.error || "Error deleting sales representative");
+      return;
+    }
+
+    if (selectedRep === rep.name) setSelectedRep(null);
+    router.refresh();
   }
 
   return (
@@ -138,6 +203,44 @@ export default function SalesRepsClient({ sales }: { sales: RepSale[] }) {
           </div>
           <strong>{reps.length} {lang === "ar" ? "مندوب" : "reps"}</strong>
         </div>
+
+        <section className="rep-manager">
+          <div className="rep-manager__add">
+            <label>
+              {lang === "ar" ? "اسم المندوب الجديد" : "New Sales Rep Name"}
+              <input
+                value={newRepName}
+                onChange={(event) => setNewRepName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") addSalesRep();
+                }}
+                placeholder={lang === "ar" ? "أدخل الاسم" : "Enter name"}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={addSalesRep}
+              disabled={savingRep || !newRepName.trim()}
+            >
+              {savingRep ? "..." : lang === "ar" ? "+ إضافة مندوب" : "+ Add Sales Rep"}
+            </button>
+          </div>
+          <div className="rep-manager__list">
+            {managedReps.map((rep) => (
+              <span key={rep.id}>
+                {rep.name}
+                <button
+                  type="button"
+                  onClick={() => deleteSalesRep(rep)}
+                  aria-label={`Delete ${rep.name}`}
+                  title={lang === "ar" ? "حذف" : "Delete"}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </section>
 
         <section className="rep-summary-grid">
           <button
