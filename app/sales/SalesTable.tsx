@@ -98,7 +98,9 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
   const inputStyle: React.CSSProperties = {
     padding: "6px 8px",
     fontSize: 13,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--input-border)",
+    background: "var(--input-bg)",
+    color: "var(--input-text)",
     borderRadius: 4,
     width: "100%",
   };
@@ -174,20 +176,20 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
   }
 
   return (
-    <div dir={dir} style={{ fontFamily: "Arial, 'Segoe UI', Tahoma, sans-serif", minHeight: "100vh", background: "#f5f6f8" }}>
+    <div dir={dir} style={{ fontFamily: "Arial, 'Segoe UI', Tahoma, sans-serif", minHeight: "100vh", background: "var(--page-bg)", color: "var(--text-primary)" }}>
       <Header active="sales" lang={lang} onToggleLang={() => setLang(lang === "en" ? "ar" : "en")} />
       <main style={{ padding: "0 32px", maxWidth: 1300, margin: "0 auto" }}>
         <h1 style={{ margin: 0 }}>{t.title}</h1>
 
-      <p style={{ color: "#666", marginBottom: 20 }}>
+      <p style={{ color: "var(--text-secondary)", marginBottom: 20 }}>
         {t.total} {sales.length}
       </p>
 
       <div
         style={{
-          background: "#fff",
+          background: "var(--surface-bg)",
           borderRadius: 8,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+          boxShadow: "var(--surface-shadow)",
           padding: 16,
           marginBottom: 16,
         }}
@@ -261,9 +263,9 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
 
       <div
         style={{
-          background: "#fff",
+          background: "var(--surface-bg)",
           borderRadius: 8,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+          boxShadow: "var(--surface-shadow)",
           padding: 16,
           marginBottom: 24,
         }}
@@ -271,7 +273,7 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
         <h3 style={{ marginTop: 0, marginBottom: 6, fontSize: 15 }}>
           {t.bulkTitle}
         </h3>
-        <p style={{ fontSize: 12, color: "#666", marginTop: 0 }}>
+        <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 0 }}>
           {t.bulkHint}
         </p>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -306,9 +308,9 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
       <div
         style={{
           overflowX: "auto",
-          background: "#fff",
+          background: "var(--surface-bg)",
           borderRadius: 8,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+          boxShadow: "var(--surface-shadow)",
         }}
       >
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -330,8 +332,8 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
               <tr
                 key={s.id}
                 style={{
-                  background: i % 2 === 0 ? "#fff" : "#f9fafb",
-                  borderBottom: "1px solid #e5e7eb",
+                  background: i % 2 === 0 ? "var(--surface-bg)" : "var(--surface-muted)",
+                  borderBottom: "1px solid var(--border-color)",
                 }}
               >
                 <Td align={align}>{s.invoice_no}</Td>
