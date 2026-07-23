@@ -19,6 +19,11 @@ type SaleRow = {
   total_sales: number;
 };
 
+type CustomerOption = {
+  customer_code: string;
+  customer_name: string;
+};
+
 const translations = {
   en: {
     title: "Sales Invoices",
@@ -80,7 +85,13 @@ const emptyForm = {
   tax: "",
 };
 
-export default function SalesTable({ sales }: { sales: SaleRow[] }) {
+export default function SalesTable({
+  sales,
+  customers,
+}: {
+  sales: SaleRow[];
+  customers: CustomerOption[];
+}) {
   const router = useRouter();
   const [lang, setLang] = useState<"en" | "ar">("en");
   const t = translations[lang];
@@ -261,14 +272,27 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
               <span className="entry-form__label">
                 {t.customer} Code<span className="entry-form__required">*</span>
               </span>
-              <input
+              <select
                 className="entry-form__input"
-                placeholder={t.customer + " Code"}
                 value={form.customer_code}
                 onChange={(e) =>
                   setForm({ ...form, customer_code: e.target.value })
                 }
-              />
+              >
+                <option value="">
+                  {lang === "ar"
+                    ? "اختر كود واسم العميل"
+                    : "Select customer code and name"}
+                </option>
+                {customers.map((customer) => (
+                  <option
+                    key={customer.customer_code}
+                    value={customer.customer_code}
+                  >
+                    {customer.customer_code} — {customer.customer_name}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="entry-form__field entry-form__field--wide">
