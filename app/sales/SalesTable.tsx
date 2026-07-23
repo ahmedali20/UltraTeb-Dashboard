@@ -97,6 +97,8 @@ const emptyForm = {
   tax: "",
 };
 
+type InvoiceForm = typeof emptyForm;
+
 export default function SalesTable({
   sales,
   customers,
@@ -113,6 +115,10 @@ export default function SalesTable({
   const [form, setForm] = useState(emptyForm);
   const [taxMode, setTaxMode] = useState<"14" | "5" | "manual">("14");
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<InvoiceForm>(emptyForm);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkRows, setBulkRows] = useState<BulkInvoiceRow[]>([]);
@@ -129,6 +135,13 @@ export default function SalesTable({
     borderRadius: 4,
     width: "100%",
   };
+
+  const sortedSales = [...sales].sort((a, b) =>
+    a.invoice_no.localeCompare(b.invoice_no, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    })
+  );
 
   function calculateTax(itemTotal: string, mode: "14" | "5" | "manual") {
     if (mode === "manual") return form.tax;
@@ -244,12 +257,30 @@ export default function SalesTable({
 
     Papa.parse(file, {
       header: true,
-      skipEmptyLines: true,
+      skipEmptyLines: "greedy",
+      transformHeader: (header) =>
+        header
+          .replace(/^\uFEFF/, "")
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_+|_+$/g, ""),
       complete: (results) => {
         const parsedRows = results.data as Record<string, unknown>[];
 
         setBulkRows(
-          parsedRows.map((row, index) => {
+          parsedRows
+          .filter((row) =>
+            [
+              row.invoice_no,
+              row.sales_date,
+              row.customer_code,
+              row.customer_name,
+              row.sales_item_total,
+              row.tax,
+            ].some((value) => String(value ?? "").trim())
+          )
+          .map((row, index) => {
             const sourceCode = String(row.customer_code ?? "").trim();
             const sourceName = String(row.customer_name ?? "").trim();
             const normalizedName = normalizeCustomerValue(sourceName);
@@ -360,15 +391,95 @@ export default function SalesTable({
     }
   }
 
+  function startEdit(sale: SaleRow) {
+    setEditingId(sale.id);
+    setEditForm({
+      invoice_no: sale.invoice_no,
+      sales_date: sale.sales_date,
+      customer_code: sale.customer_code,
+      sales_item_total: String(sale.sales_item_total),
+      tax: String(sale.tax),
+    });
+  }
+
+  async function handleSaveEdit(id: string) {
+    if (
+      !editForm.invoice_no ||
+      !editForm.sales_date ||
+      !editForm.customer_code
+    ) {
+      alert("Invoice number, date and customer are required.");
+      return;
+    }
+
+    setSavingEdit(true);
+    const res = await fetch(`/api/sales/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editForm),
+    });
+    setSavingEdit(false);
+
+    if (res.ok) {
+      setEditingId(null);
+      router.refresh();
+    } else {
+      const { error } = await res.json();
+      alert(error || "Error updating invoice");
+    }
+  }
+
+  async function handleDeleteAll() {
+    const warning =
+      lang === "ar"
+        ? "هل أنت متأكد من حذف جميع الفواتير؟ لا يمكن التراجع عن هذا الإجراء."
+        : "Delete ALL invoices? This cannot be undone.";
+    if (!confirm(warning)) return;
+
+    setDeletingAll(true);
+    const res = await fetch("/api/sales", { method: "DELETE" });
+    setDeletingAll(false);
+
+    if (res.ok) {
+      setEditingId(null);
+      router.refresh();
+    } else {
+      const { error } = await res.json();
+      alert(error || "Error deleting all invoices");
+    }
+  }
+
   return (
     <div dir={dir} style={{ fontFamily: "Arial, 'Segoe UI', Tahoma, sans-serif", minHeight: "100vh", background: "var(--page-bg)", color: "var(--text-primary)" }}>
       <Header active="sales" lang={lang} onToggleLang={() => setLang(lang === "en" ? "ar" : "en")} />
       <main style={{ padding: "0 32px", maxWidth: 1300, margin: "0 auto" }}>
         <h1 style={{ margin: 0 }}>{t.title}</h1>
 
-      <p style={{ color: "var(--text-secondary)", marginBottom: 20 }}>
-        {t.total} {sales.length}
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 20 }}>
+        <p style={{ color: "var(--text-secondary)", margin: 0 }}>
+          {t.total} {sales.length}
+        </p>
+        <button
+          type="button"
+          onClick={handleDeleteAll}
+          disabled={!sales.length || deletingAll}
+          style={{
+            padding: "9px 14px",
+            borderRadius: 6,
+            border: "1px solid #dc2626",
+            background: deletingAll ? "#94a3b8" : "#dc2626",
+            color: "#fff",
+            cursor: !sales.length || deletingAll ? "not-allowed" : "pointer",
+            fontWeight: 600,
+          }}
+        >
+          {deletingAll
+            ? "..."
+            : lang === "ar"
+              ? "حذف جميع الفواتير"
+              : "Delete All Invoices"}
+        </button>
+      </div>
 
       <section className="entry-form">
         <div className="entry-form__header">
@@ -717,7 +828,13 @@ export default function SalesTable({
             </tr>
           </thead>
           <tbody>
-            {sales.map((s, i) => (
+            {sortedSales.map((s, i) => {
+              const isEditing = editingId === s.id;
+              const editedTotal =
+                Number(editForm.sales_item_total || 0) +
+                Number(editForm.tax || 0);
+
+              return (
               <tr
                 key={s.id}
                 style={{
@@ -725,34 +842,130 @@ export default function SalesTable({
                   borderBottom: "1px solid var(--border-color)",
                 }}
               >
-                <Td align={align}>{s.invoice_no}</Td>
-                <Td align={align}>{s.sales_date}</Td>
+                <Td align={align}>
+                  {isEditing ? (
+                    <input
+                      style={inputStyle}
+                      value={editForm.invoice_no}
+                      onChange={(event) =>
+                        setEditForm({ ...editForm, invoice_no: event.target.value })
+                      }
+                    />
+                  ) : s.invoice_no}
+                </Td>
+                <Td align={align}>
+                  {isEditing ? (
+                    <input
+                      style={inputStyle}
+                      type="date"
+                      value={editForm.sales_date}
+                      onChange={(event) =>
+                        setEditForm({ ...editForm, sales_date: event.target.value })
+                      }
+                    />
+                  ) : s.sales_date}
+                </Td>
                 <Td align={align}>{s.month}</Td>
                 <Td align={align}>
-                  {s.customer_name} ({s.customer_code})
+                  {isEditing ? (
+                    <select
+                      style={{ ...inputStyle, minWidth: 190 }}
+                      value={editForm.customer_code}
+                      onChange={(event) =>
+                        setEditForm({
+                          ...editForm,
+                          customer_code: event.target.value,
+                        })
+                      }
+                    >
+                      {customers.map((customer) => (
+                        <option
+                          key={customer.customer_code}
+                          value={customer.customer_code}
+                        >
+                          {customer.customer_code} — {customer.customer_name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    `${s.customer_name} (${s.customer_code})`
+                  )}
                 </Td>
-                <Td align={align}>{s.sales_item_total}</Td>
-                <Td align={align}>{s.tax}</Td>
-                <Td align={align}>{s.total_sales}</Td>
+                <Td align={align}>
+                  {isEditing ? (
+                    <input
+                      style={inputStyle}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.sales_item_total}
+                      onChange={(event) =>
+                        setEditForm({
+                          ...editForm,
+                          sales_item_total: event.target.value,
+                        })
+                      }
+                    />
+                  ) : s.sales_item_total}
+                </Td>
+                <Td align={align}>
+                  {isEditing ? (
+                    <input
+                      style={inputStyle}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.tax}
+                      onChange={(event) =>
+                        setEditForm({ ...editForm, tax: event.target.value })
+                      }
+                    />
+                  ) : s.tax}
+                </Td>
+                <Td align={align}>
+                  {isEditing ? editedTotal.toFixed(2) : s.total_sales}
+                </Td>
                 <Td align={align}>{s.sales_rep ?? "-"}</Td>
                 <Td align={align}>
-                  <button
-                    onClick={() => handleDelete(s.id)}
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: 4,
-                      border: "none",
-                      background: "#dc2626",
-                      color: "#fff",
-                      cursor: "pointer",
-                      fontSize: 12,
-                    }}
-                  >
-                    {t.delete}
-                  </button>
+                  <div style={{ display: "flex", gap: 6, minWidth: 130 }}>
+                    {isEditing ? (
+                      <>
+                        <button
+                          onClick={() => handleSaveEdit(s.id)}
+                          disabled={savingEdit}
+                          style={actionButtonStyle("#16a34a")}
+                        >
+                          {savingEdit ? "..." : lang === "ar" ? "حفظ" : "Save"}
+                        </button>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          disabled={savingEdit}
+                          style={actionButtonStyle("#64748b")}
+                        >
+                          {lang === "ar" ? "إلغاء" : "Cancel"}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => startEdit(s)}
+                          style={actionButtonStyle("#2563eb")}
+                        >
+                          {lang === "ar" ? "تعديل" : "Edit"}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(s.id)}
+                          style={actionButtonStyle("#dc2626")}
+                        >
+                          {t.delete}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </Td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -788,4 +1001,16 @@ function Td({
       {children}
     </td>
   );
+}
+
+function actionButtonStyle(background: string): React.CSSProperties {
+  return {
+    padding: "5px 9px",
+    borderRadius: 4,
+    border: "none",
+    background,
+    color: "#fff",
+    cursor: "pointer",
+    fontSize: 12,
+  };
 }
