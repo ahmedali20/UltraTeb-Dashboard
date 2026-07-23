@@ -75,14 +75,31 @@ function formatMoney(value: number, lang: "en" | "ar") {
 
 export default function HomeClient({ sales, customerCount }: HomeClientProps) {
   const [lang, setLang] = useState<"en" | "ar">("en");
+  const [selectedRep, setSelectedRep] = useState("All");
   const t = text[lang];
   const dir = lang === "ar" ? "rtl" : "ltr";
 
-  const totalSales = sales.reduce(
+  const allSalesReps = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          sales.map((sale) => sale.sales_rep?.trim() || t.unassigned)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [sales, t.unassigned]
+  );
+  const filteredSales =
+    selectedRep === "All"
+      ? sales
+      : sales.filter(
+          (sale) => (sale.sales_rep?.trim() || t.unassigned) === selectedRep
+        );
+
+  const totalSales = filteredSales.reduce(
     (total, sale) => total + Number(sale.total_sales || 0),
     0
   );
-  const totalTax = sales.reduce(
+  const totalTax = filteredSales.reduce(
     (total, sale) => total + Number(sale.tax || 0),
     0
   );
@@ -91,7 +108,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     const totals = new Map<string, Map<string, number>>();
     const reps = new Set<string>();
 
-    sales.forEach((sale) => {
+    filteredSales.forEach((sale) => {
       if (!sale.sales_date) return;
       const date = new Date(`${sale.sales_date}T00:00:00`);
       if (Number.isNaN(date.getTime())) return;
@@ -125,11 +142,52 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
       monthlyData: data,
       salesReps: Array.from(reps).sort((a, b) => a.localeCompare(b)),
     };
-  }, [sales, lang, t.unassigned]);
+  }, [filteredSales, lang, t.unassigned]);
 
   const chartMaximum = Math.max(...monthlyData.map((month) => month.total), 1);
   const chartColors = ["#0f766e", "#2563eb", "#f59e0b", "#7c3aed", "#e11d48", "#0891b2"];
-  const recentInvoices = sales.slice(0, 5);
+  const recentInvoices = filteredSales.slice(0, 5);
+  const uniqueCustomers = new Set(
+    filteredSales.map((sale) => sale.customer_name).filter(Boolean)
+  ).size;
+
+  const repTotals = allSalesReps
+    .map((rep) => ({
+      rep,
+      value: sales
+        .filter((sale) => (sale.sales_rep?.trim() || t.unassigned) === rep)
+        .reduce((sum, sale) => sum + Number(sale.total_sales || 0), 0),
+    }))
+    .sort((a, b) => b.value - a.value);
+  const repGrandTotal = Math.max(
+    repTotals.reduce((sum, rep) => sum + rep.value, 0),
+    1
+  );
+  let donutStart = 0;
+  const donutGradient = repTotals
+    .map((rep, index) => {
+      const start = donutStart;
+      donutStart += (rep.value / repGrandTotal) * 100;
+      return `${chartColors[index % chartColors.length]} ${start}% ${donutStart}%`;
+    })
+    .join(", ");
+
+  const customerTotals = Array.from(
+    filteredSales.reduce((totals, sale) => {
+      const name = sale.customer_name || "-";
+      const current = totals.get(name) ?? {
+        name,
+        rep: sale.sales_rep?.trim() || t.unassigned,
+        value: 0,
+      };
+      current.value += Number(sale.total_sales || 0);
+      totals.set(name, current);
+      return totals;
+    }, new Map<string, { name: string; rep: string; value: number }>())
+  )
+    .map(([, value]) => value)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
 
   return (
     <div
@@ -147,7 +205,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
         onToggleLang={() => setLang(lang === "en" ? "ar" : "en")}
       />
 
-      <main className="dashboard-home">
+      <main className="dashboard-home dashboard-home--reference">
         <div className="dashboard-home__intro">
           <div>
             <p className="dashboard-home__eyebrow">ULTRA TEB</p>
@@ -159,11 +217,35 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
           </a>
         </div>
 
+        <div className="dashboard-filterbar">
+          <span>
+            {selectedRep === "All"
+              ? lang === "ar"
+                ? "عرض جميع مندوبي المبيعات"
+                : "Showing all sales representatives"
+              : `${lang === "ar" ? "المندوب" : "Sales Rep"}: ${selectedRep}`}
+          </span>
+          <label>
+            {lang === "ar" ? "تصفية بالمندوب" : "Filter Rep"}
+            <select
+              value={selectedRep}
+              onChange={(event) => setSelectedRep(event.target.value)}
+            >
+              <option value="All">
+                {lang === "ar" ? "كل المندوبين" : "All Reps"}
+              </option>
+              {allSalesReps.map((rep) => (
+                <option key={rep} value={rep}>{rep}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         <section className="dashboard-stats" aria-label={t.title}>
           <StatCard label={t.totalSales} value={formatMoney(totalSales, lang)} icon="↗" tone="teal" />
           <StatCard label={t.totalTax} value={formatMoney(totalTax, lang)} icon="%" tone="blue" />
-          <StatCard label={t.invoices} value={sales.length.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} icon="#" tone="amber" />
-          <StatCard label={t.customers} value={customerCount.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} icon="◎" tone="purple" />
+          <StatCard label={t.invoices} value={filteredSales.length.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} icon="#" tone="amber" />
+          <StatCard label={t.customers} value={(selectedRep === "All" ? customerCount : uniqueCustomers).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} icon="◎" tone="purple" />
         </section>
 
         <section className="dashboard-grid">
@@ -222,14 +304,90 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
             )}
           </div>
 
+          <div className="dashboard-panel dashboard-donut-panel">
+            <div className="dashboard-panel__header">
+              <h2>{lang === "ar" ? "المبيعات حسب المندوب" : "Sales by Rep"}</h2>
+            </div>
+            <div className="dashboard-donut-wrap">
+              <div
+                className="dashboard-donut"
+                style={{
+                  background: repTotals.length
+                    ? `conic-gradient(${donutGradient})`
+                    : "var(--surface-muted)",
+                }}
+              >
+                <span>{formatMoney(repGrandTotal === 1 ? 0 : repGrandTotal, lang)}</span>
+              </div>
+              <div className="dashboard-donut-legend">
+                {repTotals.map((rep, index) => (
+                  <button
+                    type="button"
+                    key={rep.rep}
+                    onClick={() => setSelectedRep(rep.rep)}
+                  >
+                    <i style={{ background: chartColors[index % chartColors.length] }} />
+                    <span>{rep.rep}</span>
+                    <strong>{((rep.value / repGrandTotal) * 100).toFixed(1)}%</strong>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="dashboard-grid">
           <div className="dashboard-panel">
             <div className="dashboard-panel__header">
-              <h2>{t.quickActions}</h2>
+              <h2>{lang === "ar" ? "المبيعات حسب العميل" : "Sales by Customer"}</h2>
             </div>
-            <div className="dashboard-actions">
-              <QuickAction href="/sales" icon="+" label={t.addInvoice} />
-              <QuickAction href="/customers" icon="+" label={t.addCustomer} />
-              <QuickAction href="/sales" icon="⇧" label={t.bulkUpload} />
+            <div className="dashboard-table-wrap">
+              <table className="dashboard-table dashboard-ranking-table">
+                <thead>
+                  <tr>
+                    <th>{t.customer}</th>
+                    <th>{lang === "ar" ? "المندوب" : "Rep"}</th>
+                    <th>{t.total}</th>
+                    <th>{lang === "ar" ? "النسبة" : "Share"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customerTotals.map((customer) => (
+                    <tr key={customer.name}>
+                      <td><strong>{customer.name}</strong></td>
+                      <td>{customer.rep}</td>
+                      <td>{formatMoney(customer.value, lang)}</td>
+                      <td>{totalSales ? ((customer.value / totalSales) * 100).toFixed(1) : "0.0"}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="dashboard-panel">
+            <div className="dashboard-panel__header">
+              <h2>{lang === "ar" ? "أداء المندوبين" : "Rep Performance"}</h2>
+            </div>
+            <div className="dashboard-rep-bars">
+              {repTotals.map((rep, index) => (
+                <button
+                  type="button"
+                  key={rep.rep}
+                  onClick={() => setSelectedRep(rep.rep)}
+                >
+                  <span>{rep.rep}</span>
+                  <strong>{formatMoney(rep.value, lang)}</strong>
+                  <i>
+                    <b
+                      style={{
+                        width: `${(rep.value / Math.max(repTotals[0]?.value || 1, 1)) * 100}%`,
+                        background: chartColors[index % chartColors.length],
+                      }}
+                    />
+                  </i>
+                </button>
+              ))}
             </div>
           </div>
         </section>
@@ -295,22 +453,5 @@ function StatCard({
         <strong>{value}</strong>
       </div>
     </article>
-  );
-}
-
-function QuickAction({
-  href,
-  icon,
-  label,
-}: {
-  href: string;
-  icon: string;
-  label: string;
-}) {
-  return (
-    <a className="dashboard-action" href={href}>
-      <span>{icon}</span>
-      <strong>{label}</strong>
-    </a>
   );
 }
