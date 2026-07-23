@@ -569,6 +569,9 @@ export default function SalesTable({
               <table className="bulk-review__table">
                 <thead>
                   <tr>
+                    <th>
+                      {lang === "ar" ? "رقم الصف" : "CSV row"}
+                    </th>
                     <th>{t.invoiceNo}</th>
                     <th>{t.date}</th>
                     <th>
@@ -577,12 +580,16 @@ export default function SalesTable({
                     <th>
                       {lang === "ar" ? "مطابقة العميل" : "Customer match"}
                     </th>
+                    <th>{t.itemTotal}</th>
+                    <th>{t.tax}</th>
+                    <th>{t.totalSales}</th>
                     <th>{lang === "ar" ? "تأكيد" : "Confirm"}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {bulkRows.map((row, index) => (
                     <tr key={`${row._rowNumber}-${row.invoice_no}`}>
+                      <td>{row._rowNumber}</td>
                       <td>{row.invoice_no || `Row ${row._rowNumber}`}</td>
                       <td>{row.sales_date || "-"}</td>
                       <td>{row._sourceCustomer}</td>
@@ -609,6 +616,36 @@ export default function SalesTable({
                             </option>
                           ))}
                         </select>
+                      </td>
+                      <td>
+                        {Number(row.sales_item_total || 0).toLocaleString(
+                          lang === "ar" ? "ar-EG" : "en-US",
+                          {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          }
+                        )}
+                      </td>
+                      <td>
+                        {Number(row.tax || 0).toLocaleString(
+                          lang === "ar" ? "ar-EG" : "en-US",
+                          {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          }
+                        )}
+                      </td>
+                      <td>
+                        {(
+                          Number(row.sales_item_total || 0) +
+                          Number(row.tax || 0)
+                        ).toLocaleString(
+                          lang === "ar" ? "ar-EG" : "en-US",
+                          {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          }
+                        )}
                       </td>
                       <td>
                         <label className="bulk-review__confirm">
