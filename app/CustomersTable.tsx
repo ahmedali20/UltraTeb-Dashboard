@@ -38,7 +38,6 @@ const translations = {
   en: {
     title: "Customers",
     total: "Total customers:",
-    code: "Customer Code",
     name: "Customer Name",
     officialName: "Official Name",
     terms: "Payment Terms (days)",
@@ -59,7 +58,6 @@ const translations = {
   ar: {
     title: "جدول العملاء",
     total: "إجمالي العملاء:",
-    code: "كود العميل",
     name: "اسم العميل",
     officialName: "الاسم الرسمي",
     terms: "مدة السداد (يوم)",
@@ -299,7 +297,6 @@ export default function CustomersTable({
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#2d3748", color: "#fff" }}>
-              <Th align={align}>{t.code}</Th>
               <Th align={align}>{t.name}</Th>
               <Th align={align}>{t.officialName}</Th>
               <Th align={align}>{t.terms}</Th>
@@ -320,7 +317,6 @@ export default function CustomersTable({
                     borderBottom: "1px solid var(--border-color)",
                   }}
                 >
-                  <Td align={align}>{c.customer_code}</Td>
                   {isEditing ? (
                     <>
                       <Td align={align}>
