@@ -158,26 +158,28 @@ export default function CustomersTable({
   const inputStyle: React.CSSProperties = {
     padding: "6px 8px",
     fontSize: 13,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--input-border)",
+    background: "var(--input-bg)",
+    color: "var(--input-text)",
     borderRadius: 4,
     width: "100%",
   };
 
   return (
-    <div dir={dir} style={{ fontFamily: "Arial, 'Segoe UI', Tahoma, sans-serif", minHeight: "100vh", background: "#f5f6f8" }}>
+    <div dir={dir} style={{ fontFamily: "Arial, 'Segoe UI', Tahoma, sans-serif", minHeight: "100vh", background: "var(--page-bg)", color: "var(--text-primary)" }}>
       <Header active="customers" lang={lang} onToggleLang={() => setLang(lang === "en" ? "ar" : "en")} />
       <main style={{ padding: "0 32px", maxWidth: 1300, margin: "0 auto" }}>
         <h1 style={{ margin: 0 }}>{t.title}</h1>
 
-      <p style={{ color: "#666", marginBottom: 20 }}>
+      <p style={{ color: "var(--text-secondary)", marginBottom: 20 }}>
         {t.total} {customers.length}
       </p>
 
       <div
         style={{
-          background: "#fff",
+          background: "var(--surface-bg)",
           borderRadius: 8,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+          boxShadow: "var(--surface-shadow)",
           padding: 16,
           marginBottom: 24,
         }}
@@ -273,9 +275,9 @@ export default function CustomersTable({
       <div
         style={{
           overflowX: "auto",
-          background: "#fff",
+          background: "var(--surface-bg)",
           borderRadius: 8,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+          boxShadow: "var(--surface-shadow)",
         }}
       >
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -298,8 +300,8 @@ export default function CustomersTable({
                 <tr
                   key={c.id}
                   style={{
-                    background: i % 2 === 0 ? "#fff" : "#f9fafb",
-                    borderBottom: "1px solid #e5e7eb",
+                    background: i % 2 === 0 ? "var(--surface-bg)" : "var(--surface-muted)",
+                    borderBottom: "1px solid var(--border-color)",
                   }}
                 >
                   <Td align={align}>{c.customer_code}</Td>
