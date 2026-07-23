@@ -100,6 +100,15 @@ const emptyForm = {
 
 type InvoiceForm = typeof emptyForm;
 
+function normalizeSalesRep(value: string | null) {
+  const trimmed = value?.trim();
+  if (!trimmed) return "Unassigned";
+
+  return trimmed
+    .toLocaleLowerCase()
+    .replace(/\b[a-z]/g, (letter) => letter.toLocaleUpperCase());
+}
+
 export default function SalesTable({
   sales,
   customers,
@@ -154,7 +163,7 @@ export default function SalesTable({
     })
   );
   const recordReps = Array.from(
-    new Set(sales.map((sale) => sale.sales_rep || "Unassigned"))
+    new Set(sales.map((sale) => normalizeSalesRep(sale.sales_rep)))
   ).sort();
   const recordMonths = Array.from(
     new Set(sales.map((sale) => sale.month).filter(Boolean))
@@ -162,7 +171,7 @@ export default function SalesTable({
   const displayedSales = sortedSales.filter(
     (sale) =>
       (recordRepFilter === "All" ||
-        (sale.sales_rep || "Unassigned") === recordRepFilter) &&
+        normalizeSalesRep(sale.sales_rep) === recordRepFilter) &&
       (recordMonthFilter === "All" || sale.month === recordMonthFilter)
   );
 
@@ -1103,7 +1112,9 @@ export default function SalesTable({
                 <Td align={align}>
                   {isEditing ? editedTotal.toFixed(2) : s.total_sales}
                 </Td>
-                <Td align={align}>{s.sales_rep ?? "-"}</Td>
+                <Td align={align}>
+                  {s.sales_rep ? normalizeSalesRep(s.sales_rep) : "-"}
+                </Td>
                 <Td align={align}>
                   <div style={{ display: "flex", gap: 6, minWidth: 130 }}>
                     {isEditing ? (
