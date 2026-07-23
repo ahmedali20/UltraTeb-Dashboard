@@ -22,6 +22,7 @@ type SaleRow = {
 type CustomerOption = {
   customer_code: string;
   customer_name: string;
+  sales_rep_name: string | null;
 };
 
 type BulkInvoiceRow = {
@@ -96,6 +97,7 @@ const emptyForm = {
   customer_code: "",
   sales_item_total: "",
   tax: "",
+  sales_rep_name: "",
 };
 
 type InvoiceForm = typeof emptyForm;
@@ -139,6 +141,13 @@ export default function SalesTable({
   >({});
   const [recordRepFilter, setRecordRepFilter] = useState("All");
   const [recordMonthFilter, setRecordMonthFilter] = useState("All");
+  const salesRepOptions = Array.from(
+    new Set(
+      customerOptions
+        .map((customer) => customer.sales_rep_name?.trim())
+        .filter((name): name is string => Boolean(name))
+    )
+  ).sort((a, b) => a.localeCompare(b));
 
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkRows, setBulkRows] = useState<BulkInvoiceRow[]>([]);
@@ -208,7 +217,12 @@ export default function SalesTable({
   }
 
   async function handleAdd() {
-    if (!form.invoice_no || !form.sales_date || !form.customer_code) return;
+    if (
+      !form.invoice_no ||
+      !form.sales_date ||
+      !form.customer_code ||
+      !form.sales_rep_name
+    ) return;
     setAdding(true);
     const res = await fetch("/api/sales", {
       method: "POST",
@@ -417,6 +431,7 @@ export default function SalesTable({
     const createdCustomer: CustomerOption = {
       customer_code: json.data.customer_code,
       customer_name: json.data.customer_name,
+      sales_rep_name: json.data.sales_rep_name ?? null,
     };
 
     setCustomerOptions((current) =>
@@ -516,6 +531,7 @@ export default function SalesTable({
       customer_code: sale.customer_code,
       sales_item_total: String(sale.sales_item_total),
       tax: String(sale.tax),
+      sales_rep_name: sale.sales_rep ?? "",
     });
   }
 
@@ -523,7 +539,8 @@ export default function SalesTable({
     if (
       !editForm.invoice_no ||
       !editForm.sales_date ||
-      !editForm.customer_code
+      !editForm.customer_code ||
+      !editForm.sales_rep_name
     ) {
       alert("Invoice number, date and customer are required.");
       return;
@@ -602,9 +619,16 @@ export default function SalesTable({
               <select
                 className="entry-form__input"
                 value={form.customer_code}
-                onChange={(e) =>
-                  setForm({ ...form, customer_code: e.target.value })
-                }
+                onChange={(e) => {
+                  const customer = customerOptions.find(
+                    (item) => item.customer_code === e.target.value
+                  );
+                  setForm({
+                    ...form,
+                    customer_code: e.target.value,
+                    sales_rep_name: customer?.sales_rep_name?.trim() ?? "",
+                  });
+                }}
               >
                 <option value="">
                   {lang === "ar"
@@ -618,6 +642,26 @@ export default function SalesTable({
                   >
                     {customer.customer_name}
                   </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="entry-form__field">
+              <span className="entry-form__label">
+                {t.rep}<span className="entry-form__required">*</span>
+              </span>
+              <select
+                className="entry-form__input"
+                value={form.sales_rep_name}
+                onChange={(event) =>
+                  setForm({ ...form, sales_rep_name: event.target.value })
+                }
+              >
+                <option value="">
+                  {lang === "ar" ? "اختر مندوب المبيعات" : "Select sales rep"}
+                </option>
+                {salesRepOptions.map((rep) => (
+                  <option key={rep} value={rep}>{rep}</option>
                 ))}
               </select>
             </label>
@@ -693,7 +737,11 @@ export default function SalesTable({
               className="entry-form__submit"
               onClick={handleAdd}
               disabled={
-                adding || !form.invoice_no || !form.sales_date || !form.customer_code
+                adding ||
+                !form.invoice_no ||
+                !form.sales_date ||
+                !form.customer_code ||
+                !form.sales_rep_name
               }
             >
               {adding ? "..." : t.add}
@@ -1058,12 +1106,18 @@ export default function SalesTable({
                     <select
                       style={{ ...inputStyle, minWidth: 190 }}
                       value={editForm.customer_code}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const customer = customerOptions.find(
+                          (item) => item.customer_code === event.target.value
+                        );
                         setEditForm({
                           ...editForm,
                           customer_code: event.target.value,
-                        })
-                      }
+                          sales_rep_name:
+                            customer?.sales_rep_name?.trim() ??
+                            editForm.sales_rep_name,
+                        });
+                      }}
                     >
                       {customerOptions.map((customer) => (
                         <option
@@ -1113,7 +1167,23 @@ export default function SalesTable({
                   {isEditing ? editedTotal.toFixed(2) : s.total_sales}
                 </Td>
                 <Td align={align}>
-                  {s.sales_rep ? normalizeSalesRep(s.sales_rep) : "-"}
+                  {isEditing ? (
+                    <select
+                      style={{ ...inputStyle, minWidth: 140 }}
+                      value={editForm.sales_rep_name}
+                      onChange={(event) =>
+                        setEditForm({
+                          ...editForm,
+                          sales_rep_name: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="">Select rep</option>
+                      {salesRepOptions.map((rep) => (
+                        <option key={rep} value={rep}>{rep}</option>
+                      ))}
+                    </select>
+                  ) : s.sales_rep ? normalizeSalesRep(s.sales_rep) : "-"}
                 </Td>
                 <Td align={align}>
                   <div style={{ display: "flex", gap: 6, minWidth: 130 }}>
@@ -1121,7 +1191,7 @@ export default function SalesTable({
                       <>
                         <button
                           onClick={() => handleSaveEdit(s.id)}
-                          disabled={savingEdit}
+                          disabled={savingEdit || !editForm.sales_rep_name}
                           style={actionButtonStyle("#16a34a")}
                         >
                           {savingEdit ? "..." : lang === "ar" ? "حفظ" : "Save"}
