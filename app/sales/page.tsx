@@ -10,10 +10,21 @@ const supabaseServer = createClient(
 export const revalidate = 0;
 
 export default async function SalesPage() {
-  const { data: sales, error } = await supabaseServer
-    .from("sales_view")
-    .select("*")
-    .order("sales_date", { ascending: false });
+  const [
+    { data: sales, error: salesError },
+    { data: customers, error: customersError },
+  ] = await Promise.all([
+    supabaseServer
+      .from("sales_view")
+      .select("*")
+      .order("sales_date", { ascending: false }),
+    supabaseServer
+      .from("customers")
+      .select("customer_code, customer_name")
+      .order("customer_code", { ascending: true }),
+  ]);
+
+  const error = salesError || customersError;
 
   if (error) {
     return (
@@ -24,5 +35,10 @@ export default async function SalesPage() {
     );
   }
 
-  return <SalesTable sales={sales ?? []} />;
+  return (
+    <SalesTable
+      sales={sales ?? []}
+      customers={customers ?? []}
+    />
+  );
 }
