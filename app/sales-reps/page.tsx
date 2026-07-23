@@ -10,16 +10,29 @@ const supabaseServer = createClient(
 export const revalidate = 0;
 
 export default async function SalesRepsPage() {
-  const { data, error } = await supabaseServer
-    .from("sales_view")
-    .select(
-      "id, invoice_no, sales_date, month, sales_rep, customer_name, sales_item_total, tax, total_sales"
-    )
-    .order("sales_date", { ascending: false });
+  const [
+    { data, error },
+    { data: managedReps, error: repsError },
+  ] = await Promise.all([
+    supabaseServer
+      .from("sales_view")
+      .select(
+        "id, invoice_no, sales_date, month, sales_rep, customer_name, sales_item_total, tax, total_sales"
+      )
+      .order("sales_date", { ascending: false }),
+    supabaseServer
+      .from("sales_reps")
+      .select("id, name")
+      .order("name", { ascending: true }),
+  ]);
 
-  if (error) {
-    return <main style={{ padding: 32, color: "red" }}>{error.message}</main>;
+  if (error || repsError) {
+    return (
+      <main style={{ padding: 32, color: "red" }}>
+        {(error || repsError)?.message}
+      </main>
+    );
   }
 
-  return <SalesRepsClient sales={data ?? []} />;
+  return <SalesRepsClient sales={data ?? []} managedReps={managedReps ?? []} />;
 }
