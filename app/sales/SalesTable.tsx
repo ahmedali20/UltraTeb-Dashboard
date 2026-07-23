@@ -354,7 +354,7 @@ export default function SalesTable({
     );
   }
 
-  function customersForBulkRow(rowIndex: number, selectedCode: string) {
+  function customersForBulkRow(rowIndex: number, selectedCode?: string) {
     const search = normalizeCustomerValue(bulkCustomerSearches[rowIndex]);
     if (!search) return customerOptions;
 
