@@ -724,3 +724,19 @@ input::placeholder {
 .bulk-customer-modal__actions .bulk-customer-modal__create {
   background: #178a6b;
 }
+.bulk-review__customer-search {
+  width: 100%;
+  margin-bottom: 7px;
+  padding: 8px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  outline: none;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: 12px;
+}
+
+.bulk-review__customer-search:focus {
+  border-color: #178a6b;
+  box-shadow: 0 0 0 3px rgba(23, 138, 107, 0.12);
+}
