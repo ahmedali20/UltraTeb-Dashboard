@@ -1084,6 +1084,12 @@ input::placeholder {
   transform: translateY(-2px);
 }
 
+.rep-summary-card--all {
+  background:
+    linear-gradient(135deg, rgba(74, 144, 217, 0.16), transparent 65%),
+    var(--surface-bg);
+}
+
 .rep-summary-card__top {
   display: flex;
   align-items: center;
