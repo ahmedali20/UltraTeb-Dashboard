@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 import Header from "../Header";
@@ -114,9 +114,11 @@ function normalizeSalesRep(value: string | null) {
 export default function SalesTable({
   sales,
   customers,
+  salesReps,
 }: {
   sales: SaleRow[];
   customers: CustomerOption[];
+  salesReps: string[];
 }) {
   const router = useRouter();
   const [lang, setLang] = useState<"en" | "ar">("en");
@@ -141,11 +143,15 @@ export default function SalesTable({
   >({});
   const [recordRepFilter, setRecordRepFilter] = useState("All");
   const [recordMonthFilter, setRecordMonthFilter] = useState("All");
+  const [activeSalesView, setActiveSalesView] = useState<"add" | "records">(
+    "add"
+  );
   const salesRepOptions = Array.from(
     new Set(
       customerOptions
         .map((customer) => customer.sales_rep_name?.trim())
         .filter((name): name is string => Boolean(name))
+        .concat(salesReps)
     )
   ).sort((a, b) => a.localeCompare(b));
 
@@ -165,12 +171,15 @@ export default function SalesTable({
     width: "100%",
   };
 
-  const sortedSales = [...sales].sort((a, b) =>
-    a.invoice_no.localeCompare(b.invoice_no, undefined, {
+  const sortedSales = [...sales].sort((a, b) => {
+    const dateComparison = a.sales_date.localeCompare(b.sales_date);
+    if (dateComparison !== 0) return dateComparison;
+
+    return a.invoice_no.localeCompare(b.invoice_no, undefined, {
       numeric: true,
       sensitivity: "base",
-    })
-  );
+    });
+  });
   const recordReps = Array.from(
     new Set(sales.map((sale) => normalizeSalesRep(sale.sales_rep)))
   ).sort();
@@ -187,6 +196,18 @@ export default function SalesTable({
     (total, sale) => total + Number(sale.total_sales || 0),
     0
   );
+
+  useEffect(() => {
+    function updateViewFromHash() {
+      setActiveSalesView(
+        window.location.hash === "#all-records" ? "records" : "add"
+      );
+    }
+
+    updateViewFromHash();
+    window.addEventListener("hashchange", updateViewFromHash);
+    return () => window.removeEventListener("hashchange", updateViewFromHash);
+  }, []);
 
   function calculateTax(itemTotal: string, mode: "14" | "5" | "manual") {
     if (mode === "manual") return form.tax;
@@ -577,7 +598,11 @@ export default function SalesTable({
         {t.total} {sales.length}
       </p>
 
-      <section className="entry-form" id="add-record">
+      <section
+        className="entry-form"
+        id="add-record"
+        style={{ display: activeSalesView === "add" ? undefined : "none" }}
+      >
         <div className="entry-form__header">
           <div>
             <h3 className="entry-form__title">{t.addTitle}</h3>
@@ -757,6 +782,7 @@ export default function SalesTable({
       <div
         id="bulk-upload"
         style={{
+          display: activeSalesView === "add" ? undefined : "none",
           background: "var(--surface-bg)",
           borderRadius: 8,
           boxShadow: "var(--surface-shadow)",
@@ -1011,7 +1037,11 @@ export default function SalesTable({
         )}
       </div>
 
-      <div className="records-toolbar" id="all-records">
+      <div
+        className="records-toolbar"
+        id="all-records"
+        style={{ display: activeSalesView === "records" ? undefined : "none" }}
+      >
         <div>
           <strong>{lang === "ar" ? "كل الفواتير" : "All Records"}</strong>
           <span>
@@ -1053,6 +1083,7 @@ export default function SalesTable({
 
       <div
         style={{
+          display: activeSalesView === "records" ? undefined : "none",
           overflowX: "auto",
           background: "var(--surface-bg)",
           borderRadius: 8,
