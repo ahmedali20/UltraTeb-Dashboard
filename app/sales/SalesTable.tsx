@@ -323,8 +323,7 @@ export default function SalesTable({
               customer_name: matchedCustomer?.customer_name ?? "",
               sales_item_total: String(row.sales_item_total ?? "").trim(),
               tax: String(row.tax ?? "").trim(),
-              _sourceCustomer:
-                [sourceCode, sourceName].filter(Boolean).join(" — ") || "-",
+              _sourceCustomer: sourceName || "-",
               _sourceCustomerName: sourceName,
               _confirmed: false,
               _rowNumber: index + 2,
