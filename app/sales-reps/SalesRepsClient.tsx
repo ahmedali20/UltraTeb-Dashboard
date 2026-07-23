@@ -16,6 +16,15 @@ type RepSale = {
   total_sales: number;
 };
 
+function normalizeSalesRep(value: string | null, fallback: string) {
+  const trimmed = value?.trim();
+  if (!trimmed) return fallback;
+
+  return trimmed
+    .toLocaleLowerCase()
+    .replace(/\b[a-z]/g, (letter) => letter.toLocaleUpperCase());
+}
+
 export default function SalesRepsClient({ sales }: { sales: RepSale[] }) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [selectedRep, setSelectedRep] = useState<string | null>(null);
@@ -30,9 +39,10 @@ export default function SalesRepsClient({ sales }: { sales: RepSale[] }) {
     >();
 
     sales.forEach((sale) => {
-      const name =
-        sale.sales_rep?.trim() ||
-        (lang === "ar" ? "بدون مندوب" : "Unassigned");
+      const name = normalizeSalesRep(
+        sale.sales_rep,
+        lang === "ar" ? "بدون مندوب" : "Unassigned"
+      );
       const current = totals.get(name) ?? {
         invoices: 0,
         total: 0,
@@ -58,8 +68,10 @@ export default function SalesRepsClient({ sales }: { sales: RepSale[] }) {
   const repSales = selectedRep
     ? sales.filter(
         (sale) =>
-          (sale.sales_rep?.trim() ||
-            (lang === "ar" ? "بدون مندوب" : "Unassigned")) === selectedRep
+          normalizeSalesRep(
+            sale.sales_rep,
+            lang === "ar" ? "بدون مندوب" : "Unassigned"
+          ) === selectedRep
       )
     : [];
   const hospitals = Array.from(
