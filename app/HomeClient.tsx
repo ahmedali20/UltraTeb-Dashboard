@@ -73,6 +73,15 @@ function formatMoney(value: number, lang: "en" | "ar") {
   }).format(value);
 }
 
+function normalizeSalesRep(value: string | null, fallback: string) {
+  const trimmed = value?.trim();
+  if (!trimmed) return fallback;
+
+  return trimmed
+    .toLocaleLowerCase()
+    .replace(/\b[a-z]/g, (letter) => letter.toLocaleUpperCase());
+}
+
 export default function HomeClient({ sales, customerCount }: HomeClientProps) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [selectedRep, setSelectedRep] = useState("All");
@@ -83,7 +92,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     () =>
       Array.from(
         new Set(
-          sales.map((sale) => sale.sales_rep?.trim() || t.unassigned)
+          sales.map((sale) => normalizeSalesRep(sale.sales_rep, t.unassigned))
         )
       ).sort((a, b) => a.localeCompare(b)),
     [sales, t.unassigned]
@@ -92,7 +101,8 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     selectedRep === "All"
       ? sales
       : sales.filter(
-          (sale) => (sale.sales_rep?.trim() || t.unassigned) === selectedRep
+          (sale) =>
+            normalizeSalesRep(sale.sales_rep, t.unassigned) === selectedRep
         );
 
   const totalSales = filteredSales.reduce(
@@ -114,7 +124,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
       if (Number.isNaN(date.getTime())) return;
 
       const key = sale.sales_date.slice(0, 7);
-      const rep = sale.sales_rep?.trim() || t.unassigned;
+      const rep = normalizeSalesRep(sale.sales_rep, t.unassigned);
       reps.add(rep);
 
       const month = totals.get(key) ?? new Map<string, number>();
@@ -155,7 +165,9 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     .map((rep) => ({
       rep,
       value: sales
-        .filter((sale) => (sale.sales_rep?.trim() || t.unassigned) === rep)
+        .filter(
+          (sale) => normalizeSalesRep(sale.sales_rep, t.unassigned) === rep
+        )
         .reduce((sum, sale) => sum + Number(sale.total_sales || 0), 0),
     }))
     .sort((a, b) => b.value - a.value);
@@ -177,7 +189,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
       const name = sale.customer_name || "-";
       const current = totals.get(name) ?? {
         name,
-        rep: sale.sales_rep?.trim() || t.unassigned,
+        rep: normalizeSalesRep(sale.sales_rep, t.unassigned),
         value: 0,
       };
       current.value += Number(sale.total_sales || 0);
