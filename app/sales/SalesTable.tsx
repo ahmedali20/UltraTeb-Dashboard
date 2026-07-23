@@ -24,6 +24,18 @@ type CustomerOption = {
   customer_name: string;
 };
 
+type BulkInvoiceRow = {
+  invoice_no?: string;
+  sales_date?: string;
+  customer_code?: string;
+  customer_name?: string;
+  sales_item_total?: string;
+  tax?: string;
+  _sourceCustomer: string;
+  _confirmed: boolean;
+  _rowNumber: number;
+};
+
 const translations = {
   en: {
     title: "Sales Invoices",
@@ -43,7 +55,7 @@ const translations = {
     add: "Add Invoice",
     bulkTitle: "Bulk Upload (CSV)",
     bulkHint:
-      "CSV columns required: invoice_no, sales_date, customer_code, sales_item_total, tax",
+      "CSV columns: invoice_no, sales_date, customer_code, customer_name, sales_item_total, tax",
     chooseFile: "Choose CSV File",
     upload: "Upload",
     uploading: "Uploading...",
@@ -103,6 +115,7 @@ export default function SalesTable({
   const [adding, setAdding] = useState(false);
 
   const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkRows, setBulkRows] = useState<BulkInvoiceRow[]>([]);
   const [bulkStatus, setBulkStatus] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -178,7 +191,7 @@ export default function SalesTable({
     }
   }
 
-  function handleBulkUpload() {
+  function handleLegacyBulkUpload() {
     if (!bulkFile) return;
     setUploading(true);
     setBulkStatus("");
@@ -217,6 +230,134 @@ export default function SalesTable({
         setBulkStatus(err.message);
       },
     });
+  }
+
+  function normalizeCustomerValue(value: unknown) {
+    return String(value ?? "").trim().toLocaleLowerCase();
+  }
+
+  function handleBulkFileChange(file: File | null) {
+    setBulkFile(file);
+    setBulkRows([]);
+    setBulkStatus("");
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const parsedRows = results.data as Record<string, unknown>[];
+
+        setBulkRows(
+          parsedRows.map((row, index) => {
+            const sourceCode = String(row.customer_code ?? "").trim();
+            const sourceName = String(row.customer_name ?? "").trim();
+            const normalizedName = normalizeCustomerValue(sourceName);
+            const matchedCustomer =
+              customers.find(
+                (customer) => customer.customer_code === sourceCode
+              ) ??
+              customers.find(
+                (customer) =>
+                  normalizeCustomerValue(customer.customer_name) ===
+                  normalizedName
+              );
+
+            return {
+              invoice_no: String(row.invoice_no ?? "").trim(),
+              sales_date: String(row.sales_date ?? "").trim(),
+              customer_code: matchedCustomer?.customer_code ?? "",
+              customer_name: matchedCustomer?.customer_name ?? "",
+              sales_item_total: String(row.sales_item_total ?? "").trim(),
+              tax: String(row.tax ?? "").trim(),
+              _sourceCustomer:
+                [sourceCode, sourceName].filter(Boolean).join(" — ") || "-",
+              _confirmed: false,
+              _rowNumber: index + 2,
+            };
+          })
+        );
+      },
+      error: (err) => setBulkStatus(err.message),
+    });
+  }
+
+  function updateBulkCustomer(rowIndex: number, customerCode: string) {
+    const customer = customers.find(
+      (item) => item.customer_code === customerCode
+    );
+
+    setBulkRows((current) =>
+      current.map((row, index) =>
+        index === rowIndex
+          ? {
+              ...row,
+              customer_code: customer?.customer_code ?? "",
+              customer_name: customer?.customer_name ?? "",
+              _confirmed: Boolean(customer),
+            }
+          : row
+      )
+    );
+  }
+
+  function confirmBulkRow(rowIndex: number, confirmed: boolean) {
+    setBulkRows((current) =>
+      current.map((row, index) =>
+        index === rowIndex && row.customer_code
+          ? { ...row, _confirmed: confirmed }
+          : row
+      )
+    );
+  }
+
+  function confirmAllMatchedRows() {
+    setBulkRows((current) =>
+      current.map((row) => ({
+        ...row,
+        _confirmed: Boolean(row.customer_code),
+      }))
+    );
+  }
+
+  async function handleBulkUpload() {
+    if (!bulkFile || !bulkRows.length) return;
+    if (bulkRows.some((row) => !row.customer_code || !row._confirmed)) {
+      setBulkStatus(
+        lang === "ar"
+          ? "يرجى اختيار وتأكيد العميل لكل فاتورة."
+          : "Please select and confirm a customer for every invoice."
+      );
+      return;
+    }
+
+    setUploading(true);
+    setBulkStatus("");
+
+    const rows = bulkRows.map(
+      ({ _confirmed, _rowNumber, _sourceCustomer, ...row }) => row
+    );
+    const res = await fetch("/api/sales/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows }),
+    });
+    const json = await res.json();
+    setUploading(false);
+
+    if (res.ok) {
+      setBulkStatus(
+        `Uploaded ${json.inserted} invoices successfully${
+          json.failed?.length ? `, ${json.failed.length} failed` : ""
+        }`
+      );
+      setBulkFile(null);
+      setBulkRows([]);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      router.refresh();
+    } else {
+      setBulkStatus(json.error || "Upload failed");
+    }
   }
 
   return (
@@ -395,12 +536,20 @@ export default function SalesTable({
             ref={fileInputRef}
             type="file"
             accept=".csv"
-            onChange={(e) => setBulkFile(e.target.files?.[0] ?? null)}
+            onChange={(e) =>
+              handleBulkFileChange(e.target.files?.[0] ?? null)
+            }
             style={{ fontSize: 13 }}
           />
           <button
             onClick={handleBulkUpload}
-            disabled={!bulkFile || uploading}
+            disabled={
+              !bulkRows.length ||
+              uploading ||
+              bulkRows.some(
+                (row) => !row.customer_code || !row._confirmed
+              )
+            }
             style={{
               padding: "8px 18px",
               borderRadius: 6,
@@ -414,6 +563,95 @@ export default function SalesTable({
             {uploading ? t.uploading : t.upload}
           </button>
         </div>
+        {bulkRows.length > 0 && (
+          <>
+            <div className="bulk-review">
+              <table className="bulk-review__table">
+                <thead>
+                  <tr>
+                    <th>{t.invoiceNo}</th>
+                    <th>{t.date}</th>
+                    <th>
+                      {lang === "ar" ? "العميل في الملف" : "Customer in CSV"}
+                    </th>
+                    <th>
+                      {lang === "ar" ? "مطابقة العميل" : "Customer match"}
+                    </th>
+                    <th>{lang === "ar" ? "تأكيد" : "Confirm"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bulkRows.map((row, index) => (
+                    <tr key={`${row._rowNumber}-${row.invoice_no}`}>
+                      <td>{row.invoice_no || `Row ${row._rowNumber}`}</td>
+                      <td>{row.sales_date || "-"}</td>
+                      <td>{row._sourceCustomer}</td>
+                      <td>
+                        <select
+                          className="bulk-review__select"
+                          value={row.customer_code}
+                          onChange={(event) =>
+                            updateBulkCustomer(index, event.target.value)
+                          }
+                        >
+                          <option value="">
+                            {lang === "ar"
+                              ? "اختر العميل"
+                              : "Select customer"}
+                          </option>
+                          {customers.map((customer) => (
+                            <option
+                              key={customer.customer_code}
+                              value={customer.customer_code}
+                            >
+                              {customer.customer_code} —{" "}
+                              {customer.customer_name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <label className="bulk-review__confirm">
+                          <input
+                            type="checkbox"
+                            checked={row._confirmed}
+                            disabled={!row.customer_code}
+                            onChange={(event) =>
+                              confirmBulkRow(index, event.target.checked)
+                            }
+                          />
+                          {row._confirmed
+                            ? lang === "ar"
+                              ? "تم"
+                              : "Confirmed"
+                            : lang === "ar"
+                              ? "راجع"
+                              : "Review"}
+                        </label>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="bulk-review__summary">
+              <span>
+                {bulkRows.filter((row) => row._confirmed).length} /{" "}
+                {bulkRows.length}{" "}
+                {lang === "ar" ? "تم تأكيدهم" : "confirmed"}
+              </span>
+              <button
+                type="button"
+                className="bulk-review__confirm-all"
+                onClick={confirmAllMatchedRows}
+              >
+                {lang === "ar"
+                  ? "تأكيد كل المطابقات"
+                  : "Confirm all matched"}
+              </button>
+            </div>
+          </>
+        )}
         {bulkStatus && (
           <p style={{ marginTop: 10, fontSize: 13 }}>{bulkStatus}</p>
         )}
