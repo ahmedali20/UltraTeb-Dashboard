@@ -201,6 +201,72 @@ input::placeholder {
   gap: 10px;
 }
 
+.bulk-review {
+  margin-top: 18px;
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.bulk-review__table {
+  width: 100%;
+  min-width: 800px;
+  border-collapse: collapse;
+}
+
+.bulk-review__table th,
+.bulk-review__table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: start;
+  font-size: 12px;
+}
+
+.bulk-review__table th {
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.bulk-review__select {
+  width: 100%;
+  min-width: 260px;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid var(--input-border);
+  border-radius: 7px;
+  background: var(--input-bg);
+  color: var(--input-text);
+}
+
+.bulk-review__confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.bulk-review__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.bulk-review__confirm-all {
+  padding: 7px 12px;
+  border: 1px solid #178a6b;
+  border-radius: 7px;
+  background: transparent;
+  color: #178a6b;
+  cursor: pointer;
+  font-weight: 700;
+}
+
 .entry-form__actions {
   display: flex;
   justify-content: flex-end;
