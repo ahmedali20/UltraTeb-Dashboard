@@ -49,9 +49,6 @@ export default function Header({
   function applyTheme(dark: boolean) {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     document.documentElement.style.colorScheme = dark ? "dark" : "light";
-
-    document.body.style.background = dark ? "#111827" : "#f5f6f8";
-    document.body.style.color = dark ? "#f8fafc" : "#1a1a1a";
   }
 
   function toggleTheme() {
