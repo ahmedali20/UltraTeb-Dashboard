@@ -56,7 +56,7 @@ const translations = {
     add: "Add Invoice",
     bulkTitle: "Bulk Upload (CSV)",
     bulkHint:
-      "CSV columns: invoice_no, sales_date, customer_code, customer_name, sales_item_total, tax",
+      "CSV columns: invoice_no, sales_date, customer_name, sales_item_total, tax",
     chooseFile: "Choose CSV File",
     upload: "Upload",
     uploading: "Uploading...",
@@ -81,7 +81,7 @@ const translations = {
     add: "إضافة فاتورة",
     bulkTitle: "رفع جماعي (CSV)",
     bulkHint:
-      "أعمدة الـ CSV المطلوبة: invoice_no, sales_date, customer_code, sales_item_total, tax",
+      "أعمدة ملف CSV: invoice_no, sales_date, customer_name, sales_item_total, tax",
     chooseFile: "اختر ملف CSV",
     upload: "رفع",
     uploading: "جاري الرفع...",
@@ -361,8 +361,7 @@ export default function SalesTable({
     return customerOptions.filter(
       (customer) =>
         customer.customer_code === selectedCode ||
-        normalizeCustomerValue(customer.customer_name).includes(search) ||
-        normalizeCustomerValue(customer.customer_code).includes(search)
+        normalizeCustomerValue(customer.customer_name).includes(search)
     );
   }
 
@@ -575,7 +574,7 @@ export default function SalesTable({
 
             <label className="entry-form__field">
               <span className="entry-form__label">
-                {t.customer} Code<span className="entry-form__required">*</span>
+                {t.customer}<span className="entry-form__required">*</span>
               </span>
               <select
                 className="entry-form__input"
@@ -587,14 +586,14 @@ export default function SalesTable({
                 <option value="">
                   {lang === "ar"
                     ? "اختر كود واسم العميل"
-                    : "Select customer code and name"}
+                    : "Select customer"}
                 </option>
                 {customerOptions.map((customer) => (
                   <option
                     key={customer.customer_code}
                     value={customer.customer_code}
                   >
-                    {customer.customer_code} — {customer.customer_name}
+                    {customer.customer_name}
                   </option>
                 ))}
               </select>
@@ -763,8 +762,8 @@ export default function SalesTable({
                           type="search"
                           placeholder={
                             lang === "ar"
-                              ? "ابحث بالاسم أو الكود"
-                              : "Search by name or code"
+                              ? "ابحث باسم العميل"
+                              : "Search by customer name"
                           }
                           value={bulkCustomerSearches[index] ?? ""}
                           onChange={(event) =>
@@ -886,8 +885,8 @@ export default function SalesTable({
                   </h3>
                   <p>
                     {lang === "ar"
-                      ? "سيتم إنشاء كود العميل تلقائياً، ثم اختياره لهذه الفاتورة."
-                      : "The customer code will be generated automatically and selected for this invoice."}
+                      ? "سيتم إنشاء العميل واختياره لهذه الفاتورة."
+                      : "The new customer will be created and selected for this invoice."}
                   </p>
                   <label>
                     <span>
@@ -1014,12 +1013,12 @@ export default function SalesTable({
                           key={customer.customer_code}
                           value={customer.customer_code}
                         >
-                          {customer.customer_code} — {customer.customer_name}
+                          {customer.customer_name}
                         </option>
                       ))}
                     </select>
                   ) : (
-                    `${s.customer_name} (${s.customer_code})`
+                    s.customer_name || "-"
                   )}
                 </Td>
                 <Td align={align}>
