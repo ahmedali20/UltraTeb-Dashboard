@@ -256,7 +256,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
                     <tr key={sale.id}>
                       <td><strong>{sale.invoice_no}</strong></td>
                       <td>{sale.sales_date}</td>
-                      <td>{sale.customer_name || sale.customer_code}</td>
+                      <td>{sale.customer_name || "-"}</td>
                       <td><strong>{formatMoney(Number(sale.total_sales || 0), lang)}</strong></td>
                     </tr>
                   ))}
