@@ -464,6 +464,27 @@ input::placeholder {
   padding-top: 28px;
 }
 
+.dashboard-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  min-height: 28px;
+}
+
+.dashboard-chart__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.dashboard-chart__legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
 .dashboard-chart__column {
   display: flex;
   flex: 1;
@@ -485,19 +506,24 @@ input::placeholder {
 
 .dashboard-chart__track {
   display: flex;
+  flex-direction: column;
   align-items: flex-end;
+  justify-content: flex-end;
   width: min(42px, 70%);
-  height: 180px;
+  max-height: 180px;
   overflow: hidden;
   border-radius: 8px 8px 3px 3px;
   background: var(--surface-muted);
 }
 
-.dashboard-chart__bar {
+.dashboard-chart__segment {
   width: 100%;
   min-height: 8px;
-  border-radius: 8px 8px 3px 3px;
-  background: linear-gradient(180deg, #22b68b, #0f766e);
+  transition: opacity 160ms ease;
+}
+
+.dashboard-chart__segment:hover {
+  opacity: 0.78;
 }
 
 .dashboard-chart__label {
