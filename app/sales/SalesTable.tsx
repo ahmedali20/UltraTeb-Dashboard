@@ -88,6 +88,7 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
   const align = lang === "ar" ? "right" : "left";
 
   const [form, setForm] = useState(emptyForm);
+  const [taxMode, setTaxMode] = useState<"14" | "5" | "manual">("14");
   const [adding, setAdding] = useState(false);
 
   const [bulkFile, setBulkFile] = useState<File | null>(null);
@@ -104,6 +105,38 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
     borderRadius: 4,
     width: "100%",
   };
+
+  function calculateTax(itemTotal: string, mode: "14" | "5" | "manual") {
+    if (mode === "manual") return form.tax;
+
+    const amount = Number(itemTotal);
+    if (!Number.isFinite(amount) || amount <= 0) return "";
+
+    const rate = mode === "14" ? 0.14 : 0.05;
+    return (amount * rate).toFixed(2);
+  }
+
+  function handleItemTotalChange(value: string) {
+    setForm((current) => ({
+      ...current,
+      sales_item_total: value,
+      tax:
+        taxMode === "manual"
+          ? current.tax
+          : calculateTax(value, taxMode),
+    }));
+  }
+
+  function handleTaxModeChange(mode: "14" | "5" | "manual") {
+    setTaxMode(mode);
+    setForm((current) => ({
+      ...current,
+      tax:
+        mode === "manual"
+          ? current.tax
+          : calculateTax(current.sales_item_total, mode),
+    }));
+  }
 
   async function handleAdd() {
     if (!form.invoice_no || !form.sales_date || !form.customer_code) return;
@@ -243,23 +276,64 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
               <input
                 className="entry-form__input"
                 type="number"
+                min="0"
+                step="0.01"
                 placeholder={t.itemTotal}
                 value={form.sales_item_total}
-                onChange={(e) =>
-                  setForm({ ...form, sales_item_total: e.target.value })
-                }
+                onChange={(e) => handleItemTotalChange(e.target.value)}
               />
             </label>
 
             <label className="entry-form__field entry-form__field--wide">
               <span className="entry-form__label">{t.tax}</span>
-              <input
-                className="entry-form__input"
-                type="number"
-                placeholder={t.tax}
-                value={form.tax}
-                onChange={(e) => setForm({ ...form, tax: e.target.value })}
-              />
+              <div className="tax-field">
+                <div
+                  className="tax-options"
+                  role="group"
+                  aria-label={lang === "ar" ? "طريقة حساب الضريبة" : "Tax calculation method"}
+                >
+                  <button
+                    type="button"
+                    className={`tax-options__button ${
+                      taxMode === "14" ? "tax-options__button--active" : ""
+                    }`}
+                    onClick={() => handleTaxModeChange("14")}
+                  >
+                    14%
+                  </button>
+                  <button
+                    type="button"
+                    className={`tax-options__button ${
+                      taxMode === "5" ? "tax-options__button--active" : ""
+                    }`}
+                    onClick={() => handleTaxModeChange("5")}
+                  >
+                    5%
+                  </button>
+                  <button
+                    type="button"
+                    className={`tax-options__button ${
+                      taxMode === "manual" ? "tax-options__button--active" : ""
+                    }`}
+                    onClick={() => handleTaxModeChange("manual")}
+                  >
+                    {lang === "ar" ? "يدوي" : "Manual"}
+                  </button>
+                </div>
+
+                <input
+                  className="entry-form__input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder={t.tax}
+                  value={form.tax}
+                  readOnly={taxMode !== "manual"}
+                  onChange={(e) =>
+                    setForm({ ...form, tax: e.target.value })
+                  }
+                />
+              </div>
             </label>
           </div>
 
