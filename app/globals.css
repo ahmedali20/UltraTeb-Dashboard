@@ -1,0 +1,61 @@
+:root {
+  --page-bg: #f5f6f8;
+  --surface-bg: #ffffff;
+  --surface-muted: #f9fafb;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --border-color: #e5e7eb;
+  --input-border: #d1d5db;
+  --input-bg: #ffffff;
+  --input-text: #1a1a1a;
+  --surface-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --footer-text: #6b7c87;
+  --footer-border: #e2e8ec;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #111827;
+  --surface-bg: #1f2937;
+  --surface-muted: #273449;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --border-color: #374151;
+  --input-border: #4b5563;
+  --input-bg: #111827;
+  --input-text: #f8fafc;
+  --surface-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --footer-text: #94a3b8;
+  --footer-border: #374151;
+}
+
+html,
+body {
+  background: var(--page-bg);
+  color: var(--text-primary);
+}
+
+body,
+body * {
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 160ms ease;
+}
+
+input {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--input-text);
+}
+
+input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  body * {
+    transition: none !important;
+  }
+}
