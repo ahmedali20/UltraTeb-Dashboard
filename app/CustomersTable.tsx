@@ -175,102 +175,118 @@ export default function CustomersTable({
         {t.total} {customers.length}
       </p>
 
-      <div
-        style={{
-          background: "var(--surface-bg)",
-          borderRadius: 8,
-          boxShadow: "var(--surface-shadow)",
-          padding: 16,
-          marginBottom: 24,
-        }}
-      >
-        <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 15 }}>
-          {t.addTitle}
-        </h3>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            gap: 10,
-          }}
-        >
-          <input
-            style={inputStyle}
-            placeholder={t.namePlaceholder}
-            value={newCustomer.customer_name}
-            onChange={(e) =>
-              setNewCustomer({ ...newCustomer, customer_name: e.target.value })
-            }
-          />
-          <input
-            style={inputStyle}
-            placeholder={t.officialName}
-            value={newCustomer.customer_official_name}
-            onChange={(e) =>
-              setNewCustomer({
-                ...newCustomer,
-                customer_official_name: e.target.value,
-              })
-            }
-          />
-          <input
-            style={inputStyle}
-            placeholder={t.terms}
-            type="number"
-            value={newCustomer.payment_terms_days}
-            onChange={(e) =>
-              setNewCustomer({
-                ...newCustomer,
-                payment_terms_days: e.target.value,
-              })
-            }
-          />
-          <input
-            style={inputStyle}
-            placeholder={t.trn}
-            value={newCustomer.customer_trn}
-            onChange={(e) =>
-              setNewCustomer({ ...newCustomer, customer_trn: e.target.value })
-            }
-          />
-          <input
-            style={inputStyle}
-            placeholder={t.rep}
-            value={newCustomer.sales_rep_name}
-            onChange={(e) =>
-              setNewCustomer({
-                ...newCustomer,
-                sales_rep_name: e.target.value,
-              })
-            }
-          />
-          <input
-            style={inputStyle}
-            placeholder={t.credit}
-            type="number"
-            value={newCustomer.credit_limit}
-            onChange={(e) =>
-              setNewCustomer({ ...newCustomer, credit_limit: e.target.value })
-            }
-          />
+      <section className="entry-form">
+        <div className="entry-form__header">
+          <div>
+            <h3 className="entry-form__title">{t.addTitle}</h3>
+            <p className="entry-form__subtitle">
+              {lang === "ar"
+                ? "أدخل بيانات العميل الأساسية والتجارية."
+                : "Enter the customer’s essential business details."}
+            </p>
+          </div>
+          <span className="entry-form__badge" aria-hidden="true">+</span>
         </div>
-        <button
-          onClick={handleAdd}
-          disabled={adding || !newCustomer.customer_name.trim()}
-          style={{
-            marginTop: 12,
-            padding: "8px 18px",
-            borderRadius: 6,
-            border: "none",
-            background: adding ? "#94a3b8" : "#16a34a",
-            color: "#fff",
-            cursor: adding ? "default" : "pointer",
-            fontSize: 14,
-          }}
-        >
-          {adding ? "..." : t.add}
-        </button>
-      </div>
+
+        <div className="entry-form__body">
+          <div className="entry-form__grid">
+            <label className="entry-form__field entry-form__field--wide">
+              <span className="entry-form__label">
+                {t.name}<span className="entry-form__required">*</span>
+              </span>
+              <input
+                className="entry-form__input"
+                placeholder={t.namePlaceholder}
+                value={newCustomer.customer_name}
+                onChange={(e) =>
+                  setNewCustomer({ ...newCustomer, customer_name: e.target.value })
+                }
+              />
+            </label>
+
+            <label className="entry-form__field entry-form__field--wide">
+              <span className="entry-form__label">{t.officialName}</span>
+              <input
+                className="entry-form__input"
+                placeholder={t.officialName}
+                value={newCustomer.customer_official_name}
+                onChange={(e) =>
+                  setNewCustomer({
+                    ...newCustomer,
+                    customer_official_name: e.target.value,
+                  })
+                }
+              />
+            </label>
+
+            <label className="entry-form__field">
+              <span className="entry-form__label">{t.terms}</span>
+              <input
+                className="entry-form__input"
+                placeholder={t.terms}
+                type="number"
+                value={newCustomer.payment_terms_days}
+                onChange={(e) =>
+                  setNewCustomer({
+                    ...newCustomer,
+                    payment_terms_days: e.target.value,
+                  })
+                }
+              />
+            </label>
+
+            <label className="entry-form__field">
+              <span className="entry-form__label">{t.trn}</span>
+              <input
+                className="entry-form__input"
+                placeholder={t.trn}
+                value={newCustomer.customer_trn}
+                onChange={(e) =>
+                  setNewCustomer({ ...newCustomer, customer_trn: e.target.value })
+                }
+              />
+            </label>
+
+            <label className="entry-form__field">
+              <span className="entry-form__label">{t.rep}</span>
+              <input
+                className="entry-form__input"
+                placeholder={t.rep}
+                value={newCustomer.sales_rep_name}
+                onChange={(e) =>
+                  setNewCustomer({
+                    ...newCustomer,
+                    sales_rep_name: e.target.value,
+                  })
+                }
+              />
+            </label>
+
+            <label className="entry-form__field">
+              <span className="entry-form__label">{t.credit}</span>
+              <input
+                className="entry-form__input"
+                placeholder={t.credit}
+                type="number"
+                value={newCustomer.credit_limit}
+                onChange={(e) =>
+                  setNewCustomer({ ...newCustomer, credit_limit: e.target.value })
+                }
+              />
+            </label>
+          </div>
+
+          <div className="entry-form__actions">
+            <button
+              className="entry-form__submit"
+              onClick={handleAdd}
+              disabled={adding || !newCustomer.customer_name.trim()}
+            >
+              {adding ? "..." : t.add}
+            </button>
+          </div>
+        </div>
+      </section>
 
       <div
         style={{
