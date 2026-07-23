@@ -210,7 +210,7 @@ input::placeholder {
 
 .bulk-review__table {
   width: 100%;
-  min-width: 800px;
+  min-width: 1150px;
   border-collapse: collapse;
 }
 
