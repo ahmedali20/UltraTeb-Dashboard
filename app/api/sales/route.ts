@@ -9,36 +9,19 @@ const supabaseServer = createClient(
 
 export async function POST(request: Request) {
   const body = await request.json();
+  const name = String(body.name ?? "").trim();
 
-  if (!body.sales_rep_name) {
+  if (!name) {
     return NextResponse.json(
-      { error: "Sales representative is required." },
-      { status: 400 }
-    );
-  }
-
-  const { error: customerError } = await supabaseServer
-    .from("customers")
-    .update({ sales_rep_name: body.sales_rep_name })
-    .eq("customer_code", body.customer_code);
-
-  if (customerError) {
-    return NextResponse.json(
-      { error: customerError.message },
+      { error: "Sales representative name is required." },
       { status: 400 }
     );
   }
 
   const { data, error } = await supabaseServer
-    .from("sales")
-    .insert({
-      invoice_no: body.invoice_no,
-      sales_date: body.sales_date,
-      customer_code: body.customer_code,
-      sales_item_total: Number(body.sales_item_total) || 0,
-      tax: Number(body.tax) || 0,
-    })
-    .select()
+    .from("sales_reps")
+    .insert({ name })
+    .select("id, name")
     .single();
 
   if (error) {
@@ -48,11 +31,45 @@ export async function POST(request: Request) {
   return NextResponse.json({ data });
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  const id = new URL(request.url).searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json({ error: "Missing representative ID." }, { status: 400 });
+  }
+
+  const { data: rep, error: repError } = await supabaseServer
+    .from("sales_reps")
+    .select("name")
+    .eq("id", id)
+    .single();
+
+  if (repError) {
+    return NextResponse.json({ error: repError.message }, { status: 400 });
+  }
+
+  const { count, error: countError } = await supabaseServer
+    .from("customers")
+    .select("*", { count: "exact", head: true })
+    .ilike("sales_rep_name", rep.name.trim());
+
+  if (countError) {
+    return NextResponse.json({ error: countError.message }, { status: 400 });
+  }
+
+  if ((count ?? 0) > 0) {
+    return NextResponse.json(
+      {
+        error: `This representative is assigned to ${count} customer(s). Reassign them before deleting.`,
+      },
+      { status: 409 }
+    );
+  }
+
   const { error } = await supabaseServer
-    .from("sales")
+    .from("sales_reps")
     .delete()
-    .not("id", "is", null);
+    .eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
