@@ -185,81 +185,97 @@ export default function SalesTable({ sales }: { sales: SaleRow[] }) {
         {t.total} {sales.length}
       </p>
 
-      <div
-        style={{
-          background: "var(--surface-bg)",
-          borderRadius: 8,
-          boxShadow: "var(--surface-shadow)",
-          padding: 16,
-          marginBottom: 16,
-        }}
-      >
-        <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 15 }}>
-          {t.addTitle}
-        </h3>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            gap: 10,
-          }}
-        >
-          <input
-            style={inputStyle}
-            placeholder={t.invoiceNo}
-            value={form.invoice_no}
-            onChange={(e) => setForm({ ...form, invoice_no: e.target.value })}
-          />
-          <input
-            style={inputStyle}
-            type="date"
-            value={form.sales_date}
-            onChange={(e) => setForm({ ...form, sales_date: e.target.value })}
-          />
-          <input
-            style={inputStyle}
-            placeholder={t.customer + " Code"}
-            value={form.customer_code}
-            onChange={(e) =>
-              setForm({ ...form, customer_code: e.target.value })
-            }
-          />
-          <input
-            style={inputStyle}
-            type="number"
-            placeholder={t.itemTotal}
-            value={form.sales_item_total}
-            onChange={(e) =>
-              setForm({ ...form, sales_item_total: e.target.value })
-            }
-          />
-          <input
-            style={inputStyle}
-            type="number"
-            placeholder={t.tax}
-            value={form.tax}
-            onChange={(e) => setForm({ ...form, tax: e.target.value })}
-          />
+      <section className="entry-form">
+        <div className="entry-form__header">
+          <div>
+            <h3 className="entry-form__title">{t.addTitle}</h3>
+            <p className="entry-form__subtitle">
+              {lang === "ar"
+                ? "سجل بيانات الفاتورة وقيم المبيعات."
+                : "Record the invoice details and sales values."}
+            </p>
+          </div>
+          <span className="entry-form__badge" aria-hidden="true">+</span>
         </div>
-        <button
-          onClick={handleAdd}
-          disabled={
-            adding || !form.invoice_no || !form.sales_date || !form.customer_code
-          }
-          style={{
-            marginTop: 12,
-            padding: "8px 18px",
-            borderRadius: 6,
-            border: "none",
-            background: adding ? "#94a3b8" : "#16a34a",
-            color: "#fff",
-            cursor: adding ? "default" : "pointer",
-            fontSize: 14,
-          }}
-        >
-          {adding ? "..." : t.add}
-        </button>
-      </div>
+
+        <div className="entry-form__body">
+          <div className="entry-form__grid">
+            <label className="entry-form__field">
+              <span className="entry-form__label">
+                {t.invoiceNo}<span className="entry-form__required">*</span>
+              </span>
+              <input
+                className="entry-form__input"
+                placeholder={t.invoiceNo}
+                value={form.invoice_no}
+                onChange={(e) => setForm({ ...form, invoice_no: e.target.value })}
+              />
+            </label>
+
+            <label className="entry-form__field">
+              <span className="entry-form__label">
+                {t.date}<span className="entry-form__required">*</span>
+              </span>
+              <input
+                className="entry-form__input"
+                type="date"
+                value={form.sales_date}
+                onChange={(e) => setForm({ ...form, sales_date: e.target.value })}
+              />
+            </label>
+
+            <label className="entry-form__field">
+              <span className="entry-form__label">
+                {t.customer} Code<span className="entry-form__required">*</span>
+              </span>
+              <input
+                className="entry-form__input"
+                placeholder={t.customer + " Code"}
+                value={form.customer_code}
+                onChange={(e) =>
+                  setForm({ ...form, customer_code: e.target.value })
+                }
+              />
+            </label>
+
+            <label className="entry-form__field entry-form__field--wide">
+              <span className="entry-form__label">{t.itemTotal}</span>
+              <input
+                className="entry-form__input"
+                type="number"
+                placeholder={t.itemTotal}
+                value={form.sales_item_total}
+                onChange={(e) =>
+                  setForm({ ...form, sales_item_total: e.target.value })
+                }
+              />
+            </label>
+
+            <label className="entry-form__field entry-form__field--wide">
+              <span className="entry-form__label">{t.tax}</span>
+              <input
+                className="entry-form__input"
+                type="number"
+                placeholder={t.tax}
+                value={form.tax}
+                onChange={(e) => setForm({ ...form, tax: e.target.value })}
+              />
+            </label>
+          </div>
+
+          <div className="entry-form__actions">
+            <button
+              className="entry-form__submit"
+              onClick={handleAdd}
+              disabled={
+                adding || !form.invoice_no || !form.sales_date || !form.customer_code
+              }
+            >
+              {adding ? "..." : t.add}
+            </button>
+          </div>
+        </div>
+      </section>
 
       <div
         style={{
