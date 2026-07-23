@@ -118,7 +118,6 @@ export default function SalesTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<InvoiceForm>(emptyForm);
   const [savingEdit, setSavingEdit] = useState(false);
-  const [deletingAll, setDeletingAll] = useState(false);
 
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkRows, setBulkRows] = useState<BulkInvoiceRow[]>([]);
@@ -429,57 +428,15 @@ export default function SalesTable({
     }
   }
 
-  async function handleDeleteAll() {
-    const warning =
-      lang === "ar"
-        ? "هل أنت متأكد من حذف جميع الفواتير؟ لا يمكن التراجع عن هذا الإجراء."
-        : "Delete ALL invoices? This cannot be undone.";
-    if (!confirm(warning)) return;
-
-    setDeletingAll(true);
-    const res = await fetch("/api/sales", { method: "DELETE" });
-    setDeletingAll(false);
-
-    if (res.ok) {
-      setEditingId(null);
-      router.refresh();
-    } else {
-      const { error } = await res.json();
-      alert(error || "Error deleting all invoices");
-    }
-  }
-
   return (
     <div dir={dir} style={{ fontFamily: "Arial, 'Segoe UI', Tahoma, sans-serif", minHeight: "100vh", background: "var(--page-bg)", color: "var(--text-primary)" }}>
       <Header active="sales" lang={lang} onToggleLang={() => setLang(lang === "en" ? "ar" : "en")} />
       <main style={{ padding: "0 32px", maxWidth: 1300, margin: "0 auto" }}>
         <h1 style={{ margin: 0 }}>{t.title}</h1>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 20 }}>
-        <p style={{ color: "var(--text-secondary)", margin: 0 }}>
-          {t.total} {sales.length}
-        </p>
-        <button
-          type="button"
-          onClick={handleDeleteAll}
-          disabled={!sales.length || deletingAll}
-          style={{
-            padding: "9px 14px",
-            borderRadius: 6,
-            border: "1px solid #dc2626",
-            background: deletingAll ? "#94a3b8" : "#dc2626",
-            color: "#fff",
-            cursor: !sales.length || deletingAll ? "not-allowed" : "pointer",
-            fontWeight: 600,
-          }}
-        >
-          {deletingAll
-            ? "..."
-            : lang === "ar"
-              ? "حذف جميع الفواتير"
-              : "Delete All Invoices"}
-        </button>
-      </div>
+      <p style={{ color: "var(--text-secondary)", marginBottom: 20 }}>
+        {t.total} {sales.length}
+      </p>
 
       <section className="entry-form">
         <div className="entry-form__header">
