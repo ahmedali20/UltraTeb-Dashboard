@@ -15,7 +15,7 @@ export default function HomeClient() {
   const dir = lang === "ar" ? "rtl" : "ltr";
 
   return (
-    <div dir={dir} style={{ fontFamily: "Arial, 'Segoe UI', Tahoma, sans-serif", minHeight: "100vh", background: "#f5f6f8" }}>
+    <div dir={dir} style={{ fontFamily: "Arial, 'Segoe UI', Tahoma, sans-serif", minHeight: "100vh", background: "var(--page-bg)", color: "var(--text-primary)" }}>
       <Header active="home" lang={lang} onToggleLang={() => setLang(lang === "en" ? "ar" : "en")} />
       <main
         style={{
@@ -27,7 +27,7 @@ export default function HomeClient() {
         }}
       >
         <h1 style={{ marginBottom: 8 }}>{t.title}</h1>
-        <p style={{ color: "#666", marginBottom: 32 }}>{t.subtitle}</p>
+        <p style={{ color: "var(--text-secondary)", marginBottom: 32 }}>{t.subtitle}</p>
         <div style={{ display: "flex", gap: 20 }}>
           <a
             href="/customers"
