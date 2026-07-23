@@ -128,6 +128,8 @@ export default function SalesTable({
   const [bulkCustomerSearches, setBulkCustomerSearches] = useState<
     Record<number, string>
   >({});
+  const [recordRepFilter, setRecordRepFilter] = useState("All");
+  const [recordMonthFilter, setRecordMonthFilter] = useState("All");
 
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkRows, setBulkRows] = useState<BulkInvoiceRow[]>([]);
@@ -150,6 +152,18 @@ export default function SalesTable({
       numeric: true,
       sensitivity: "base",
     })
+  );
+  const recordReps = Array.from(
+    new Set(sales.map((sale) => sale.sales_rep || "Unassigned"))
+  ).sort();
+  const recordMonths = Array.from(
+    new Set(sales.map((sale) => sale.month).filter(Boolean))
+  ).sort((a, b) => b.localeCompare(a));
+  const displayedSales = sortedSales.filter(
+    (sale) =>
+      (recordRepFilter === "All" ||
+        (sale.sales_rep || "Unassigned") === recordRepFilter) &&
+      (recordMonthFilter === "All" || sale.month === recordMonthFilter)
   );
 
   function calculateTax(itemTotal: string, mode: "14" | "5" | "manual") {
@@ -533,7 +547,7 @@ export default function SalesTable({
         {t.total} {sales.length}
       </p>
 
-      <section className="entry-form">
+      <section className="entry-form" id="add-record">
         <div className="entry-form__header">
           <div>
             <h3 className="entry-form__title">{t.addTitle}</h3>
@@ -680,6 +694,7 @@ export default function SalesTable({
       </section>
 
       <div
+        id="bulk-upload"
         style={{
           background: "var(--surface-bg)",
           borderRadius: 8,
@@ -935,6 +950,39 @@ export default function SalesTable({
         )}
       </div>
 
+      <div className="records-toolbar" id="all-records">
+        <div>
+          <strong>{lang === "ar" ? "كل الفواتير" : "All Records"}</strong>
+          <span>
+            {displayedSales.length} {lang === "ar" ? "سجل" : "records"}
+          </span>
+        </div>
+        <label>
+          {lang === "ar" ? "الشهر" : "Month"}
+          <select
+            value={recordMonthFilter}
+            onChange={(event) => setRecordMonthFilter(event.target.value)}
+          >
+            <option value="All">{lang === "ar" ? "كل الشهور" : "All Months"}</option>
+            {recordMonths.map((month) => (
+              <option key={month} value={month}>{month}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {lang === "ar" ? "المندوب" : "Sales Rep"}
+          <select
+            value={recordRepFilter}
+            onChange={(event) => setRecordRepFilter(event.target.value)}
+          >
+            <option value="All">{lang === "ar" ? "كل المندوبين" : "All Reps"}</option>
+            {recordReps.map((rep) => (
+              <option key={rep} value={rep}>{rep}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       <div
         style={{
           overflowX: "auto",
@@ -958,7 +1006,7 @@ export default function SalesTable({
             </tr>
           </thead>
           <tbody>
-            {sortedSales.map((s, i) => {
+            {displayedSales.map((s, i) => {
               const isEditing = editingId === s.id;
               const editedTotal =
                 Number(editForm.sales_item_total || 0) +
