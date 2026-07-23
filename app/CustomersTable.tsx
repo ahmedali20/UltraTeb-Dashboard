@@ -79,8 +79,10 @@ const translations = {
 
 export default function CustomersTable({
   customers,
+  salesReps,
 }: {
   customers: Customer[];
+  salesReps: string[];
 }) {
   const router = useRouter();
   const [lang, setLang] = useState<"en" | "ar">("en");
@@ -89,9 +91,12 @@ export default function CustomersTable({
   const align = lang === "ar" ? "right" : "left";
   const salesRepOptions = Array.from(
     new Set(
-      customers
-        .map((customer) => customer.sales_rep_name?.trim())
-        .filter((name): name is string => Boolean(name))
+      [
+        ...salesReps,
+        ...customers
+          .map((customer) => customer.sales_rep_name?.trim())
+          .filter((name): name is string => Boolean(name)),
+      ]
     )
   ).sort((a, b) => a.localeCompare(b));
 
