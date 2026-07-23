@@ -32,6 +32,7 @@ type BulkInvoiceRow = {
   sales_item_total?: string;
   tax?: string;
   _sourceCustomer: string;
+  _sourceCustomerName: string;
   _confirmed: boolean;
   _rowNumber: number;
 };
@@ -118,6 +119,12 @@ export default function SalesTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<InvoiceForm>(emptyForm);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [customerOptions, setCustomerOptions] = useState(customers);
+  const [creatingCustomerRow, setCreatingCustomerRow] = useState<number | null>(
+    null
+  );
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
 
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkRows, setBulkRows] = useState<BulkInvoiceRow[]>([]);
@@ -284,10 +291,10 @@ export default function SalesTable({
             const sourceName = String(row.customer_name ?? "").trim();
             const normalizedName = normalizeCustomerValue(sourceName);
             const matchedCustomer =
-              customers.find(
+              customerOptions.find(
                 (customer) => customer.customer_code === sourceCode
               ) ??
-              customers.find(
+              customerOptions.find(
                 (customer) =>
                   normalizeCustomerValue(customer.customer_name) ===
                   normalizedName
@@ -302,6 +309,7 @@ export default function SalesTable({
               tax: String(row.tax ?? "").trim(),
               _sourceCustomer:
                 [sourceCode, sourceName].filter(Boolean).join(" — ") || "-",
+              _sourceCustomerName: sourceName,
               _confirmed: false,
               _rowNumber: index + 2,
             };
@@ -313,7 +321,7 @@ export default function SalesTable({
   }
 
   function updateBulkCustomer(rowIndex: number, customerCode: string) {
-    const customer = customers.find(
+    const customer = customerOptions.find(
       (item) => item.customer_code === customerCode
     );
 
@@ -329,6 +337,60 @@ export default function SalesTable({
           : row
       )
     );
+  }
+
+  function openCreateCustomer(rowIndex: number) {
+    setCreatingCustomerRow(rowIndex);
+    setNewCustomerName(
+      bulkRows[rowIndex]._sourceCustomerName ||
+        bulkRows[rowIndex].customer_name ||
+        ""
+    );
+  }
+
+  async function createCustomerForBulkRow() {
+    if (creatingCustomerRow === null || !newCustomerName.trim()) return;
+
+    setCreatingCustomer(true);
+    const res = await fetch("/api/customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customer_name: newCustomerName.trim() }),
+    });
+    const json = await res.json();
+    setCreatingCustomer(false);
+
+    if (!res.ok) {
+      alert(json.error || "Error creating customer");
+      return;
+    }
+
+    const createdCustomer: CustomerOption = {
+      customer_code: json.data.customer_code,
+      customer_name: json.data.customer_name,
+    };
+
+    setCustomerOptions((current) =>
+      [...current, createdCustomer].sort((a, b) =>
+        a.customer_code.localeCompare(b.customer_code, undefined, {
+          numeric: true,
+        })
+      )
+    );
+    setBulkRows((current) =>
+      current.map((row, index) =>
+        index === creatingCustomerRow
+          ? {
+              ...row,
+              customer_code: createdCustomer.customer_code,
+              customer_name: createdCustomer.customer_name,
+              _confirmed: true,
+            }
+          : row
+      )
+    );
+    setCreatingCustomerRow(null);
+    setNewCustomerName("");
   }
 
   function confirmBulkRow(rowIndex: number, confirmed: boolean) {
@@ -365,7 +427,13 @@ export default function SalesTable({
     setBulkStatus("");
 
     const rows = bulkRows.map(
-      ({ _confirmed, _rowNumber, _sourceCustomer, ...row }) => row
+      ({
+        _confirmed,
+        _rowNumber,
+        _sourceCustomer,
+        _sourceCustomerName,
+        ...row
+      }) => row
     );
     const res = await fetch("/api/sales/bulk", {
       method: "POST",
@@ -493,7 +561,7 @@ export default function SalesTable({
                     ? "اختر كود واسم العميل"
                     : "Select customer code and name"}
                 </option>
-                {customers.map((customer) => (
+                {customerOptions.map((customer) => (
                   <option
                     key={customer.customer_code}
                     value={customer.customer_code}
@@ -674,7 +742,7 @@ export default function SalesTable({
                               ? "اختر العميل"
                               : "Select customer"}
                           </option>
-                          {customers.map((customer) => (
+                          {customerOptions.map((customer) => (
                             <option
                               key={customer.customer_code}
                               value={customer.customer_code}
@@ -684,6 +752,16 @@ export default function SalesTable({
                             </option>
                           ))}
                         </select>
+                        <button
+                          type="button"
+                          className="bulk-review__new-customer"
+                          onClick={() => openCreateCustomer(index)}
+                        >
+                          +{" "}
+                          {lang === "ar"
+                            ? "إنشاء عميل جديد"
+                            : "Create new customer"}
+                        </button>
                       </td>
                       <td>
                         {Number(row.sales_item_total || 0).toLocaleString(
@@ -755,6 +833,59 @@ export default function SalesTable({
                   : "Confirm all matched"}
               </button>
             </div>
+            {creatingCustomerRow !== null && (
+              <div className="bulk-customer-modal" role="dialog" aria-modal="true">
+                <div className="bulk-customer-modal__card">
+                  <h3>
+                    {lang === "ar"
+                      ? "إنشاء عميل جديد"
+                      : "Create New Customer"}
+                  </h3>
+                  <p>
+                    {lang === "ar"
+                      ? "سيتم إنشاء كود العميل تلقائياً، ثم اختياره لهذه الفاتورة."
+                      : "The customer code will be generated automatically and selected for this invoice."}
+                  </p>
+                  <label>
+                    <span>
+                      {lang === "ar" ? "اسم العميل" : "Customer Name"}
+                    </span>
+                    <input
+                      autoFocus
+                      className="entry-form__input"
+                      value={newCustomerName}
+                      onChange={(event) =>
+                        setNewCustomerName(event.target.value)
+                      }
+                    />
+                  </label>
+                  <div className="bulk-customer-modal__actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreatingCustomerRow(null);
+                        setNewCustomerName("");
+                      }}
+                      disabled={creatingCustomer}
+                    >
+                      {lang === "ar" ? "إلغاء" : "Cancel"}
+                    </button>
+                    <button
+                      type="button"
+                      className="bulk-customer-modal__create"
+                      onClick={createCustomerForBulkRow}
+                      disabled={creatingCustomer || !newCustomerName.trim()}
+                    >
+                      {creatingCustomer
+                        ? "..."
+                        : lang === "ar"
+                          ? "إنشاء واختيار"
+                          : "Create and Select"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
         {bulkStatus && (
@@ -835,7 +966,7 @@ export default function SalesTable({
                         })
                       }
                     >
-                      {customers.map((customer) => (
+                      {customerOptions.map((customer) => (
                         <option
                           key={customer.customer_code}
                           value={customer.customer_code}
