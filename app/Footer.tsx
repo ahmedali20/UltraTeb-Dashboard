@@ -13,8 +13,8 @@ export default function Footer({ lang }: { lang: "en" | "ar" }) {
         padding: "18px 28px",
         textAlign: "center",
         fontSize: 12,
-        color: "#8a99a3",
-        borderTop: "1px solid #e2e8ec",
+        color: "var(--footer-text)",
+        borderTop: "1px solid var(--footer-border)",
       }}
     >
       {text[lang]} · {new Date().getFullYear()}
