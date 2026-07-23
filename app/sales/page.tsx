@@ -13,6 +13,7 @@ export default async function SalesPage() {
   const [
     { data: sales, error: salesError },
     { data: customers, error: customersError },
+    { data: salesReps, error: salesRepsError },
   ] = await Promise.all([
     supabaseServer
       .from("sales_view")
@@ -22,9 +23,13 @@ export default async function SalesPage() {
       .from("customers")
       .select("customer_code, customer_name, sales_rep_name")
       .order("customer_code", { ascending: true }),
+    supabaseServer
+      .from("sales_reps")
+      .select("name")
+      .order("name", { ascending: true }),
   ]);
 
-  const error = salesError || customersError;
+  const error = salesError || customersError || salesRepsError;
 
   if (error) {
     return (
@@ -39,6 +44,7 @@ export default async function SalesPage() {
     <SalesTable
       sales={sales ?? []}
       customers={customers ?? []}
+      salesReps={(salesReps ?? []).map((rep) => rep.name)}
     />
   );
 }
