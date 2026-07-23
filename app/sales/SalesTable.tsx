@@ -791,7 +791,6 @@ export default function SalesTable({
                               key={customer.customer_code}
                               value={customer.customer_code}
                             >
-                              {customer.customer_code} —{" "}
                               {customer.customer_name}
                             </option>
                           ))}
