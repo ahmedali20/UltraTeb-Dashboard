@@ -10,6 +10,7 @@ type DashboardSale = {
   sales_date: string;
   customer_code: string;
   customer_name: string;
+  sales_rep: string | null;
   sales_item_total: number;
   tax: number;
   total_sales: number;
@@ -28,7 +29,7 @@ const text = {
     totalTax: "Total Tax",
     invoices: "Total Invoices",
     customers: "Total Customers",
-    monthlySales: "Monthly Sales",
+    monthlySales: "Monthly Sales by Sales Rep",
     recentInvoices: "Recent Invoices",
     quickActions: "Quick Actions",
     addInvoice: "Add Invoice",
@@ -40,6 +41,7 @@ const text = {
     customer: "Customer",
     total: "Total",
     noInvoices: "No invoices have been added yet.",
+    unassigned: "Unassigned",
   },
   ar: {
     title: "نظرة عامة على الأعمال",
@@ -48,7 +50,7 @@ const text = {
     totalTax: "إجمالي الضريبة",
     invoices: "إجمالي الفواتير",
     customers: "إجمالي العملاء",
-    monthlySales: "المبيعات الشهرية",
+    monthlySales: "المبيعات الشهرية حسب المندوب",
     recentInvoices: "أحدث الفواتير",
     quickActions: "إجراءات سريعة",
     addInvoice: "إضافة فاتورة",
@@ -60,6 +62,7 @@ const text = {
     customer: "العميل",
     total: "الإجمالي",
     noInvoices: "لم تتم إضافة فواتير بعد.",
+    unassigned: "بدون مندوب",
   },
 };
 
@@ -84,8 +87,9 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     0
   );
 
-  const monthlyData = useMemo(() => {
-    const totals = new Map<string, number>();
+  const { monthlyData, salesReps } = useMemo(() => {
+    const totals = new Map<string, Map<string, number>>();
+    const reps = new Set<string>();
 
     sales.forEach((sale) => {
       if (!sale.sales_date) return;
@@ -93,23 +97,38 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
       if (Number.isNaN(date.getTime())) return;
 
       const key = sale.sales_date.slice(0, 7);
-      totals.set(key, (totals.get(key) ?? 0) + Number(sale.total_sales || 0));
+      const rep = sale.sales_rep?.trim() || t.unassigned;
+      reps.add(rep);
+
+      const month = totals.get(key) ?? new Map<string, number>();
+      month.set(rep, (month.get(rep) ?? 0) + Number(sale.total_sales || 0));
+      totals.set(key, month);
     });
 
-    return Array.from(totals.entries())
+    const data = Array.from(totals.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-6)
-      .map(([key, value]) => ({
-        key,
-        value,
-        label: new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
-          month: "short",
-          year: "2-digit",
-        }).format(new Date(`${key}-01T00:00:00`)),
-      }));
-  }, [sales, lang]);
+      .map(([key, repTotals]) => {
+        const values = Object.fromEntries(repTotals.entries());
+        return {
+          key,
+          values,
+          total: Object.values(values).reduce((sum, value) => sum + value, 0),
+          label: new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
+            month: "short",
+            year: "2-digit",
+          }).format(new Date(`${key}-01T00:00:00`)),
+        };
+      });
 
-  const chartMaximum = Math.max(...monthlyData.map((month) => month.value), 1);
+    return {
+      monthlyData: data,
+      salesReps: Array.from(reps).sort((a, b) => a.localeCompare(b)),
+    };
+  }, [sales, lang, t.unassigned]);
+
+  const chartMaximum = Math.max(...monthlyData.map((month) => month.total), 1);
+  const chartColors = ["#0f766e", "#2563eb", "#f59e0b", "#7c3aed", "#e11d48", "#0891b2"];
   const recentInvoices = sales.slice(0, 5);
 
   return (
@@ -155,22 +174,49 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
             </div>
 
             {monthlyData.length ? (
-              <div className="dashboard-chart__area">
-                {monthlyData.map((month) => (
-                  <div className="dashboard-chart__column" key={month.key}>
-                    <span className="dashboard-chart__value">
-                      {formatMoney(month.value, lang)}
+              <>
+                <div className="dashboard-chart__legend">
+                  {salesReps.map((rep, index) => (
+                    <span key={rep}>
+                      <i style={{ background: chartColors[index % chartColors.length] }} />
+                      {rep}
                     </span>
-                    <div className="dashboard-chart__track">
+                  ))}
+                </div>
+                <div className="dashboard-chart__area">
+                  {monthlyData.map((month) => (
+                    <div className="dashboard-chart__column" key={month.key}>
+                      <span className="dashboard-chart__value">
+                        {formatMoney(month.total, lang)}
+                      </span>
                       <div
-                        className="dashboard-chart__bar"
-                        style={{ height: `${Math.max((month.value / chartMaximum) * 100, 5)}%` }}
-                      />
+                        className="dashboard-chart__track"
+                        style={{
+                          height: `${Math.max((month.total / chartMaximum) * 180, 8)}px`,
+                        }}
+                      >
+                        {salesReps.map((rep, index) => {
+                          const repValue = month.values[rep] ?? 0;
+                          if (!repValue) return null;
+
+                          return (
+                            <div
+                              key={rep}
+                              className="dashboard-chart__segment"
+                              title={`${rep}: ${formatMoney(repValue, lang)}`}
+                              style={{
+                                height: `${(repValue / month.total) * 100}%`,
+                                background: chartColors[index % chartColors.length],
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                      <span className="dashboard-chart__label">{month.label}</span>
                     </div>
-                    <span className="dashboard-chart__label">{month.label}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="dashboard-empty">{t.noInvoices}</div>
             )}
