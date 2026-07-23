@@ -12,6 +12,26 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const body = await request.json();
+
+  if (!body.sales_rep_name) {
+    return NextResponse.json(
+      { error: "Sales representative is required." },
+      { status: 400 }
+    );
+  }
+
+  const { error: customerError } = await supabaseServer
+    .from("customers")
+    .update({ sales_rep_name: body.sales_rep_name })
+    .eq("customer_code", body.customer_code);
+
+  if (customerError) {
+    return NextResponse.json(
+      { error: customerError.message },
+      { status: 400 }
+    );
+  }
+
   const { data, error } = await supabaseServer
     .from("sales")
     .update({
