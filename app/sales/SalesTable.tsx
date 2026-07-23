@@ -125,6 +125,9 @@ export default function SalesTable({
   );
   const [newCustomerName, setNewCustomerName] = useState("");
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [bulkCustomerSearches, setBulkCustomerSearches] = useState<
+    Record<number, string>
+  >({});
 
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkRows, setBulkRows] = useState<BulkInvoiceRow[]>([]);
@@ -259,6 +262,7 @@ export default function SalesTable({
     setBulkFile(file);
     setBulkRows([]);
     setBulkStatus("");
+    setBulkCustomerSearches({});
     if (!file) return;
 
     Papa.parse(file, {
@@ -290,7 +294,19 @@ export default function SalesTable({
             const sourceCode = String(row.customer_code ?? "").trim();
             const sourceName = String(row.customer_name ?? "").trim();
             const normalizedName = normalizeCustomerValue(sourceName);
+            const previousInvoiceCustomer = sales.find(
+              (sale) =>
+                normalizeCustomerValue(sale.customer_name) === normalizedName
+            );
+            const matchedFromPreviousInvoice = previousInvoiceCustomer
+              ? customerOptions.find(
+                  (customer) =>
+                    customer.customer_code ===
+                    previousInvoiceCustomer.customer_code
+                )
+              : undefined;
             const matchedCustomer =
+              matchedFromPreviousInvoice ??
               customerOptions.find(
                 (customer) => customer.customer_code === sourceCode
               ) ??
@@ -336,6 +352,18 @@ export default function SalesTable({
             }
           : row
       )
+    );
+  }
+
+  function customersForBulkRow(rowIndex: number, selectedCode: string) {
+    const search = normalizeCustomerValue(bulkCustomerSearches[rowIndex]);
+    if (!search) return customerOptions;
+
+    return customerOptions.filter(
+      (customer) =>
+        customer.customer_code === selectedCode ||
+        normalizeCustomerValue(customer.customer_name).includes(search) ||
+        normalizeCustomerValue(customer.customer_code).includes(search)
     );
   }
 
@@ -451,6 +479,7 @@ export default function SalesTable({
       );
       setBulkFile(null);
       setBulkRows([]);
+      setBulkCustomerSearches({});
       if (fileInputRef.current) fileInputRef.current.value = "";
       router.refresh();
     } else {
@@ -730,6 +759,22 @@ export default function SalesTable({
                       <td>{row.sales_date || "-"}</td>
                       <td>{row._sourceCustomer}</td>
                       <td>
+                        <input
+                          className="bulk-review__customer-search"
+                          type="search"
+                          placeholder={
+                            lang === "ar"
+                              ? "ابحث بالاسم أو الكود"
+                              : "Search by name or code"
+                          }
+                          value={bulkCustomerSearches[index] ?? ""}
+                          onChange={(event) =>
+                            setBulkCustomerSearches((current) => ({
+                              ...current,
+                              [index]: event.target.value,
+                            }))
+                          }
+                        />
                         <select
                           className="bulk-review__select"
                           value={row.customer_code}
@@ -742,7 +787,7 @@ export default function SalesTable({
                               ? "اختر العميل"
                               : "Select customer"}
                           </option>
-                          {customerOptions.map((customer) => (
+                          {customersForBulkRow(index, row.customer_code).map((customer) => (
                             <option
                               key={customer.customer_code}
                               value={customer.customer_code}
