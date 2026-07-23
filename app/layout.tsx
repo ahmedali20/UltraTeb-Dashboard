@@ -1,3 +1,5 @@
+import "./globals.css";
+
 export const metadata = {
   title: "Ultra Teb - Customers Dashboard",
   description: "Customers dashboard",
@@ -15,8 +17,8 @@ export default function RootLayout({
           margin: 0,
           fontFamily:
             "Arial, 'Segoe UI', Tahoma, sans-serif",
-          background: "#f5f6f8",
-          color: "#1a1a1a",
+          background: "var(--page-bg)",
+          color: "var(--text-primary)",
         }}
       >
         {children}
