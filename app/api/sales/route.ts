@@ -28,3 +28,16 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ data });
 }
+
+export async function DELETE() {
+  const { error } = await supabaseServer
+    .from("sales")
+    .delete()
+    .not("id", "is", null);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  return NextResponse.json({ success: true });
+}
