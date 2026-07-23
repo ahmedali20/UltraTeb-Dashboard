@@ -87,6 +87,13 @@ export default function CustomersTable({
   const t = translations[lang];
   const dir = lang === "ar" ? "rtl" : "ltr";
   const align = lang === "ar" ? "right" : "left";
+  const salesRepOptions = Array.from(
+    new Set(
+      customers
+        .map((customer) => customer.sales_rep_name?.trim())
+        .filter((name): name is string => Boolean(name))
+    )
+  ).sort((a, b) => a.localeCompare(b));
 
   const [newCustomer, setNewCustomer] = useState<FormFields>(emptyForm);
   const [adding, setAdding] = useState(false);
@@ -96,7 +103,10 @@ export default function CustomersTable({
   const [saving, setSaving] = useState(false);
 
   async function handleAdd() {
-    if (!newCustomer.customer_name.trim()) return;
+    if (
+      !newCustomer.customer_name.trim() ||
+      !newCustomer.sales_rep_name.trim()
+    ) return;
     setAdding(true);
     const res = await fetch("/api/customers", {
       method: "POST",
@@ -247,9 +257,8 @@ export default function CustomersTable({
 
             <label className="entry-form__field">
               <span className="entry-form__label">{t.rep}</span>
-              <input
+              <select
                 className="entry-form__input"
-                placeholder={t.rep}
                 value={newCustomer.sales_rep_name}
                 onChange={(e) =>
                   setNewCustomer({
@@ -257,7 +266,14 @@ export default function CustomersTable({
                     sales_rep_name: e.target.value,
                   })
                 }
-              />
+              >
+                <option value="">
+                  {lang === "ar" ? "اختر مندوب المبيعات" : "Select sales rep"}
+                </option>
+                {salesRepOptions.map((rep) => (
+                  <option key={rep} value={rep}>{rep}</option>
+                ))}
+              </select>
             </label>
 
             <label className="entry-form__field">
@@ -278,7 +294,11 @@ export default function CustomersTable({
             <button
               className="entry-form__submit"
               onClick={handleAdd}
-              disabled={adding || !newCustomer.customer_name.trim()}
+              disabled={
+                adding ||
+                !newCustomer.customer_name.trim() ||
+                !newCustomer.sales_rep_name.trim()
+              }
             >
               {adding ? "..." : t.add}
             </button>
@@ -369,7 +389,7 @@ export default function CustomersTable({
                         />
                       </Td>
                       <Td align={align}>
-                        <input
+                        <select
                           style={inputStyle}
                           value={editForm.sales_rep_name}
                           onChange={(e) =>
@@ -378,7 +398,20 @@ export default function CustomersTable({
                               sales_rep_name: e.target.value,
                             })
                           }
-                        />
+                        >
+                          <option value="">
+                            {lang === "ar" ? "اختر المندوب" : "Select rep"}
+                          </option>
+                          {Array.from(
+                            new Set(
+                              [...salesRepOptions, editForm.sales_rep_name].filter(
+                                Boolean
+                              )
+                            )
+                          ).map((rep) => (
+                            <option key={rep} value={rep}>{rep}</option>
+                          ))}
+                        </select>
                       </Td>
                       <Td align={align}>
                         <input
@@ -398,7 +431,7 @@ export default function CustomersTable({
                           <ActionButton
                             onClick={() => handleSaveEdit(c.id)}
                             color="#16a34a"
-                            disabled={saving}
+                            disabled={saving || !editForm.sales_rep_name.trim()}
                           >
                             {t.save}
                           </ActionButton>
