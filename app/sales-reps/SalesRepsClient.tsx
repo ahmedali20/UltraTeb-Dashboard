@@ -65,8 +65,17 @@ export default function SalesRepsClient({ sales }: { sales: RepSale[] }) {
   }, [sales, lang]);
 
   const maximum = Math.max(...reps.map((rep) => rep.total), 1);
+  const allCustomers = new Set(
+    sales.map((sale) => sale.customer_name).filter(Boolean)
+  ).size;
+  const allSalesTotal = sales.reduce(
+    (sum, sale) => sum + Number(sale.total_sales || 0),
+    0
+  );
   const repSales = selectedRep
-    ? sales.filter(
+    ? selectedRep === "All"
+      ? sales
+      : sales.filter(
         (sale) =>
           normalizeSalesRep(
             sale.sales_rep,
@@ -131,6 +140,43 @@ export default function SalesRepsClient({ sales }: { sales: RepSale[] }) {
         </div>
 
         <section className="rep-summary-grid">
+          <button
+            type="button"
+            className={`rep-summary-card rep-summary-card--all ${
+              selectedRep === "All" ? "rep-summary-card--active" : ""
+            }`}
+            onClick={() => chooseRep("All")}
+          >
+            <div className="rep-summary-card__top">
+              <span>ALL</span>
+              <div>
+                <h2>{lang === "ar" ? "كل المندوبين" : "All Sales Reps"}</h2>
+                <p>
+                  {reps.length} {lang === "ar" ? "مندوب" : "representatives"} ·{" "}
+                  {allCustomers} {lang === "ar" ? "عميل" : "customers"}
+                </p>
+              </div>
+            </div>
+            <div className="rep-summary-card__numbers">
+              <div>
+                <small>{lang === "ar" ? "الفواتير" : "Invoices"}</small>
+                <strong>{sales.length}</strong>
+              </div>
+              <div>
+                <small>{lang === "ar" ? "المبيعات" : "Net Sales"}</small>
+                <strong>
+                  {allSalesTotal.toLocaleString(
+                    lang === "ar" ? "ar-EG" : "en-US",
+                    { maximumFractionDigits: 2 }
+                  )}
+                </strong>
+              </div>
+            </div>
+            <div className="rep-summary-card__bar">
+              <i style={{ width: "100%", background: "#4a90d9" }} />
+            </div>
+          </button>
+
           {reps.map((rep, index) => (
             <button
               type="button"
@@ -178,7 +224,13 @@ export default function SalesRepsClient({ sales }: { sales: RepSale[] }) {
             <div className="rep-sales-details__header">
               <div>
                 <p>{lang === "ar" ? "سجل المبيعات" : "Sales Records"}</p>
-                <h2>{selectedRep}</h2>
+                <h2>
+                  {selectedRep === "All"
+                    ? lang === "ar"
+                      ? "كل المندوبين"
+                      : "All Sales Reps"
+                    : selectedRep}
+                </h2>
               </div>
               <strong>
                 {visibleSales.length} {lang === "ar" ? "فاتورة" : "invoices"} ·{" "}
