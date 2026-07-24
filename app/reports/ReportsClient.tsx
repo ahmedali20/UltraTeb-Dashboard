@@ -42,6 +42,33 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
     "summary" | "details" | "both"
   >("both");
   const dir = lang === "ar" ? "rtl" : "ltr";
+  const t = lang === "ar" ? {
+    title: "تقرير المبيعات", subtitle: "تصفية ومراجعة وطباعة أو تصدير أداء الفواتير.",
+    export: "تصدير CSV", print: "طباعة / حفظ PDF", reportType: "نوع التقرير",
+    summaryOnly: "الملخص فقط", detailsOnly: "التفاصيل فقط", both: "الملخص + التفاصيل",
+    from: "من", to: "إلى", month: "الشهر", allMonths: "كل الشهور",
+    customer: "العميل", allCustomers: "كل العملاء", salesRep: "مندوب المبيعات",
+    allReps: "كل المندوبين", clear: "مسح الفلاتر", invoices: "الفواتير",
+    itemTotal: "إجمالي البنود", totalTax: "إجمالي الضريبة", totalSales: "إجمالي المبيعات",
+    selectedPeriod: "الفترة المحددة", customerSummary: "ملخص مبيعات العملاء",
+    customers: "عملاء", customerName: "اسم العميل", grandTotal: "الإجمالي العام",
+    repSummary: "ملخص مندوبي المبيعات", reps: "مندوبون", detailed: "السجلات التفصيلية",
+    invoiceSales: "مبيعات الفواتير", records: "سجلات", invoiceNo: "رقم الفاتورة",
+    date: "التاريخ", tax: "الضريبة", noRecords: "لا توجد سجلات تطابق هذه الفلاتر.",
+  } : {
+    title: "Sales Report", subtitle: "Filter, review, print, or export your invoice performance.",
+    export: "Export CSV", print: "Print / Save PDF", reportType: "Report Type",
+    summaryOnly: "Summary Only", detailsOnly: "Details Only", both: "Summary + Details",
+    from: "From", to: "To", month: "Month", allMonths: "All Months",
+    customer: "Customer", allCustomers: "All Customers", salesRep: "Sales Rep",
+    allReps: "All Sales Reps", clear: "Clear Filters", invoices: "Invoices",
+    itemTotal: "Item Total", totalTax: "Total TAX", totalSales: "Total Sales",
+    selectedPeriod: "SELECTED PERIOD", customerSummary: "Customer Sales Summary",
+    customers: "customers", customerName: "Customer Name", grandTotal: "Grand Total",
+    repSummary: "Sales Rep Summary", reps: "reps", detailed: "DETAILED RECORDS",
+    invoiceSales: "Invoice Sales", records: "records", invoiceNo: "Invoice No",
+    date: "Date", tax: "TAX", noRecords: "No records match these filters.",
+  };
 
   const months = useMemo(
     () =>
@@ -206,20 +233,20 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         <section className="report-heading">
           <div>
             <p>ULTRA TEB</p>
-            <h1>Sales Report</h1>
-            <span>Filter, review, print, or export your invoice performance.</span>
+            <h1>{t.title}</h1>
+            <span>{t.subtitle}</span>
           </div>
           <div className="report-actions">
-            <button type="button" onClick={exportCsv}>Export CSV</button>
+            <button type="button" onClick={exportCsv}>{t.export}</button>
             <button type="button" onClick={() => window.print()}>
-              Print / Save PDF
+              {t.print}
             </button>
           </div>
         </section>
 
         <section className="report-filters">
           <label>
-            Report Type
+            {t.reportType}
             <select
               value={reportType}
               onChange={(event) =>
@@ -228,48 +255,48 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                 )
               }
             >
-              <option value="summary">Summary Only</option>
-              <option value="details">Details Only</option>
-              <option value="both">Summary + Details</option>
+              <option value="summary">{t.summaryOnly}</option>
+              <option value="details">{t.detailsOnly}</option>
+              <option value="both">{t.both}</option>
             </select>
           </label>
           <label>
-            From
+            {t.from}
             <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
           </label>
           <label>
-            To
+            {t.to}
             <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
           </label>
           <label>
-            Month
+            {t.month}
             <select value={month} onChange={(event) => setMonth(event.target.value)}>
-              <option value="All">All Months</option>
+              <option value="All">{t.allMonths}</option>
               {months.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </label>
           <label>
-            Customer
+            {t.customer}
             <select value={customer} onChange={(event) => setCustomer(event.target.value)}>
-              <option value="All">All Customers</option>
+              <option value="All">{t.allCustomers}</option>
               {customers.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </label>
           <label>
-            Sales Rep
+            {t.salesRep}
             <select value={salesRep} onChange={(event) => setSalesRep(event.target.value)}>
-              <option value="All">All Sales Reps</option>
+              <option value="All">{t.allReps}</option>
               {reps.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </label>
-          <button type="button" onClick={clearFilters}>Clear Filters</button>
+          <button type="button" onClick={clearFilters}>{t.clear}</button>
         </section>
 
         <section className="report-kpis">
-          <article><span>Total Invoices</span><strong>{filtered.length}</strong></article>
-          <article><span>Item Total</span><strong>{money(totals.item)}</strong></article>
-          <article><span>Total TAX</span><strong>{money(totals.tax)}</strong></article>
-          <article className="report-kpi-primary"><span>Total Sales</span><strong>{money(totals.total)}</strong></article>
+          <article><span>{t.invoices}</span><strong>{filtered.length}</strong></article>
+          <article><span>{t.itemTotal}</span><strong>{money(totals.item)}</strong></article>
+          <article><span>{t.totalTax}</span><strong>{money(totals.tax)}</strong></article>
+          <article className="report-kpi-primary"><span>{t.totalSales}</span><strong>{money(totals.total)}</strong></article>
         </section>
 
         {(reportType === "summary" || reportType === "both") && (
@@ -277,18 +304,18 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
           <article className="report-summary-card">
             <div className="report-summary-card__heading">
               <div>
-                <p>SELECTED PERIOD</p>
-                <h2>Customer Sales Summary</h2>
+                <p>{t.selectedPeriod}</p>
+                <h2>{t.customerSummary}</h2>
               </div>
-              <strong>{customerSummary.length} customers</strong>
+              <strong>{customerSummary.length} {t.customers}</strong>
             </div>
             <div className="report-summary-table">
               <table>
                 <thead>
                   <tr>
-                    <th>Customer Name</th>
-                    <th>Invoices</th>
-                    <th>Total Sales</th>
+                    <th>{t.customerName}</th>
+                    <th>{t.invoices}</th>
+                    <th>{t.totalSales}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -302,7 +329,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td>Grand Total</td>
+                    <td>{t.grandTotal}</td>
                     <td>{filtered.length}</td>
                     <td>{money(totals.total)}</td>
                   </tr>
@@ -314,18 +341,18 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
           <article className="report-summary-card">
             <div className="report-summary-card__heading">
               <div>
-                <p>SELECTED PERIOD</p>
-                <h2>Sales Rep Summary</h2>
+                <p>{t.selectedPeriod}</p>
+                <h2>{t.repSummary}</h2>
               </div>
-              <strong>{salesRepSummary.length} reps</strong>
+              <strong>{salesRepSummary.length} {t.reps}</strong>
             </div>
             <div className="report-summary-table">
               <table>
                 <thead>
                   <tr>
-                    <th>Sales Rep</th>
-                    <th>Invoices</th>
-                    <th>Total Sales</th>
+                    <th>{t.salesRep}</th>
+                    <th>{t.invoices}</th>
+                    <th>{t.totalSales}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -339,7 +366,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td>Grand Total</td>
+                    <td>{t.grandTotal}</td>
                     <td>{filtered.length}</td>
                     <td>{money(totals.total)}</td>
                   </tr>
@@ -353,15 +380,15 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         {(reportType === "details" || reportType === "both") && (
         <section className="report-table-card">
           <div className="report-table-title">
-            <div><p>DETAILED RECORDS</p><h2>Invoice Sales</h2></div>
-            <strong>{filtered.length} records</strong>
+            <div><p>{t.detailed}</p><h2>{t.invoiceSales}</h2></div>
+            <strong>{filtered.length} {t.records}</strong>
           </div>
           <div className="report-table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Invoice No</th><th>Date</th><th>Month</th><th>Customer</th>
-                  <th>Sales Rep</th><th>Item Total</th><th>TAX</th><th>Total Sales</th>
+                  <th>{t.invoiceNo}</th><th>{t.date}</th><th>{t.month}</th><th>{t.customer}</th>
+                  <th>{t.salesRep}</th><th>{t.itemTotal}</th><th>{t.tax}</th><th>{t.totalSales}</th>
                 </tr>
               </thead>
               <tbody>
@@ -378,7 +405,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
               </tbody>
             </table>
           </div>
-          {!filtered.length && <div className="report-empty">No records match these filters.</div>}
+          {!filtered.length && <div className="report-empty">{t.noRecords}</div>}
         </section>
         )}
       </main>
