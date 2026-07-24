@@ -245,6 +245,7 @@ async function syncInvoices() {
   let inserted = 0;
   let updated = 0;
   let createdCustomers = 0;
+  let skippedIncomplete = 0;
   const failed: { row: number; invoice?: string; error: string }[] = [];
 
   for (let index = 0; index < sheetRows.length; index += 1) {
@@ -273,7 +274,11 @@ async function syncInvoices() {
     );
     const tax = parseNumber(getValue(row, ["tax", "tax_value", "vat"]));
 
-    if (!invoiceNo && !salesDate && !customerName && !sourceCode) continue;
+    if (!invoiceNo && !rawSalesDate && !customerName && !sourceCode) continue;
+    if (!rawSalesDate && !customerName && !sourceCode) {
+      skippedIncomplete += 1;
+      continue;
+    }
     if (!invoiceNo || !salesDate || (!customerName && !sourceCode)) {
       const missing = [
         !invoiceNo ? "invoice number" : "",
@@ -377,6 +382,7 @@ async function syncInvoices() {
     inserted,
     updated,
     createdCustomers,
+    skippedIncomplete,
     failed,
     syncedAt: new Date().toISOString(),
   };
