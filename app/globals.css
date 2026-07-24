@@ -1479,6 +1479,41 @@ input::placeholder {
 .report-kpis strong { font-size: 20px; }
 .report-kpis .report-kpi-primary { border-color: #178a6b; background: #178a6b; color: #fff; }
 .report-kpi-primary span { color: #d1fae5; }
+.report-summary-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px; margin-bottom: 16px;
+}
+.report-summary-card {
+  min-width: 0; overflow: hidden; border: 1px solid var(--border-color);
+  border-radius: 12px; background: var(--surface-bg);
+}
+.report-summary-card__heading {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; padding: 15px 17px; border-bottom: 1px solid var(--border-color);
+}
+.report-summary-card__heading p,
+.report-summary-card__heading h2 { margin: 0; }
+.report-summary-card__heading p {
+  color: #178a6b; font-size: 9px; font-weight: 800; letter-spacing: .1em;
+}
+.report-summary-card__heading h2 { margin-top: 3px; font-size: 16px; }
+.report-summary-card__heading > strong { color: var(--text-secondary); font-size: 11px; }
+.report-summary-table { max-height: 360px; overflow: auto; }
+.report-summary-table table { width: 100%; border-collapse: collapse; }
+.report-summary-table th, .report-summary-table td {
+  padding: 9px 11px; border-bottom: 1px solid var(--border-color);
+  font-size: 10px; text-align: start;
+}
+.report-summary-table th {
+  position: sticky; top: 0; background: var(--surface-muted);
+  color: var(--text-secondary); font-size: 9px; text-transform: uppercase;
+}
+.report-summary-table th:nth-child(n+2),
+.report-summary-table td:nth-child(n+2) { text-align: end; white-space: nowrap; }
+.report-summary-table tfoot td {
+  position: sticky; bottom: 0; border-bottom: 0;
+  background: var(--surface-muted); font-weight: 800;
+}
 .report-table-card {
   overflow: hidden; border: 1px solid var(--border-color);
   border-radius: 12px; background: var(--surface-bg);
@@ -1504,6 +1539,7 @@ input::placeholder {
 @media (max-width: 800px) {
   .report-heading { align-items: stretch; flex-direction: column; }
   .report-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-summary-grid { grid-template-columns: 1fr; }
 }
 
 @media print {
@@ -1512,4 +1548,6 @@ input::placeholder {
   .report-page, .report-kpis article, .report-table-card {
     background: #fff !important; color: #000 !important;
   }
+  .report-summary-grid { grid-template-columns: 1fr 1fr; }
+  .report-summary-table { max-height: none; overflow: visible; }
 }
