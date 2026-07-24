@@ -748,47 +748,49 @@ export default function SalesTable({
 
         <div className="entry-form__body">
           <div className="entry-form__grid">
-            <label className="entry-form__field">
+            <div className="entry-form__field entry-form__field--wide">
               <span className="entry-form__label">
                 {lang === "ar" ? "نوع المستند" : "Document Type"}
                 <span className="entry-form__required">*</span>
               </span>
-              <select
-                className="entry-form__input"
-                value={form.document_type}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    document_type: event.target.value as
-                      | "INVOICE"
-                      | "CR_NOTE"
-                      | "DR_NOTE",
-                    original_invoice_no:
-                      event.target.value === "INVOICE"
-                        ? ""
-                        : form.original_invoice_no,
-                    note_reason:
-                      event.target.value === "INVOICE" ? "" : form.note_reason,
-                  })
-                }
-              >
-                <option value="INVOICE">
-                  {lang === "ar" ? "فاتورة مبيعات" : "Sales Invoice"}
-                </option>
-                <option value="CR_NOTE">
-                  {lang === "ar" ? "إشعار دائن (CR)" : "Credit Note (CR)"}
-                </option>
-                <option value="DR_NOTE">
-                  {lang === "ar" ? "إشعار مدين (DR)" : "Debit Note (DR)"}
-                </option>
-              </select>
-            </label>
+              <div className="document-type-options">
+                {([
+                  ["INVOICE", lang === "ar" ? "فاتورة مبيعات" : "Sales Invoice"],
+                  ["CR_NOTE", lang === "ar" ? "إشعار دائن (CR)" : "Credit Note (CR)"],
+                  ["DR_NOTE", lang === "ar" ? "إشعار مدين (DR)" : "Debit Note (DR)"],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`document-type-options__button ${
+                      form.document_type === value
+                        ? `document-type-options__button--active document-type-options__button--${value.toLowerCase()}`
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setForm({
+                        ...form,
+                        document_type: value,
+                        original_invoice_no:
+                          value === "INVOICE" ? "" : form.original_invoice_no,
+                        note_reason:
+                          value === "INVOICE" ? "" : form.note_reason,
+                      })
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <label className="entry-form__field">
               <span className="entry-form__label">
                 {form.document_type === "INVOICE"
                   ? t.invoiceNo
-                  : lang === "ar" ? "رقم الإشعار" : "Note Number"}
+                  : form.document_type === "CR_NOTE"
+                    ? lang === "ar" ? "رقم الإشعار الدائن" : "Credit Note Number"
+                    : lang === "ar" ? "رقم الإشعار المدين" : "Debit Note Number"}
                 <span className="entry-form__required">*</span>
               </span>
               <input
@@ -796,7 +798,9 @@ export default function SalesTable({
                 placeholder={
                   form.document_type === "INVOICE"
                     ? t.invoiceNo
-                    : lang === "ar" ? "رقم الإشعار" : "Note Number"
+                    : form.document_type === "CR_NOTE"
+                      ? lang === "ar" ? "رقم الإشعار الدائن" : "Credit Note Number"
+                      : lang === "ar" ? "رقم الإشعار المدين" : "Debit Note Number"
                 }
                 value={form.invoice_no}
                 onChange={(e) => setForm({ ...form, invoice_no: e.target.value })}
