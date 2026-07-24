@@ -13,7 +13,7 @@ export default async function ReportsPage() {
   const { data, error } = await supabase
     .from("sales_view")
     .select(
-      "id, invoice_no, sales_date, month, customer_name, sales_rep, sales_item_total, tax, total_sales"
+      "id, invoice_no, sales_date, month, customer_name, sales_rep, sales_item_total, tax, total_sales, document_type, original_invoice_no, note_reason"
     )
     .order("sales_date", { ascending: true });
 
