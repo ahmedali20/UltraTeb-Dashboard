@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "./Header";
 import Footer from "./Footer";
@@ -113,6 +113,45 @@ export default function CustomersTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormFields>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerRepFilter, setCustomerRepFilter] = useState("All");
+  const [customerPage, setCustomerPage] = useState(1);
+  const [customerSortDirection, setCustomerSortDirection] =
+    useState<"asc" | "desc">("asc");
+  const customersPerPage = 25;
+
+  const filteredCustomers = customers
+    .filter((customer) => {
+      const search = customerSearch.trim().toLocaleLowerCase();
+      const matchesSearch =
+        !search ||
+        customer.customer_name?.toLocaleLowerCase().includes(search) ||
+        customer.customer_official_name?.toLocaleLowerCase().includes(search) ||
+        customer.customer_trn?.toLocaleLowerCase().includes(search);
+      const matchesRep =
+        customerRepFilter === "All" ||
+        normalizeSalesRepName(customer.sales_rep_name ?? "") ===
+          customerRepFilter;
+      return matchesSearch && matchesRep;
+    })
+    .sort((a, b) => {
+      const comparison = (a.customer_name || "").localeCompare(
+        b.customer_name || ""
+      );
+      return customerSortDirection === "asc" ? comparison : -comparison;
+    });
+  const customerPageCount = Math.max(
+    1,
+    Math.ceil(filteredCustomers.length / customersPerPage)
+  );
+  const paginatedCustomers = filteredCustomers.slice(
+    (customerPage - 1) * customersPerPage,
+    customerPage * customersPerPage
+  );
+
+  useEffect(() => {
+    setCustomerPage(1);
+  }, [customerSearch, customerRepFilter, customerSortDirection]);
 
   async function handleAdd() {
     if (
@@ -318,7 +357,43 @@ export default function CustomersTable({
         </div>
       </section>
 
+      <div className="data-table-toolbar">
+        <div>
+          <strong>{lang === "ar" ? "قائمة العملاء" : "Customer Directory"}</strong>
+          <span>
+            {filteredCustomers.length} {lang === "ar" ? "عميل" : "customers"}
+          </span>
+        </div>
+        <label className="data-table-search">
+          <span>{lang === "ar" ? "بحث" : "Search"}</span>
+          <input
+            value={customerSearch}
+            onChange={(event) => setCustomerSearch(event.target.value)}
+            placeholder={
+              lang === "ar"
+                ? "الاسم أو الاسم الرسمي أو الرقم الضريبي"
+                : "Name, official name, or TRN"
+            }
+          />
+        </label>
+        <label>
+          <span>{lang === "ar" ? "مندوب المبيعات" : "Sales Rep"}</span>
+          <select
+            value={customerRepFilter}
+            onChange={(event) => setCustomerRepFilter(event.target.value)}
+          >
+            <option value="All">
+              {lang === "ar" ? "كل المندوبين" : "All Sales Reps"}
+            </option>
+            {salesRepOptions.map((rep) => (
+              <option key={rep} value={rep}>{rep}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       <div
+        className="professional-data-table"
         style={{
           overflowX: "auto",
           background: "var(--surface-bg)",
@@ -329,7 +404,20 @@ export default function CustomersTable({
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#2d3748", color: "#fff" }}>
-              <Th align={align}>{t.name}</Th>
+              <Th align={align}>
+                <button
+                  type="button"
+                  className="table-sort-button"
+                  onClick={() =>
+                    setCustomerSortDirection((direction) =>
+                      direction === "asc" ? "desc" : "asc"
+                    )
+                  }
+                >
+                  <span>{t.name}</span>
+                  <i>{customerSortDirection === "asc" ? "↑" : "↓"}</i>
+                </button>
+              </Th>
               <Th align={align}>{t.officialName}</Th>
               <Th align={align}>{t.terms}</Th>
               <Th align={align}>{t.trn}</Th>
@@ -339,7 +427,7 @@ export default function CustomersTable({
             </tr>
           </thead>
           <tbody>
-            {customers.map((c, i) => {
+            {paginatedCustomers.map((c, i) => {
               const isEditing = editingId === c.id;
               return (
                 <tr
@@ -487,6 +575,44 @@ export default function CustomersTable({
             })}
           </tbody>
         </table>
+        {!filteredCustomers.length && (
+          <div className="data-table-empty">
+            {lang === "ar"
+              ? "لا يوجد عملاء مطابقون للبحث."
+              : "No customers match these filters."}
+          </div>
+        )}
+        <div className="data-pagination">
+          <span>
+            {lang === "ar" ? "عرض" : "Showing"}{" "}
+            {filteredCustomers.length
+              ? (customerPage - 1) * customersPerPage + 1
+              : 0}
+            –{Math.min(customerPage * customersPerPage, filteredCustomers.length)}{" "}
+            {lang === "ar" ? "من" : "of"} {filteredCustomers.length}
+          </span>
+          <div>
+            <button
+              type="button"
+              disabled={customerPage === 1}
+              onClick={() => setCustomerPage((page) => Math.max(1, page - 1))}
+            >
+              {lang === "ar" ? "السابق" : "Previous"}
+            </button>
+            <strong>{customerPage} / {customerPageCount}</strong>
+            <button
+              type="button"
+              disabled={customerPage === customerPageCount}
+              onClick={() =>
+                setCustomerPage((page) =>
+                  Math.min(customerPageCount, page + 1)
+                )
+              }
+            >
+              {lang === "ar" ? "التالي" : "Next"}
+            </button>
+          </div>
+        </div>
       </div>
       </main>
       <Footer lang={lang} />
