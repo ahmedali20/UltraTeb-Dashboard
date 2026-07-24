@@ -14,6 +14,7 @@ export default async function SalesPage() {
     { data: sales, error: salesError },
     { data: customers, error: customersError },
     { data: salesReps, error: salesRepsError },
+    { data: syncStatus },
   ] = await Promise.all([
     supabaseServer
       .from("sales_view")
@@ -27,6 +28,11 @@ export default async function SalesPage() {
       .from("sales_reps")
       .select("name")
       .order("name", { ascending: true }),
+    supabaseServer
+      .from("dashboard_settings")
+      .select("value")
+      .eq("key", "google_sheet_last_success")
+      .maybeSingle(),
   ]);
 
   const error = salesError || customersError || salesRepsError;
@@ -45,6 +51,7 @@ export default async function SalesPage() {
       sales={sales ?? []}
       customers={customers ?? []}
       salesReps={(salesReps ?? []).map((rep) => rep.name)}
+      lastSuccessfulSync={syncStatus?.value ?? null}
     />
   );
 }
