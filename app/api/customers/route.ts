@@ -7,8 +7,28 @@ const supabaseServer = createClient(
   { auth: { persistSession: false } }
 );
 
+function isAmountLike(value: unknown) {
+  const normalized = String(value ?? "")
+    .trim()
+    .replace(/,/g, "")
+    .replace(/^\((.*)\)$/, "-$1");
+  return normalized !== "" && /^-?\d+(?:\.\d+)?$/.test(normalized);
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
+  if (isAmountLike(body.customer_name)) {
+    return NextResponse.json(
+      { error: "A customer name cannot be a numeric amount." },
+      { status: 400 }
+    );
+  }
+  if (body.sales_rep_name && isAmountLike(body.sales_rep_name)) {
+    return NextResponse.json(
+      { error: "A sales representative name cannot be a numeric amount." },
+      { status: 400 }
+    );
+  }
 
   const { data: existingCustomers, error: codesError } = await supabaseServer
     .from("customers")
