@@ -251,7 +251,7 @@ export default function SalesRepsClient({
             onClick={() => chooseRep("All")}
           >
             <div className="rep-summary-card__top">
-              <span>ALL</span>
+              <span>{lang === "ar" ? "الكل" : "ALL"}</span>
               <div>
                 <h2>{lang === "ar" ? "كل المندوبين" : "All Sales Reps"}</h2>
                 <p>
