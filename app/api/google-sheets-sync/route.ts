@@ -4,9 +4,9 @@ import { NextResponse } from "next/server";
 
 const SPREADSHEET_ID = "13L05U9X3f4cerrzSQu6qQxSTrqY-b8jo4SVYZ9Vrcc4";
 const SHEETS = [
-  { name: "Invoices Sales", documentType: "INVOICE" },
-  { name: "CR Notes", documentType: "CR_NOTE" },
-  { name: "DR Notes", documentType: "DR_NOTE" },
+  { name: "Invoices Sales", documentType: "INVOICE", range: "B:I" },
+  { name: "CR Notes", documentType: "CR_NOTE", range: "A:I" },
+  { name: "DR Notes", documentType: "DR_NOTE", range: "A:I" },
 ] as const;
 
 const supabase = createClient(
@@ -168,9 +168,10 @@ async function getGoogleAccessToken() {
 async function readSheet(
   token: string,
   sheetName: string,
-  forcedDocumentType: "INVOICE" | "CR_NOTE" | "DR_NOTE"
+  forcedDocumentType: "INVOICE" | "CR_NOTE" | "DR_NOTE",
+  sheetRange: string
 ) {
-  const range = encodeURIComponent(`'${sheetName}'!A:Z`);
+  const range = encodeURIComponent(`'${sheetName}'!${sheetRange}`);
   const response = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE`,
     {
@@ -256,13 +257,14 @@ async function readSheet(
       "debit_note_no",
       "debit_note_number",
     ]);
+    const isInvoiceSheet = forcedDocumentType === "INVOICE";
 
     return {
       ...mapped,
       invoice_no:
-        forcedDocumentType === "INVOICE"
-          ? invoiceNumber
-          : noteNumber || invoiceNumber,
+        isInvoiceSheet
+          ? invoiceNumber || String(valuesRow[0] ?? "")
+          : noteNumber || String(valuesRow[2] ?? ""),
       sales_date:
         getValue(mapped, [
           "sales_date",
@@ -271,14 +273,14 @@ async function readSheet(
           "dr_date",
           "cr_date",
           "date",
-        ]),
+        ]) || String(valuesRow[isInvoiceSheet ? 1 : 3] ?? ""),
       customer_name:
         getValue(mapped, [
           "customer_name",
           "customer",
           "hospital",
           "hospital_name",
-        ]),
+        ]) || String(valuesRow[isInvoiceSheet ? 3 : 0] ?? ""),
       sales_item_total:
         getValue(mapped, [
           "sales_item_total",
@@ -291,20 +293,20 @@ async function readSheet(
           "subtotal",
           "sales_sub_total",
           "sales_subtotal",
-        ]),
+        ]) || String(valuesRow[isInvoiceSheet ? 4 : 5] ?? ""),
       tax: getValue(mapped, [
         "tax",
         "tax_value",
         "vat",
         "sales_tax",
-      ]),
+      ]) || String(valuesRow[isInvoiceSheet ? 5 : 6] ?? ""),
       sales_rep:
         getValue(mapped, [
           "sales_rep",
           "sales_representative",
           "representative",
           "rep",
-        ]),
+        ]) || String(valuesRow[isInvoiceSheet ? 7 : 8] ?? ""),
       document_type: forcedDocumentType,
       original_invoice_no:
         getValue(mapped, [
@@ -317,8 +319,8 @@ async function readSheet(
           "invoice_reference",
           "invoice_ref",
         ]) ||
-        (forcedDocumentType !== "INVOICE" && noteNumber
-          ? invoiceNumber
+        (!isInvoiceSheet
+          ? invoiceNumber || String(valuesRow[1] ?? "")
           : ""),
       note_reason:
         getValue(mapped, [
@@ -412,7 +414,7 @@ async function syncInvoices() {
   const token = await getGoogleAccessToken();
   const sheetGroups = await Promise.all(
     SHEETS.map((sheet) =>
-      readSheet(token, sheet.name, sheet.documentType)
+      readSheet(token, sheet.name, sheet.documentType, sheet.range)
     )
   );
   const sheetRows = sheetGroups.flat();
