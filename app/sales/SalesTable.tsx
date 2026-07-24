@@ -17,6 +17,9 @@ type SaleRow = {
   sales_item_total: number;
   tax: number;
   total_sales: number;
+  document_type: "INVOICE" | "CR_NOTE" | "DR_NOTE";
+  original_invoice_no: string | null;
+  note_reason: string | null;
 };
 
 type CustomerOption = {
@@ -92,7 +95,10 @@ const translations = {
 };
 
 const emptyForm = {
+  document_type: "INVOICE" as "INVOICE" | "CR_NOTE" | "DR_NOTE",
   invoice_no: "",
+  original_invoice_no: "",
+  note_reason: "",
   sales_date: "",
   customer_code: "",
   sales_item_total: "",
@@ -296,7 +302,9 @@ export default function SalesTable({
       !form.invoice_no ||
       !form.sales_date ||
       !form.customer_code ||
-      !form.sales_rep_name
+      !form.sales_rep_name ||
+      (form.document_type !== "INVOICE" &&
+        (!form.original_invoice_no.trim() || !form.note_reason.trim()))
     ) return;
     setAdding(true);
     const res = await fetch("/api/sales", {
@@ -636,11 +644,14 @@ export default function SalesTable({
   function startEdit(sale: SaleRow) {
     setEditingId(sale.id);
     setEditForm({
+      document_type: sale.document_type ?? "INVOICE",
       invoice_no: sale.invoice_no,
+      original_invoice_no: sale.original_invoice_no ?? "",
+      note_reason: sale.note_reason ?? "",
       sales_date: sale.sales_date,
       customer_code: sale.customer_code,
-      sales_item_total: String(sale.sales_item_total),
-      tax: String(sale.tax),
+      sales_item_total: String(Math.abs(sale.sales_item_total)),
+      tax: String(Math.abs(sale.tax)),
       sales_rep_name: sale.sales_rep ?? "",
     });
   }
@@ -650,7 +661,9 @@ export default function SalesTable({
       !editForm.invoice_no ||
       !editForm.sales_date ||
       !editForm.customer_code ||
-      !editForm.sales_rep_name
+      !editForm.sales_rep_name ||
+      (editForm.document_type !== "INVOICE" &&
+        (!editForm.original_invoice_no.trim() || !editForm.note_reason.trim()))
     ) {
       alert("Invoice number, date and customer are required.");
       return;
@@ -737,15 +750,99 @@ export default function SalesTable({
           <div className="entry-form__grid">
             <label className="entry-form__field">
               <span className="entry-form__label">
-                {t.invoiceNo}<span className="entry-form__required">*</span>
+                {lang === "ar" ? "نوع المستند" : "Document Type"}
+                <span className="entry-form__required">*</span>
+              </span>
+              <select
+                className="entry-form__input"
+                value={form.document_type}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    document_type: event.target.value as
+                      | "INVOICE"
+                      | "CR_NOTE"
+                      | "DR_NOTE",
+                    original_invoice_no:
+                      event.target.value === "INVOICE"
+                        ? ""
+                        : form.original_invoice_no,
+                    note_reason:
+                      event.target.value === "INVOICE" ? "" : form.note_reason,
+                  })
+                }
+              >
+                <option value="INVOICE">
+                  {lang === "ar" ? "فاتورة مبيعات" : "Sales Invoice"}
+                </option>
+                <option value="CR_NOTE">
+                  {lang === "ar" ? "إشعار دائن (CR)" : "Credit Note (CR)"}
+                </option>
+                <option value="DR_NOTE">
+                  {lang === "ar" ? "إشعار مدين (DR)" : "Debit Note (DR)"}
+                </option>
+              </select>
+            </label>
+
+            <label className="entry-form__field">
+              <span className="entry-form__label">
+                {form.document_type === "INVOICE"
+                  ? t.invoiceNo
+                  : lang === "ar" ? "رقم الإشعار" : "Note Number"}
+                <span className="entry-form__required">*</span>
               </span>
               <input
                 className="entry-form__input"
-                placeholder={t.invoiceNo}
+                placeholder={
+                  form.document_type === "INVOICE"
+                    ? t.invoiceNo
+                    : lang === "ar" ? "رقم الإشعار" : "Note Number"
+                }
                 value={form.invoice_no}
                 onChange={(e) => setForm({ ...form, invoice_no: e.target.value })}
               />
             </label>
+
+            {form.document_type !== "INVOICE" && (
+              <>
+                <label className="entry-form__field">
+                  <span className="entry-form__label">
+                    {lang === "ar"
+                      ? "رقم الفاتورة الأصلية"
+                      : "Original Invoice No"}
+                    <span className="entry-form__required">*</span>
+                  </span>
+                  <input
+                    className="entry-form__input"
+                    value={form.original_invoice_no}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        original_invoice_no: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <label className="entry-form__field entry-form__field--wide">
+                  <span className="entry-form__label">
+                    {lang === "ar" ? "سبب الإشعار" : "Note Reason"}
+                    <span className="entry-form__required">*</span>
+                  </span>
+                  <input
+                    className="entry-form__input"
+                    value={form.note_reason}
+                    onChange={(event) =>
+                      setForm({ ...form, note_reason: event.target.value })
+                    }
+                    placeholder={
+                      lang === "ar"
+                        ? "مثال: مرتجع أو تعديل سعر"
+                        : "Example: return or price correction"
+                    }
+                  />
+                </label>
+              </>
+            )}
 
             <label className="entry-form__field">
               <span className="entry-form__label">
@@ -888,10 +985,19 @@ export default function SalesTable({
                 !form.invoice_no ||
                 !form.sales_date ||
                 !form.customer_code ||
-                !form.sales_rep_name
+                !form.sales_rep_name ||
+                (form.document_type !== "INVOICE" &&
+                  (!form.original_invoice_no.trim() ||
+                    !form.note_reason.trim()))
               }
             >
-              {adding ? "..." : t.add}
+              {adding
+                ? "..."
+                : form.document_type === "CR_NOTE"
+                  ? lang === "ar" ? "إضافة إشعار دائن" : "Add Credit Note"
+                  : form.document_type === "DR_NOTE"
+                    ? lang === "ar" ? "إضافة إشعار مدين" : "Add Debit Note"
+                    : t.add}
             </button>
           </div>
         </div>
@@ -1213,6 +1319,9 @@ export default function SalesTable({
           <thead>
             <tr style={{ background: "#2d3748", color: "#fff" }}>
               <Th align={align}>
+                {lang === "ar" ? "نوع المستند" : "Document"}
+              </Th>
+              <Th align={align}>
                 <SortButton active={recordSort === "invoice"} direction={recordSortDirection} onClick={() => toggleRecordSort("invoice")}>{t.invoiceNo}</SortButton>
               </Th>
               <Th align={align}>
@@ -1235,8 +1344,9 @@ export default function SalesTable({
             {paginatedSales.map((s, i) => {
               const isEditing = editingId === s.id;
               const editedTotal =
-                Number(editForm.sales_item_total || 0) +
-                Number(editForm.tax || 0);
+                (editForm.document_type === "CR_NOTE" ? -1 : 1) *
+                (Number(editForm.sales_item_total || 0) +
+                  Number(editForm.tax || 0));
 
               return (
               <tr
@@ -1246,6 +1356,32 @@ export default function SalesTable({
                   borderBottom: "1px solid var(--border-color)",
                 }}
               >
+                <Td align={align}>
+                  <span
+                    className={`document-type-badge document-type-badge--${
+                      (s.document_type ?? "INVOICE").toLowerCase()
+                    }`}
+                    title={
+                      s.document_type === "INVOICE"
+                        ? undefined
+                        : `${s.original_invoice_no ?? ""} · ${
+                            s.note_reason ?? ""
+                          }`
+                    }
+                  >
+                    {s.document_type === "CR_NOTE"
+                      ? "CR Note"
+                      : s.document_type === "DR_NOTE"
+                        ? "DR Note"
+                        : lang === "ar" ? "فاتورة" : "Invoice"}
+                  </span>
+                  {s.document_type !== "INVOICE" && (
+                    <small className="document-note-reference">
+                      {lang === "ar" ? "فاتورة" : "Invoice"}:{" "}
+                      {s.original_invoice_no || "-"}
+                    </small>
+                  )}
+                </Td>
                 <Td align={align}>
                   {isEditing ? (
                     <input
