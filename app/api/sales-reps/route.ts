@@ -7,6 +7,14 @@ const supabaseServer = createClient(
   { auth: { persistSession: false } }
 );
 
+function isAmountLike(value: string) {
+  const normalized = value
+    .trim()
+    .replace(/,/g, "")
+    .replace(/^\((.*)\)$/, "-$1");
+  return normalized !== "" && /^-?\d+(?:\.\d+)?$/.test(normalized);
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
   const name = String(body.name ?? "").trim();
@@ -14,6 +22,12 @@ export async function POST(request: Request) {
   if (!name) {
     return NextResponse.json(
       { error: "Sales representative name is required." },
+      { status: 400 }
+    );
+  }
+  if (isAmountLike(name)) {
+    return NextResponse.json(
+      { error: "A sales representative name cannot be a numeric amount." },
       { status: 400 }
     );
   }
