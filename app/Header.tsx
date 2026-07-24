@@ -36,7 +36,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
   const [isDark, setIsDark] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("dashboard-theme");
@@ -47,6 +47,10 @@ export default function Header({ active, lang, onToggleLang }: Props) {
     setIsDark(shouldUseDark);
     applyTheme(shouldUseDark);
     setIsMounted(true);
+    setIsSidebarOpen(
+      window.innerWidth > 800 &&
+        localStorage.getItem("dashboard-sidebar") !== "closed"
+    );
 
     fetch("/api/auth/me")
       .then((response) => (response.ok ? response.json() : null))
@@ -71,18 +75,29 @@ export default function Header({ active, lang, onToggleLang }: Props) {
     window.location.href = "/login";
   }
 
+  function toggleSidebar() {
+    setIsSidebarOpen((open) => {
+      const next = !open;
+      if (window.innerWidth > 800) {
+        localStorage.setItem("dashboard-sidebar", next ? "open" : "closed");
+      }
+      return next;
+    });
+  }
+
   const linkClass = (page: string) =>
     `app-sidebar__link${active === page ? " app-sidebar__link--active" : ""}`;
 
   return (
-    <header className="app-header">
+    <header className={`app-header${isSidebarOpen ? " app-header--sidebar-open" : ""}`}>
       <div className="app-topbar">
         <button
           type="button"
           className="app-menu-button"
-          aria-label="Open navigation"
-          aria-expanded={isMenuOpen}
-          onClick={() => setIsMenuOpen((open) => !open)}
+          aria-label={isSidebarOpen ? "Hide navigation" : "Show navigation"}
+          title={isSidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          aria-expanded={isSidebarOpen}
+          onClick={toggleSidebar}
         >
           ☰
         </button>
@@ -126,7 +141,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
         </div>
       </div>
 
-      <aside className={`app-sidebar${isMenuOpen ? " app-sidebar--open" : ""}`}>
+      <aside className={`app-sidebar${isSidebarOpen ? " app-sidebar--open" : ""}`}>
         <div className="app-sidebar__brand">Ultra Teb</div>
         <nav className="app-sidebar__nav" aria-label="Main navigation">
           <a href="/" className={linkClass("home")}>{t.home}</a>
@@ -141,12 +156,12 @@ export default function Header({ active, lang, onToggleLang }: Props) {
         </nav>
       </aside>
 
-      {isMenuOpen && (
+      {isSidebarOpen && (
         <button
           type="button"
           aria-label="Close navigation"
           className="app-sidebar-backdrop"
-          onClick={() => setIsMenuOpen(false)}
+          onClick={() => setIsSidebarOpen(false)}
         />
       )}
     </header>
