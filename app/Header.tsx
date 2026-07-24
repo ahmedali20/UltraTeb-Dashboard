@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   active: "home" | "customers" | "sales" | "reps" | "reports" | "users";
@@ -37,6 +37,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
   const [isMounted, setIsMounted] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("dashboard-theme");
@@ -57,6 +58,13 @@ export default function Header({ active, lang, onToggleLang }: Props) {
       .then((user) => setIsAdmin(user?.role === "admin"))
       .catch(() => setIsAdmin(false));
   }, []);
+
+  useEffect(() => {
+    const pageShell = headerRef.current?.parentElement;
+    if (!pageShell) return;
+    pageShell.classList.toggle("dashboard-shell--sidebar-open", isSidebarOpen);
+    return () => pageShell.classList.remove("dashboard-shell--sidebar-open");
+  }, [isSidebarOpen]);
 
   function applyTheme(dark: boolean) {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -89,7 +97,10 @@ export default function Header({ active, lang, onToggleLang }: Props) {
     `app-sidebar__link${active === page ? " app-sidebar__link--active" : ""}`;
 
   return (
-    <header className={`app-header${isSidebarOpen ? " app-header--sidebar-open" : ""}`}>
+    <header
+      ref={headerRef}
+      className={`app-header${isSidebarOpen ? " app-header--sidebar-open" : ""}`}
+    >
       <div className="app-topbar">
         <button
           type="button"
