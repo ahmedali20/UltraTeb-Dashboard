@@ -31,11 +31,21 @@ async function signingKey() {
   );
 }
 
-export async function createDashboardSession(username: string) {
+export type DashboardSession = {
+  username: string;
+  role: "admin" | "user";
+  expiresAt: number;
+};
+
+export async function createDashboardSession(
+  username: string,
+  role: "admin" | "user"
+) {
   const payload = bytesToBase64Url(
     encoder.encode(
       JSON.stringify({
         username,
+        role,
         expiresAt: Date.now() + 8 * 60 * 60 * 1000,
       })
     )
@@ -48,10 +58,12 @@ export async function createDashboardSession(username: string) {
   return `${payload}.${bytesToBase64Url(new Uint8Array(signature))}`;
 }
 
-export async function verifyDashboardSession(token?: string) {
-  if (!token) return false;
+export async function readDashboardSession(
+  token?: string
+): Promise<DashboardSession | null> {
+  if (!token) return null;
   const [payload, signature] = token.split(".");
-  if (!payload || !signature) return false;
+  if (!payload || !signature) return null;
 
   try {
     const valid = await crypto.subtle.verify(
@@ -60,18 +72,50 @@ export async function verifyDashboardSession(token?: string) {
       base64UrlToBytes(signature),
       encoder.encode(payload)
     );
-    if (!valid) return false;
+    if (!valid) return null;
 
     const session = JSON.parse(
       new TextDecoder().decode(base64UrlToBytes(payload))
     );
-    return (
+    const validSession =
       typeof session.username === "string" &&
+      (session.role === "admin" || session.role === "user") &&
       typeof session.expiresAt === "number" &&
-      session.expiresAt > Date.now()
-    );
+      session.expiresAt > Date.now();
+    return validSession ? session : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
+export async function verifyDashboardSession(token?: string) {
+  return Boolean(await readDashboardSession(token));
+}
+
+export function createPasswordSalt() {
+  return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(16)));
+}
+
+export async function hashDashboardPassword(
+  password: string,
+  salt: string
+) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const derived = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: base64UrlToBytes(salt),
+      iterations: 150000,
+    },
+    key,
+    256
+  );
+  return bytesToBase64Url(new Uint8Array(derived));
+}
