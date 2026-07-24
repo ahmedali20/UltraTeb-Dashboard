@@ -49,7 +49,10 @@ function parseNumber(value: string) {
 }
 
 function parseDate(value: string) {
-  const trimmed = value.trim();
+  const trimmed = value
+    .trim()
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)));
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
 
   const spreadsheetSerial = Number(trimmed);
@@ -63,18 +66,25 @@ function parseDate(value: string) {
     return new Date(milliseconds).toISOString().slice(0, 10);
   }
 
-  const parts = trimmed.split(/[\/.-]/).map((part) => Number(part));
+  const dateOnly = trimmed.split(/[T\s]/)[0];
+  const parts = dateOnly.split(/[\/.-]/).map((part) => Number(part));
   if (parts.length === 3 && parts.every(Number.isFinite)) {
     const [first, second, third] = parts;
-    const year = third < 100 ? 2000 + third : third;
-    const month = first > 12 ? second : first;
-    const day = first > 12 ? first : second;
+    const year =
+      first > 999 ? first : third < 100 ? 2000 + third : third;
+    const month = second;
+    const day = first > 999 ? third : first;
     if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
       return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(
         2,
         "0"
       )}`;
     }
+  }
+
+  const parsedTimestamp = Date.parse(trimmed);
+  if (Number.isFinite(parsedTimestamp)) {
+    return new Date(parsedTimestamp).toISOString().slice(0, 10);
   }
 
   return "";
@@ -240,9 +250,12 @@ async function syncInvoices() {
   for (let index = 0; index < sheetRows.length; index += 1) {
     const row = sheetRows[index];
     const invoiceNo = getValue(row, ["invoice_no", "invoice_number", "invoice"]);
-    const salesDate = parseDate(
-      getValue(row, ["sales_date", "invoice_date", "date"])
-    );
+    const rawSalesDate = getValue(row, [
+      "sales_date",
+      "invoice_date",
+      "date",
+    ]);
+    const salesDate = parseDate(rawSalesDate);
     const sourceCode = getValue(row, ["customer_code", "code"]);
     const customerName = getValue(row, [
       "customer_name",
@@ -264,13 +277,19 @@ async function syncInvoices() {
     if (!invoiceNo || !salesDate || (!customerName && !sourceCode)) {
       const missing = [
         !invoiceNo ? "invoice number" : "",
-        !salesDate ? "sales date" : "",
+        !rawSalesDate ? "sales date" : "",
         !customerName && !sourceCode ? "customer" : "",
       ].filter(Boolean);
+      const invalidDate =
+        rawSalesDate && !salesDate
+          ? `Invalid sales date value "${rawSalesDate}".`
+          : "";
       failed.push({
         row: index + 2,
         invoice: invoiceNo,
-        error: `Missing ${missing.join(", ")}.`,
+        error:
+          invalidDate ||
+          `Missing ${missing.join(", ")}.`,
       });
       continue;
     }
