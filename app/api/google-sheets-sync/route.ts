@@ -52,6 +52,17 @@ function parseDate(value: string) {
   const trimmed = value.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
 
+  const spreadsheetSerial = Number(trimmed);
+  if (
+    Number.isFinite(spreadsheetSerial) &&
+    spreadsheetSerial >= 1 &&
+    spreadsheetSerial <= 2958465
+  ) {
+    const milliseconds =
+      Date.UTC(1899, 11, 30) + Math.floor(spreadsheetSerial) * 86400000;
+    return new Date(milliseconds).toISOString().slice(0, 10);
+  }
+
   const parts = trimmed.split(/[\/.-]/).map((part) => Number(part));
   if (parts.length === 3 && parts.every(Number.isFinite)) {
     const [first, second, third] = parts;
@@ -136,8 +147,26 @@ async function readSheet() {
   const values: string[][] = result.values ?? [];
   if (values.length < 2) return [];
 
-  const headers = values[0].map(normalizeHeader);
-  return values.slice(1).map((valuesRow) =>
+  const headerRowIndex = values.slice(0, 20).findIndex((candidate) => {
+    const normalized = candidate.map(normalizeHeader);
+    return (
+      normalized.some((header) =>
+        ["invoice_no", "invoice_number", "invoice"].includes(header)
+      ) &&
+      normalized.some((header) =>
+        ["sales_date", "invoice_date", "date"].includes(header)
+      )
+    );
+  });
+
+  if (headerRowIndex < 0) {
+    throw new Error(
+      "Header row not found. Add Invoice No and Sales Date headers to the sheet."
+    );
+  }
+
+  const headers = values[headerRowIndex].map(normalizeHeader);
+  return values.slice(headerRowIndex + 1).map((valuesRow) =>
     Object.fromEntries(
       headers.map((header, index) => [header, String(valuesRow[index] ?? "")])
     )
