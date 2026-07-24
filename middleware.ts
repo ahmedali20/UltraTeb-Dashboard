@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyDashboardSession } from "./lib/dashboard-auth";
+import { readDashboardSession } from "./lib/dashboard-auth";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -22,10 +22,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const authenticated = await verifyDashboardSession(
+  const session = await readDashboardSession(
     request.cookies.get("ultra_teb_session")?.value
   );
-  if (authenticated) return NextResponse.next();
+  if (session) {
+    if (
+      (pathname === "/users" || pathname.startsWith("/api/auth/users")) &&
+      session.role !== "admin"
+    ) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    return NextResponse.next();
+  }
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -39,4 +50,3 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ["/((?!.*\\.[\\w]+$).*)"],
 };
-
