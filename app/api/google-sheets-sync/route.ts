@@ -3,7 +3,11 @@ import { createSign } from "crypto";
 import { NextResponse } from "next/server";
 
 const SPREADSHEET_ID = "13L05U9X3f4cerrzSQu6qQxSTrqY-b8jo4SVYZ9Vrcc4";
-const SHEET_NAME = "Invoices Sales";
+const SHEETS = [
+  { name: "Invoices Sales", documentType: "INVOICE" },
+  { name: "CR Notes", documentType: "CR_NOTE" },
+  { name: "DR Notes", documentType: "DR_NOTE" },
+] as const;
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -161,9 +165,12 @@ async function getGoogleAccessToken() {
   return result.access_token as string;
 }
 
-async function readSheet() {
-  const token = await getGoogleAccessToken();
-  const range = encodeURIComponent(`'${SHEET_NAME}'!B:L`);
+async function readSheet(
+  token: string,
+  sheetName: string,
+  forcedDocumentType: "INVOICE" | "CR_NOTE" | "DR_NOTE"
+) {
+  const range = encodeURIComponent(`'${sheetName}'!A:Z`);
   const response = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE`,
     {
@@ -184,84 +191,147 @@ async function readSheet() {
     const normalized = candidate.map(normalizeHeader);
     return (
       normalized.some((header) =>
-        ["invoice_no", "invoice_number", "invoice"].includes(header)
+        [
+          "invoice_no",
+          "invoice_number",
+          "invoice",
+          "note_no",
+          "note_number",
+          "cr_note_no",
+          "cr_note_number",
+          "cr_no",
+          "cr_number",
+          "credit_note_no",
+          "credit_note_number",
+          "dr_note_no",
+          "dr_note_number",
+          "dr_no",
+          "dr_number",
+          "debit_note_no",
+          "debit_note_number",
+        ].includes(header)
       ) &&
       normalized.some((header) =>
-        ["sales_date", "invoice_date", "date"].includes(header)
+        [
+          "sales_date",
+          "invoice_date",
+          "note_date",
+          "dr_date",
+          "cr_date",
+          "date",
+        ].includes(header)
       )
     );
   });
 
   if (headerRowIndex < 0) {
     throw new Error(
-      "Header row not found. Add Invoice No and Sales Date headers to the sheet."
+      `Header row not found in "${sheetName}". Add a document number and Sales Date headers.`
     );
   }
 
   const headers = values[headerRowIndex].map(normalizeHeader);
-  return values.slice(headerRowIndex + 1).map((valuesRow) => {
+  return values.slice(headerRowIndex + 1).map((valuesRow, rowIndex) => {
     const mapped = Object.fromEntries(
       headers.map((header, index) => [header, String(valuesRow[index] ?? "")])
     ) as SheetRow;
+    const invoiceNumber = getValue(mapped, [
+      "invoice_no",
+      "invoice_number",
+      "invoice",
+    ]);
+    const noteNumber = getValue(mapped, [
+      "note_no",
+      "note_number",
+      "cr_note_no",
+      "cr_note_number",
+      "cr_no",
+      "cr_number",
+      "credit_note_no",
+      "credit_note_number",
+      "dr_note_no",
+      "dr_note_number",
+      "dr_no",
+      "dr_number",
+      "debit_note_no",
+      "debit_note_number",
+    ]);
 
-    // The Invoices Sales range is B:L:
-    // B invoice, C date, D month, E customer, F item total, G tax,
-    // H total, I sales representative, J document type,
-    // K original invoice number, L note reason.
     return {
       ...mapped,
       invoice_no:
-        getValue(mapped, ["invoice_no", "invoice_number", "invoice"]) ||
-        String(valuesRow[0] ?? ""),
+        forcedDocumentType === "INVOICE"
+          ? invoiceNumber
+          : noteNumber || invoiceNumber,
       sales_date:
-        getValue(mapped, ["sales_date", "invoice_date", "date"]) ||
-        String(valuesRow[1] ?? ""),
+        getValue(mapped, [
+          "sales_date",
+          "invoice_date",
+          "note_date",
+          "dr_date",
+          "cr_date",
+          "date",
+        ]),
       customer_name:
         getValue(mapped, [
           "customer_name",
           "customer",
           "hospital",
           "hospital_name",
-        ]) || String(valuesRow[3] ?? ""),
+        ]),
       sales_item_total:
         getValue(mapped, [
           "sales_item_total",
           "item_total",
           "net_sales",
           "sales_total",
-        ]) || String(valuesRow[4] ?? ""),
-      tax:
-        getValue(mapped, ["tax", "tax_value", "vat"]) ||
-        String(valuesRow[5] ?? ""),
+          "amount_before_tax",
+          "net_amount",
+          "sub_total",
+          "subtotal",
+          "sales_sub_total",
+          "sales_subtotal",
+        ]),
+      tax: getValue(mapped, [
+        "tax",
+        "tax_value",
+        "vat",
+        "sales_tax",
+      ]),
       sales_rep:
         getValue(mapped, [
           "sales_rep",
           "sales_representative",
           "representative",
           "rep",
-        ]) || String(valuesRow[7] ?? ""),
-      document_type:
-        getValue(mapped, [
-          "document_type",
-          "document",
-          "type",
-          "invoice_type",
-          "note_type",
-        ]) || String(valuesRow[8] ?? ""),
+        ]),
+      document_type: forcedDocumentType,
       original_invoice_no:
         getValue(mapped, [
           "original_invoice_no",
+          "original_invoice_number",
           "original_invoice",
           "related_invoice_no",
+          "related_invoice_number",
           "reference_invoice",
-        ]) || String(valuesRow[9] ?? ""),
+          "invoice_reference",
+          "invoice_ref",
+        ]) ||
+        (forcedDocumentType !== "INVOICE" && noteNumber
+          ? invoiceNumber
+          : ""),
       note_reason:
         getValue(mapped, [
           "note_reason",
           "reason",
           "credit_debit_reason",
           "adjustment_reason",
-        ]) || String(valuesRow[10] ?? ""),
+        ]) ||
+        (forcedDocumentType === "INVOICE"
+          ? ""
+          : `Imported from ${sheetName}`),
+      _sheet_name: sheetName,
+      _sheet_row: String(headerRowIndex + rowIndex + 2),
     };
   });
 }
@@ -295,7 +365,10 @@ function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
     ]);
 
     if (!invoiceNo) {
-      rowsWithoutInvoice.push({ ...row, _sheet_row: String(index + 2) });
+      rowsWithoutInvoice.push({
+        ...row,
+        _sheet_row: row._sheet_row || String(index + 2),
+      });
       return;
     }
 
@@ -308,7 +381,7 @@ function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
     if (!existing) {
       combined.set(documentKey, {
         ...row,
-        _sheet_row: String(index + 2),
+        _sheet_row: row._sheet_row || String(index + 2),
       });
       return;
     }
@@ -336,7 +409,13 @@ function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
 }
 
 async function syncInvoices() {
-  const sheetRows = await readSheet();
+  const token = await getGoogleAccessToken();
+  const sheetGroups = await Promise.all(
+    SHEETS.map((sheet) =>
+      readSheet(token, sheet.name, sheet.documentType)
+    )
+  );
+  const sheetRows = sheetGroups.flat();
   const combinedRows = combineRowsWithSameInvoice(sheetRows);
   const [{ data: customers, error: customersError }, { data: priorSales, error: salesError }] =
     await Promise.all([
