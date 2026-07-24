@@ -393,12 +393,14 @@ export default function SalesTable({
         `Sync complete: ${result.inserted} added, ${result.updated} updated, ` +
           `${result.createdCustomers} customers created, ` +
           `${result.creditNotes ?? 0} credit notes, ` +
-          `${result.debitNotes ?? 0} debit notes` +
+          `${result.debitNotes ?? 0} debit notes, ` +
+          `${result.deleted ?? 0} old records deleted` +
           (result.failed?.length
             ? `, ${result.failed.length} rows failed. First error: row ${
                 result.failed[0].row
               } — ${result.failed[0].error}`
-            : ".")
+            : ".") +
+          (result.deletionSkipped ? ` ${result.deletionSkipReason}` : "")
       );
       if (result.lastSuccessfulSync) {
         setLastSheetSync(result.lastSuccessfulSync);
