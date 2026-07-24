@@ -21,6 +21,30 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const dir = lang === "ar" ? "rtl" : "ltr";
+  const t = lang === "ar" ? {
+    administration: "الإدارة", title: "إدارة المستخدمين",
+    subtitle: "إضافة المستخدمين وتغيير كلمات المرور والأدوار وصلاحية الحساب.",
+    users: "مستخدمون", addNew: "إضافة مستخدم جديد", username: "اسم المستخدم",
+    password: "كلمة المرور", role: "الدور", user: "مستخدم", admin: "مسؤول",
+    adding: "جارٍ الإضافة...", add: "إضافة مستخدم", status: "الحالة",
+    created: "تاريخ الإنشاء", actions: "الإجراءات", active: "نشط",
+    disabled: "معطل", changePassword: "تغيير كلمة المرور", delete: "حذف",
+    loading: "جارٍ تحميل المستخدمين...", empty: "لا يوجد مستخدمون.",
+    newPassword: "أدخل كلمة مرور جديدة لـ", minimum: "بحد أدنى 8 أحرف",
+    confirmDelete: "هل تريد حذف المستخدم",
+  } : {
+    administration: "ADMINISTRATION", title: "User Management",
+    subtitle: "Add users, change passwords, roles, and account access.",
+    users: "users", addNew: "Add New User", username: "Username",
+    password: "Password", role: "Role", user: "User", admin: "Admin",
+    adding: "Adding...", add: "Add User", status: "Status",
+    created: "Created", actions: "Actions", active: "Active",
+    disabled: "Disabled", changePassword: "Change Password", delete: "Delete",
+    loading: "Loading users...", empty: "No managed users found.",
+    newPassword: "Enter a new password for", minimum: "minimum 8 characters",
+    confirmDelete: "Delete user",
+  };
 
   async function loadUsers() {
     setLoading(true);
@@ -78,14 +102,14 @@ export default function UsersPage() {
 
   async function resetPassword(user: ManagedUser) {
     const newPassword = prompt(
-      `Enter a new password for ${user.username} (minimum 8 characters):`
+      `${t.newPassword} ${user.username} (${t.minimum}):`
     );
     if (!newPassword) return;
     await updateUser(user.id, { password: newPassword });
   }
 
   async function deleteUser(user: ManagedUser) {
-    if (!confirm(`Delete user ${user.username}?`)) return;
+    if (!confirm(`${t.confirmDelete} ${user.username}?`)) return;
     const response = await fetch(
       `/api/auth/users?id=${encodeURIComponent(user.id)}`,
       { method: "DELETE" }
@@ -100,7 +124,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="users-page">
+    <div className="users-page" dir={dir}>
       <Header
         active="users"
         lang={lang}
@@ -109,18 +133,18 @@ export default function UsersPage() {
       <main className="users-layout">
         <div className="users-heading">
           <div>
-            <p>ADMINISTRATION</p>
-            <h1>User Management</h1>
-            <span>Add users, change passwords, roles, and account access.</span>
+            <p>{t.administration}</p>
+            <h1>{t.title}</h1>
+            <span>{t.subtitle}</span>
           </div>
-          <strong>{users.length} users</strong>
+          <strong>{users.length} {t.users}</strong>
         </div>
 
         <section className="users-add-card">
-          <h2>Add New User</h2>
+          <h2>{t.addNew}</h2>
           <form onSubmit={addUser}>
             <label>
-              Username
+              {t.username}
               <input
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
@@ -129,7 +153,7 @@ export default function UsersPage() {
               />
             </label>
             <label>
-              Password
+              {t.password}
               <input
                 type="password"
                 value={password}
@@ -139,19 +163,19 @@ export default function UsersPage() {
               />
             </label>
             <label>
-              Role
+              {t.role}
               <select
                 value={role}
                 onChange={(event) =>
                   setRole(event.target.value as "admin" | "user")
                 }
               >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
+                <option value="user">{t.user}</option>
+                <option value="admin">{t.admin}</option>
               </select>
             </label>
             <button type="submit" disabled={saving}>
-              {saving ? "Adding..." : "Add User"}
+              {saving ? t.adding : t.add}
             </button>
           </form>
           {message && <p className="users-message">{message}</p>}
@@ -161,11 +185,11 @@ export default function UsersPage() {
           <table>
             <thead>
               <tr>
-                <th>Username</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
+                <th>{t.username}</th>
+                <th>{t.role}</th>
+                <th>{t.status}</th>
+                <th>{t.created}</th>
+                <th>{t.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -179,8 +203,8 @@ export default function UsersPage() {
                         updateUser(user.id, { role: event.target.value })
                       }
                     >
-                      <option value="user">User</option>
-                      <option value="admin">Admin</option>
+                      <option value="user">{t.user}</option>
+                      <option value="admin">{t.admin}</option>
                     </select>
                   </td>
                   <td>
@@ -191,21 +215,21 @@ export default function UsersPage() {
                         updateUser(user.id, { active: !user.active })
                       }
                     >
-                      {user.active ? "Active" : "Disabled"}
+                      {user.active ? t.active : t.disabled}
                     </button>
                   </td>
-                  <td>{new Date(user.created_at).toLocaleDateString("en-EG")}</td>
+                  <td>{new Date(user.created_at).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-EG")}</td>
                   <td>
                     <div className="users-actions">
                       <button type="button" onClick={() => resetPassword(user)}>
-                        Change Password
+                        {t.changePassword}
                       </button>
                       <button
                         type="button"
                         className="users-delete"
                         onClick={() => deleteUser(user)}
                       >
-                        Delete
+                        {t.delete}
                       </button>
                     </div>
                   </td>
@@ -213,9 +237,9 @@ export default function UsersPage() {
               ))}
             </tbody>
           </table>
-          {loading && <div className="users-empty">Loading users...</div>}
+          {loading && <div className="users-empty">{t.loading}</div>}
           {!loading && !users.length && (
-            <div className="users-empty">No managed users found.</div>
+            <div className="users-empty">{t.empty}</div>
           )}
         </section>
       </main>
@@ -223,4 +247,3 @@ export default function UsersPage() {
     </div>
   );
 }
-
