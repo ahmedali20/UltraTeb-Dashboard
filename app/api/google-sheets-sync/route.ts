@@ -236,14 +236,62 @@ async function nextCustomerCode() {
   return `CUST${String(number).padStart(3, "0")}`;
 }
 
+function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
+  const combined = new Map<string, SheetRow>();
+  const rowsWithoutInvoice: SheetRow[] = [];
+  let duplicateRowsCombined = 0;
+
+  sheetRows.forEach((row, index) => {
+    const invoiceNo = getValue(row, [
+      "invoice_no",
+      "invoice_number",
+      "invoice",
+    ]);
+
+    if (!invoiceNo) {
+      rowsWithoutInvoice.push({ ...row, _sheet_row: String(index + 2) });
+      return;
+    }
+
+    const existing = combined.get(invoiceNo);
+    if (!existing) {
+      combined.set(invoiceNo, {
+        ...row,
+        _sheet_row: String(index + 2),
+      });
+      return;
+    }
+
+    existing.sales_item_total = String(
+      parseNumber(existing.sales_item_total || "") +
+        parseNumber(row.sales_item_total || "")
+    );
+    existing.tax = String(
+      parseNumber(existing.tax || "") + parseNumber(row.tax || "")
+    );
+    existing.customer_name ||= row.customer_name;
+    existing.sales_date ||= row.sales_date;
+    existing.sales_rep ||= row.sales_rep;
+    duplicateRowsCombined += 1;
+  });
+
+  return {
+    rows: [...combined.values(), ...rowsWithoutInvoice],
+    duplicateRowsCombined,
+  };
+}
+
 async function syncInvoices() {
   const sheetRows = await readSheet();
+  const combinedRows = combineRowsWithSameInvoice(sheetRows);
   const [{ data: customers, error: customersError }, { data: priorSales, error: salesError }] =
     await Promise.all([
       supabase
         .from("customers")
         .select("customer_code, customer_name, sales_rep_name"),
-      supabase.from("sales_view").select("invoice_no, customer_code, customer_name"),
+      supabase
+        .from("sales_view")
+        .select("id, invoice_no, customer_code, customer_name"),
     ]);
 
   if (customersError) throw new Error(customersError.message);
@@ -256,8 +304,9 @@ async function syncInvoices() {
   let skippedIncomplete = 0;
   const failed: { row: number; invoice?: string; error: string }[] = [];
 
-  for (let index = 0; index < sheetRows.length; index += 1) {
-    const row = sheetRows[index];
+  for (let index = 0; index < combinedRows.rows.length; index += 1) {
+    const row = combinedRows.rows[index];
+    const sheetRowNumber = Number(row._sheet_row) || index + 2;
     const invoiceNo = getValue(row, ["invoice_no", "invoice_number", "invoice"]);
     const rawSalesDate = getValue(row, [
       "sales_date",
@@ -304,7 +353,7 @@ async function syncInvoices() {
           ? `Invalid sales date value "${rawSalesDate}".`
           : "";
       failed.push({
-        row: index + 2,
+        row: sheetRowNumber,
         invoice: invoiceNo,
         error:
           invalidDate ||
@@ -342,7 +391,7 @@ async function syncInvoices() {
         .single();
 
       if (error) {
-        failed.push({ row: index + 2, invoice: invoiceNo, error: error.message });
+        failed.push({ row: sheetRowNumber, invoice: invoiceNo, error: error.message });
         continue;
       }
 
@@ -353,7 +402,7 @@ async function syncInvoices() {
 
     if (!customer) {
       failed.push({
-        row: index + 2,
+        row: sheetRowNumber,
         invoice: invoiceNo,
         error: "Customer could not be matched.",
       });
@@ -368,7 +417,7 @@ async function syncInvoices() {
 
       if (repError) {
         failed.push({
-          row: index + 2,
+          row: sheetRowNumber,
           invoice: invoiceNo,
           error: repError.message,
         });
@@ -384,18 +433,38 @@ async function syncInvoices() {
       sales_item_total: salesItemTotal,
       tax,
     };
-    const existing = (priorSales ?? []).find(
+    const existingMatches = (priorSales ?? []).filter(
       (sale) => String(sale.invoice_no).trim() === invoiceNo
     );
-
+    const existing = existingMatches[0];
     const query = existing
-      ? supabase.from("sales").update(payload).eq("invoice_no", invoiceNo)
+      ? supabase.from("sales").update(payload).eq("id", existing.id)
       : supabase.from("sales").insert(payload);
     const { error } = await query;
 
     if (error) {
-      failed.push({ row: index + 2, invoice: invoiceNo, error: error.message });
+      failed.push({ row: sheetRowNumber, invoice: invoiceNo, error: error.message });
     } else if (existing) {
+      const duplicateIds = existingMatches
+        .slice(1)
+        .map((sale) => sale.id)
+        .filter(Boolean);
+
+      if (duplicateIds.length) {
+        const { error: duplicateDeleteError } = await supabase
+          .from("sales")
+          .delete()
+          .in("id", duplicateIds);
+
+        if (duplicateDeleteError) {
+          failed.push({
+            row: sheetRowNumber,
+            invoice: invoiceNo,
+            error: duplicateDeleteError.message,
+          });
+          continue;
+        }
+      }
       updated += 1;
     } else {
       inserted += 1;
@@ -410,6 +479,8 @@ async function syncInvoices() {
   return {
     success: true,
     rowsRead: sheetRows.length,
+    invoicesProcessed: combinedRows.rows.length - skippedIncomplete,
+    duplicateRowsCombined: combinedRows.duplicateRowsCombined,
     inserted,
     updated,
     createdCustomers,
