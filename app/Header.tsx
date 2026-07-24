@@ -64,6 +64,20 @@ export default function Header({ active, lang, onToggleLang }: Props) {
     pageShell?.classList.toggle("dashboard-shell--sidebar-open", isSidebarOpen);
     document.body.classList.toggle("dashboard-sidebar-open", isSidebarOpen);
     document.body.classList.toggle("dashboard-sidebar-rtl", lang === "ar");
+    const sidebarSpace = isSidebarOpen ? "236px" : "0px";
+    document.body.style.setProperty(
+      "padding-left",
+      lang === "ar" ? "0px" : sidebarSpace,
+      "important"
+    );
+    document.body.style.setProperty(
+      "padding-right",
+      lang === "ar" ? sidebarSpace : "0px",
+      "important"
+    );
+    document.body.style.setProperty("box-sizing", "border-box", "important");
+    document.body.style.setProperty("width", "100%", "important");
+    document.body.style.setProperty("overflow-x", "hidden", "important");
 
     return () => {
       pageShell?.classList.remove("dashboard-shell--sidebar-open");
@@ -71,6 +85,11 @@ export default function Header({ active, lang, onToggleLang }: Props) {
         "dashboard-sidebar-open",
         "dashboard-sidebar-rtl"
       );
+      document.body.style.removeProperty("padding-left");
+      document.body.style.removeProperty("padding-right");
+      document.body.style.removeProperty("box-sizing");
+      document.body.style.removeProperty("width");
+      document.body.style.removeProperty("overflow-x");
     };
   }, [isSidebarOpen, lang]);
 
