@@ -115,10 +115,12 @@ export default function SalesTable({
   sales,
   customers,
   salesReps,
+  lastSuccessfulSync,
 }: {
   sales: SaleRow[];
   customers: CustomerOption[];
   salesReps: string[];
+  lastSuccessfulSync: string | null;
 }) {
   const router = useRouter();
   const [lang, setLang] = useState<"en" | "ar">("en");
@@ -162,6 +164,7 @@ export default function SalesTable({
   const [uploading, setUploading] = useState(false);
   const [syncingSheet, setSyncingSheet] = useState(false);
   const [sheetSyncStatus, setSheetSyncStatus] = useState("");
+  const [lastSheetSync, setLastSheetSync] = useState(lastSuccessfulSync);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const inputStyle: React.CSSProperties = {
@@ -343,6 +346,9 @@ export default function SalesTable({
               } — ${result.failed[0].error}`
             : ".")
       );
+      if (result.lastSuccessfulSync) {
+        setLastSheetSync(result.lastSuccessfulSync);
+      }
       router.refresh();
     } catch {
       setSheetSyncStatus("Google Sheet sync failed. Please try again.");
@@ -635,7 +641,19 @@ export default function SalesTable({
 
       <section className="sheet-sync-panel">
         <div>
-          <strong>Google Sheet Sync</strong>
+          <div className="sheet-sync-panel__title">
+            <strong>Google Sheet Sync</strong>
+            <small>
+              Last successful sync:{" "}
+              {lastSheetSync
+                ? new Intl.DateTimeFormat("en-EG", {
+                    timeZone: "Africa/Cairo",
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(lastSheetSync))
+                : "Not synced yet"}
+            </small>
+          </div>
           <span>
             Invoices Sales · Automatic daily sync at 11:59 AM Cairo
           </span>
