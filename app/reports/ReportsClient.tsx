@@ -14,6 +14,9 @@ type ReportSale = {
   sales_item_total: number;
   tax: number;
   total_sales: number;
+  document_type: "INVOICE" | "CR_NOTE" | "DR_NOTE";
+  original_invoice_no: string | null;
+  note_reason: string | null;
 };
 
 function normalizeRep(value: string | null) {
@@ -165,6 +168,9 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
     const detailRows = [
       [
         "Invoice No",
+        "Document Type",
+        "Original Invoice",
+        "Reason",
         "Sales Date",
         "Month",
         "Customer",
@@ -175,6 +181,9 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
       ],
       ...filtered.map((sale) => [
         sale.invoice_no,
+        sale.document_type ?? "INVOICE",
+        sale.original_invoice_no ?? "",
+        sale.note_reason ?? "",
         sale.sales_date,
         sale.month,
         sale.customer_name,
@@ -387,13 +396,18 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
             <table>
               <thead>
                 <tr>
-                  <th>{t.invoiceNo}</th><th>{t.date}</th><th>{t.month}</th><th>{t.customer}</th>
+                  <th>{lang === "ar" ? "المستند" : "Document"}</th><th>{t.invoiceNo}</th><th>{t.date}</th><th>{t.month}</th><th>{t.customer}</th>
                   <th>{t.salesRep}</th><th>{t.itemTotal}</th><th>{t.tax}</th><th>{t.totalSales}</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((sale) => (
                   <tr key={sale.id}>
+                    <td>
+                      <span className={`document-type-badge document-type-badge--${(sale.document_type ?? "INVOICE").toLowerCase()}`}>
+                        {sale.document_type === "CR_NOTE" ? "CR Note" : sale.document_type === "DR_NOTE" ? "DR Note" : lang === "ar" ? "فاتورة" : "Invoice"}
+                      </span>
+                    </td>
                     <td><strong>{sale.invoice_no}</strong></td>
                     <td>{sale.sales_date}</td><td>{sale.month}</td>
                     <td>{sale.customer_name || "-"}</td><td>{normalizeRep(sale.sales_rep)}</td>
