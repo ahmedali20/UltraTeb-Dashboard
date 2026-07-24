@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 const SPREADSHEET_ID = "13L05U9X3f4cerrzSQu6qQxSTrqY-b8jo4SVYZ9Vrcc4";
 const SHEETS = [
   { name: "Invoices Sales", documentType: "INVOICE", range: "B:I" },
-  { name: "CR Notes", documentType: "CR_NOTE", range: "A:I" },
-  { name: "DR Notes", documentType: "DR_NOTE", range: "A:I" },
+  { name: "CR Notes", documentType: "CR_NOTE", range: "B:J" },
+  { name: "DR Notes", documentType: "DR_NOTE", range: "B:J" },
 ] as const;
 
 const supabase = createClient(
@@ -36,6 +36,18 @@ function normalizeHeader(value: string) {
 
 function normalizeName(value: string) {
   return value.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+}
+
+function isAmountLike(value: string | null | undefined) {
+  const raw = String(value ?? "").trim();
+  const normalized = raw
+    .replace(/[\s,\u00a0]/g, "")
+    .replace(/^\((.*)\)$/, "-$1");
+  return (
+    /[.,()]/.test(raw) &&
+    normalized !== "" &&
+    /^-?\d+(?:\.\d+)?$/.test(normalized)
+  );
 }
 
 function getValue(row: SheetRow, aliases: string[]) {
@@ -437,6 +449,10 @@ async function syncInvoices() {
   let deleted = 0;
   let deletionSkipped = false;
   let deletionSkipReason = "";
+  let invalidRepValuesIgnored = 0;
+  let cleanedCustomers = 0;
+  let cleanedCustomerReps = 0;
+  let cleanedSalesReps = 0;
   const syncedDocumentKeys = new Set<string>();
   const failed: { row: number; invoice?: string; error: string }[] = [];
 
@@ -466,12 +482,14 @@ async function syncInvoices() {
       ])
     );
     const tax = parseNumber(getValue(row, ["tax", "tax_value", "vat"]));
-    const salesRep = getValue(row, [
+    const rawSalesRep = getValue(row, [
       "sales_rep",
       "sales_representative",
       "representative",
       "rep",
     ]);
+    const salesRep = isAmountLike(rawSalesRep) ? "" : rawSalesRep;
+    if (rawSalesRep && !salesRep) invalidRepValuesIgnored += 1;
     const rawDocumentType = getValue(row, [
       "document_type",
       "document",
@@ -516,6 +534,14 @@ async function syncInvoices() {
         error:
           invalidDate ||
           `Missing ${missing.join(", ")}.`,
+      });
+      continue;
+    }
+    if (customerName && isAmountLike(customerName)) {
+      failed.push({
+        row: sheetRowNumber,
+        invoice: invoiceNo,
+        error: `Invalid numeric customer name "${customerName}".`,
       });
       continue;
     }
@@ -699,6 +725,70 @@ async function syncInvoices() {
     failed.length === 0 && skippedIncomplete === 0 && !deletionSkipped;
 
   if (fullSyncSucceeded) {
+    const [
+      { data: linkedSales, error: linkedSalesError },
+      { data: currentCustomers, error: currentCustomersError },
+    ] = await Promise.all([
+      supabase.from("sales").select("customer_code"),
+      supabase
+        .from("customers")
+        .select("customer_code, customer_name, sales_rep_name"),
+    ]);
+    if (linkedSalesError) throw new Error(linkedSalesError.message);
+    if (currentCustomersError) throw new Error(currentCustomersError.message);
+
+    const linkedCustomerCodes = new Set(
+      (linkedSales ?? []).map((sale) => sale.customer_code).filter(Boolean)
+    );
+    const removableCustomerCodes = (currentCustomers ?? [])
+      .filter(
+        (customer) =>
+          isAmountLike(customer.customer_name) &&
+          !linkedCustomerCodes.has(customer.customer_code)
+      )
+      .map((customer) => customer.customer_code);
+
+    for (let offset = 0; offset < removableCustomerCodes.length; offset += 100) {
+      const codes = removableCustomerCodes.slice(offset, offset + 100);
+      const { error } = await supabase
+        .from("customers")
+        .delete()
+        .in("customer_code", codes);
+      if (error) throw new Error(`Could not remove invalid customers: ${error.message}`);
+      cleanedCustomers += codes.length;
+    }
+
+    const invalidRepCustomerCodes = (currentCustomers ?? [])
+      .filter((customer) => isAmountLike(customer.sales_rep_name))
+      .map((customer) => customer.customer_code);
+
+    for (let offset = 0; offset < invalidRepCustomerCodes.length; offset += 100) {
+      const codes = invalidRepCustomerCodes.slice(offset, offset + 100);
+      const { error } = await supabase
+        .from("customers")
+        .update({ sales_rep_name: null })
+        .in("customer_code", codes);
+      if (error) throw new Error(`Could not clear invalid representatives: ${error.message}`);
+      cleanedCustomerReps += codes.length;
+    }
+
+    const { data: repRows, error: repRowsError } = await supabase
+      .from("sales_reps")
+      .select("id, name");
+    if (repRowsError) throw new Error(repRowsError.message);
+
+    const invalidRepIds = (repRows ?? [])
+      .filter((rep) => isAmountLike(rep.name))
+      .map((rep) => rep.id);
+    if (invalidRepIds.length) {
+      const { error } = await supabase
+        .from("sales_reps")
+        .delete()
+        .in("id", invalidRepIds);
+      if (error) throw new Error(`Could not remove invalid representatives: ${error.message}`);
+      cleanedSalesReps = invalidRepIds.length;
+    }
+
     const { error: statusError } = await supabase
       .from("dashboard_settings")
       .upsert(
@@ -726,6 +816,10 @@ async function syncInvoices() {
     deleted,
     deletionSkipped,
     deletionSkipReason,
+    invalidRepValuesIgnored,
+    cleanedCustomers,
+    cleanedCustomerReps,
+    cleanedSalesReps,
     skippedIncomplete,
     failed,
     syncedAt,
