@@ -8,11 +8,11 @@ const supabaseServer = createClient(
 );
 
 function isAmountLike(value: unknown) {
-  const normalized = String(value ?? "")
-    .trim()
-    .replace(/,/g, "")
+  const raw = String(value ?? "").trim();
+  const normalized = raw
+    .replace(/[\s,\u00a0]/g, "")
     .replace(/^\((.*)\)$/, "-$1");
-  return normalized !== "" && /^-?\d+(?:\.\d+)?$/.test(normalized);
+  return /[.,()]/.test(raw) && /^-?\d+(?:\.\d+)?$/.test(normalized);
 }
 
 export async function PATCH(
