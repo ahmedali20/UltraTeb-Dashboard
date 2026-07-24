@@ -468,11 +468,6 @@ async function syncInvoices() {
       updated += 1;
     } else {
       inserted += 1;
-      priorSales?.push({
-        invoice_no: invoiceNo,
-        customer_code: customer.customer_code,
-        customer_name: customer.customer_name,
-      });
     }
   }
 
