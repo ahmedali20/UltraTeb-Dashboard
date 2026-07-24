@@ -1,26 +1,66 @@
 import { NextResponse } from "next/server";
-import { createDashboardSession } from "../../../../lib/dashboard-auth";
+import { createClient } from "@supabase/supabase-js";
+import {
+  createDashboardSession,
+  createPasswordSalt,
+  hashDashboardPassword,
+} from "../../../../lib/dashboard-auth";
+
+const supabase = createClient(
+  process.env.SUPABASE_URL as string,
+  process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+  { auth: { persistSession: false } }
+);
 
 export async function POST(request: Request) {
   const { username, password } = await request.json();
-  const expectedUsername = process.env.DASHBOARD_USERNAME;
-  const expectedPassword = process.env.DASHBOARD_PASSWORD;
+  const normalizedUsername = String(username ?? "").trim();
+  const submittedPassword = String(password ?? "");
+  let authenticatedRole: "admin" | "user" | null = null;
 
-  if (!expectedUsername || !expectedPassword) {
-    return NextResponse.json(
-      { error: "Dashboard login is not configured." },
-      { status: 500 }
+  const { data: managedUser } = await supabase
+    .from("dashboard_users")
+    .select("username, password_hash, password_salt, role, active")
+    .ilike("username", normalizedUsername)
+    .maybeSingle();
+
+  if (managedUser?.active) {
+    const submittedHash = await hashDashboardPassword(
+      submittedPassword,
+      managedUser.password_salt
     );
+    if (submittedHash === managedUser.password_hash) {
+      authenticatedRole = managedUser.role;
+    }
   }
 
-  if (username !== expectedUsername || password !== expectedPassword) {
+  const environmentAdmin =
+    normalizedUsername === process.env.DASHBOARD_USERNAME &&
+    submittedPassword === process.env.DASHBOARD_PASSWORD;
+
+  if (!managedUser && environmentAdmin) {
+    const salt = createPasswordSalt();
+    await supabase.from("dashboard_users").insert({
+      username: normalizedUsername,
+      password_hash: await hashDashboardPassword(submittedPassword, salt),
+      password_salt: salt,
+      role: "admin",
+      active: true,
+    });
+    authenticatedRole = "admin";
+  }
+
+  if (!authenticatedRole) {
     return NextResponse.json(
       { error: "Incorrect username or password." },
       { status: 401 }
     );
   }
 
-  const token = await createDashboardSession(expectedUsername);
+  const token = await createDashboardSession(
+    normalizedUsername,
+    authenticatedRole
+  );
   const response = NextResponse.json({ success: true });
   response.cookies.set("ultra_teb_session", token, {
     httpOnly: true,
@@ -31,4 +71,3 @@ export async function POST(request: Request) {
   });
   return response;
 }
-
