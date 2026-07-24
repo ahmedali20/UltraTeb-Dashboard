@@ -1747,3 +1747,34 @@ input::placeholder {
   .app-topbar__actions { gap: 7px; }
   .app-topbar__button { padding: 7px 9px; font-size: 12px; }
 }
+
+[dir="rtl"]:has(> .app-header) {
+  padding-right: 236px;
+  padding-left: 0;
+}
+[dir="rtl"] > .app-header .app-sidebar {
+  inset: 0 0 0 auto;
+  border-right: 0;
+  border-left: 1px solid rgba(255,255,255,.1);
+  box-shadow: -6px 0 22px rgba(5,25,30,.12);
+}
+[dir="rtl"] > .app-header .app-sidebar__link:hover {
+  transform: translateX(-2px);
+}
+.login-card { position: relative; }
+.login-card .login-language {
+  position: absolute; top: 18px; right: 18px; width: auto;
+  padding: 6px 10px; border: 1px solid #cbd5e1;
+  background: #f8fafc; color: #0f3b44; font-size: 11px;
+}
+[dir="rtl"] .login-card .login-language { right: auto; left: 18px; }
+
+@media (max-width: 800px) {
+  [dir="rtl"]:has(> .app-header) { padding-right: 0; }
+  [dir="rtl"] > .app-header .app-sidebar {
+    transform: translateX(105%);
+  }
+  [dir="rtl"] > .app-header .app-sidebar--open {
+    transform: translateX(0);
+  }
+}
