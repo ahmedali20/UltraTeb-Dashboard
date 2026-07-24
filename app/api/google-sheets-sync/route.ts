@@ -166,11 +166,40 @@ async function readSheet() {
   }
 
   const headers = values[headerRowIndex].map(normalizeHeader);
-  return values.slice(headerRowIndex + 1).map((valuesRow) =>
-    Object.fromEntries(
+  return values.slice(headerRowIndex + 1).map((valuesRow) => {
+    const mapped = Object.fromEntries(
       headers.map((header, index) => [header, String(valuesRow[index] ?? "")])
-    )
-  );
+    ) as SheetRow;
+
+    // The Invoices Sales sheet uses columns A:E in this order. Keep this
+    // positional fallback so renamed or formatted headers cannot block sync.
+    return {
+      ...mapped,
+      invoice_no:
+        getValue(mapped, ["invoice_no", "invoice_number", "invoice"]) ||
+        String(valuesRow[0] ?? ""),
+      sales_date:
+        getValue(mapped, ["sales_date", "invoice_date", "date"]) ||
+        String(valuesRow[1] ?? ""),
+      customer_name:
+        getValue(mapped, [
+          "customer_name",
+          "customer",
+          "hospital",
+          "hospital_name",
+        ]) || String(valuesRow[2] ?? ""),
+      sales_item_total:
+        getValue(mapped, [
+          "sales_item_total",
+          "item_total",
+          "net_sales",
+          "sales_total",
+        ]) || String(valuesRow[3] ?? ""),
+      tax:
+        getValue(mapped, ["tax", "tax_value", "vat"]) ||
+        String(valuesRow[4] ?? ""),
+    };
+  });
 }
 
 async function nextCustomerCode() {
@@ -233,10 +262,15 @@ async function syncInvoices() {
 
     if (!invoiceNo && !salesDate && !customerName && !sourceCode) continue;
     if (!invoiceNo || !salesDate || (!customerName && !sourceCode)) {
+      const missing = [
+        !invoiceNo ? "invoice number" : "",
+        !salesDate ? "sales date" : "",
+        !customerName && !sourceCode ? "customer" : "",
+      ].filter(Boolean);
       failed.push({
         row: index + 2,
         invoice: invoiceNo,
-        error: "Missing invoice number, sales date, or customer.",
+        error: `Missing ${missing.join(", ")}.`,
       });
       continue;
     }
