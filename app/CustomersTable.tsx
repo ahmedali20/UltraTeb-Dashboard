@@ -34,6 +34,13 @@ const emptyForm: FormFields = {
   credit_limit: "",
 };
 
+function normalizeSalesRepName(value: string) {
+  return value
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/\b[a-z]/g, (letter) => letter.toLocaleUpperCase());
+}
+
 const translations = {
   en: {
     title: "Customers",
@@ -96,7 +103,7 @@ export default function CustomersTable({
         ...customers
           .map((customer) => customer.sales_rep_name?.trim())
           .filter((name): name is string => Boolean(name)),
-      ]
+      ].map(normalizeSalesRepName)
     )
   ).sort((a, b) => a.localeCompare(b));
 
