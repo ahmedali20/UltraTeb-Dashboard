@@ -49,7 +49,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
     applyTheme(shouldUseDark);
     setIsMounted(true);
     setIsSidebarOpen(
-      window.innerWidth > 800 &&
+      window.innerWidth > 600 &&
         localStorage.getItem("dashboard-sidebar") !== "closed"
     );
 
@@ -94,7 +94,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
   function toggleSidebar() {
     setIsSidebarOpen((open) => {
       const next = !open;
-      if (window.innerWidth > 800) {
+      if (window.innerWidth > 600) {
         localStorage.setItem("dashboard-sidebar", next ? "open" : "closed");
       }
       return next;
