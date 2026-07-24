@@ -1673,13 +1673,24 @@ input::placeholder {
 }
 
 /* Main application sidebar */
-:has(> .app-header--sidebar-open) { padding-left: 236px; }
+:has(> .app-header--sidebar-open) { padding-left: 0; }
 .dashboard-shell--sidebar-open {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding-left: 0;
+  overflow-x: hidden;
+}
+body.dashboard-sidebar-open {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
   padding-left: 236px;
   overflow-x: hidden;
+}
+body.dashboard-sidebar-open.dashboard-sidebar-rtl {
+  padding-right: 236px;
+  padding-left: 0;
 }
 .app-header { margin-bottom: 28px; }
 .app-topbar {
@@ -1758,11 +1769,11 @@ input::placeholder {
 }
 
 [dir="rtl"]:has(> .app-header--sidebar-open) {
-  padding-right: 236px;
+  padding-right: 0;
   padding-left: 0;
 }
 [dir="rtl"].dashboard-shell--sidebar-open {
-  padding-right: 236px;
+  padding-right: 0;
   padding-left: 0;
 }
 [dir="rtl"] > .app-header .app-sidebar {
@@ -1788,6 +1799,11 @@ input::placeholder {
   [dir="rtl"]:has(> .app-header--sidebar-open) { padding-right: 0; }
   .dashboard-shell--sidebar-open,
   [dir="rtl"].dashboard-shell--sidebar-open {
+    padding-right: 0;
+    padding-left: 0;
+  }
+  body.dashboard-sidebar-open,
+  body.dashboard-sidebar-open.dashboard-sidebar-rtl {
     padding-right: 0;
     padding-left: 0;
   }
