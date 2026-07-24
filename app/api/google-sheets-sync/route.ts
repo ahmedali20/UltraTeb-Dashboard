@@ -358,6 +358,10 @@ async function syncInvoices() {
   let skippedIncomplete = 0;
   let creditNotes = 0;
   let debitNotes = 0;
+  let deleted = 0;
+  let deletionSkipped = false;
+  let deletionSkipReason = "";
+  const syncedDocumentKeys = new Set<string>();
   const failed: { row: number; invoice?: string; error: string }[] = [];
 
   for (let index = 0; index < combinedRows.rows.length; index += 1) {
@@ -572,24 +576,66 @@ async function syncInvoices() {
     } else {
       inserted += 1;
     }
+    syncedDocumentKeys.add(`${documentType}:${invoiceNo}`);
     if (documentType === "CR_NOTE") creditNotes += 1;
     if (documentType === "DR_NOTE") debitNotes += 1;
   }
 
+  /*
+   * Google Sheets is the source of truth for sales records. Only remove records
+   * that disappeared from the sheet after a completely valid sync. This guard
+   * prevents an empty, partially configured, or malformed sheet from deleting
+   * existing dashboard data.
+   */
+  if (failed.length > 0 || skippedIncomplete > 0) {
+    deletionSkipped = true;
+    deletionSkipReason =
+      "Deletion skipped because one or more sheet rows failed or were incomplete.";
+  } else if (syncedDocumentKeys.size === 0) {
+    deletionSkipped = true;
+    deletionSkipReason = "Deletion skipped because the sheet contains no valid records.";
+  } else {
+    const staleIds = (priorSales ?? [])
+      .filter((sale) => {
+        const existingType = sale.document_type ?? "INVOICE";
+        const existingInvoiceNo = String(sale.invoice_no ?? "").trim();
+        return !syncedDocumentKeys.has(`${existingType}:${existingInvoiceNo}`);
+      })
+      .map((sale) => sale.id)
+      .filter(Boolean);
+
+    for (let offset = 0; offset < staleIds.length; offset += 100) {
+      const ids = staleIds.slice(offset, offset + 100);
+      const { error: deleteError } = await supabase
+        .from("sales")
+        .delete()
+        .in("id", ids);
+
+      if (deleteError) {
+        throw new Error(`Could not remove old sales records: ${deleteError.message}`);
+      }
+      deleted += ids.length;
+    }
+  }
+
   const syncedAt = new Date().toISOString();
+  const fullSyncSucceeded =
+    failed.length === 0 && skippedIncomplete === 0 && !deletionSkipped;
 
-  const { error: statusError } = await supabase
-    .from("dashboard_settings")
-    .upsert(
-      {
-        key: "google_sheet_last_success",
-        value: syncedAt,
-        updated_at: syncedAt,
-      },
-      { onConflict: "key" }
-    );
+  if (fullSyncSucceeded) {
+    const { error: statusError } = await supabase
+      .from("dashboard_settings")
+      .upsert(
+        {
+          key: "google_sheet_last_success",
+          value: syncedAt,
+          updated_at: syncedAt,
+        },
+        { onConflict: "key" }
+      );
 
-  if (statusError) throw new Error(statusError.message);
+    if (statusError) throw new Error(statusError.message);
+  }
 
   return {
     success: true,
@@ -601,10 +647,13 @@ async function syncInvoices() {
     createdCustomers,
     creditNotes,
     debitNotes,
+    deleted,
+    deletionSkipped,
+    deletionSkipReason,
     skippedIncomplete,
     failed,
     syncedAt,
-    lastSuccessfulSync: syncedAt,
+    lastSuccessfulSync: fullSyncSucceeded ? syncedAt : null,
   };
 }
 
