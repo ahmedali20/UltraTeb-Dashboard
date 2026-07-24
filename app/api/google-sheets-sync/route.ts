@@ -294,12 +294,9 @@ async function readSheet(
           "sales_sub_total",
           "sales_subtotal",
         ]) || String(valuesRow[isInvoiceSheet ? 4 : 5] ?? ""),
-      tax: getValue(mapped, [
-        "tax",
-        "tax_value",
-        "vat",
-        "sales_tax",
-      ]) || String(valuesRow[isInvoiceSheet ? 5 : 6] ?? ""),
+      tax:
+        getValue(mapped, ["tax", "tax_value", "vat", "sales_tax"]) ||
+        String(valuesRow[isInvoiceSheet ? 5 : 6] ?? ""),
       sales_rep:
         getValue(mapped, [
           "sales_rep",
@@ -329,9 +326,7 @@ async function readSheet(
           "credit_debit_reason",
           "adjustment_reason",
         ]) ||
-        (forcedDocumentType === "INVOICE"
-          ? ""
-          : `Imported from ${sheetName}`),
+        (isInvoiceSheet ? "" : `Imported from ${sheetName}`),
       _sheet_name: sheetName,
       _sheet_row: String(headerRowIndex + rowIndex + 2),
     };
@@ -498,7 +493,9 @@ async function syncInvoices() {
       "adjustment_reason",
     ]);
 
-    if (!invoiceNo && !rawSalesDate && !customerName && !sourceCode) continue;
+    // Ignore blank, title, subtotal, and footer rows. A real sales document
+    // must contain at least its document number or document date.
+    if (!invoiceNo && !rawSalesDate) continue;
     if (!rawSalesDate && !customerName && !sourceCode) {
       skippedIncomplete += 1;
       continue;
@@ -664,9 +661,7 @@ async function syncInvoices() {
 
   /*
    * Google Sheets is the source of truth for sales records. Only remove records
-   * that disappeared from the sheet after a completely valid sync. This guard
-   * prevents an empty, partially configured, or malformed sheet from deleting
-   * existing dashboard data.
+   * that disappeared from the sheet after a completely valid sync.
    */
   if (failed.length > 0 || skippedIncomplete > 0) {
     deletionSkipped = true;
@@ -674,7 +669,7 @@ async function syncInvoices() {
       "Deletion skipped because one or more sheet rows failed or were incomplete.";
   } else if (syncedDocumentKeys.size === 0) {
     deletionSkipped = true;
-    deletionSkipReason = "Deletion skipped because the sheet contains no valid records.";
+    deletionSkipReason = "Deletion skipped because the sheets contain no valid records.";
   } else {
     const staleIds = (priorSales ?? [])
       .filter((sale) => {
