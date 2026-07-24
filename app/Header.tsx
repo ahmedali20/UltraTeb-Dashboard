@@ -17,6 +17,11 @@ const labels = {
     reps: "Sales Reps",
     reports: "Reports",
     users: "Users",
+    workspace: "Workspace",
+    administration: "Administration",
+    admin: "Admin",
+    user: "User",
+    logout: "Logout",
     switchTo: "العربية",
   },
   ar: {
@@ -27,6 +32,11 @@ const labels = {
     reps: "المندوبون",
     reports: "التقارير",
     users: "المستخدمون",
+    workspace: "مساحة العمل",
+    administration: "الإدارة",
+    admin: "مسؤول",
+    user: "مستخدم",
+    logout: "تسجيل الخروج",
     switchTo: "English",
   },
 };
@@ -36,6 +46,10 @@ export default function Header({ active, lang, onToggleLang }: Props) {
   const [isDark, setIsDark] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{
+    username: string;
+    role: "admin" | "user";
+  } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const headerRef = useRef<HTMLElement>(null);
 
@@ -55,8 +69,14 @@ export default function Header({ active, lang, onToggleLang }: Props) {
 
     fetch("/api/auth/me")
       .then((response) => (response.ok ? response.json() : null))
-      .then((user) => setIsAdmin(user?.role === "admin"))
-      .catch(() => setIsAdmin(false));
+      .then((user) => {
+        setCurrentUser(user);
+        setIsAdmin(user?.role === "admin");
+      })
+      .catch(() => {
+        setCurrentUser(null);
+        setIsAdmin(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -137,9 +157,12 @@ export default function Header({ active, lang, onToggleLang }: Props) {
           aria-expanded={isSidebarOpen}
           onClick={toggleSidebar}
         >
-          ☰
+          <MenuIcon />
         </button>
-        <strong className="app-topbar__title">Ultra Teb Dashboard</strong>
+        <div className="app-topbar__heading">
+          <strong className="app-topbar__title">Ultra Teb Dashboard</strong>
+          <span>{active === "reps" ? t.reps : active === "sales" ? t.sales : t[active]}</span>
+        </div>
 
         <div className="app-topbar__actions">
           <button
@@ -173,23 +196,50 @@ export default function Header({ active, lang, onToggleLang }: Props) {
           <button type="button" onClick={onToggleLang} className="app-topbar__button">
             {t.switchTo}
           </button>
-          <button type="button" onClick={logout} className="app-topbar__button">
-            Logout
+          {currentUser && (
+            <div className="app-user-chip" title={`${currentUser.username} · ${currentUser.role}`}>
+              <span className="app-user-chip__avatar">
+                {currentUser.username.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="app-user-chip__copy">
+                <strong>{currentUser.username}</strong>
+                <small>{currentUser.role === "admin" ? t.admin : t.user}</small>
+              </span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={logout}
+            className="app-topbar__button app-topbar__logout"
+            title={t.logout}
+          >
+            <LogoutIcon />
+            <span>{t.logout}</span>
           </button>
         </div>
       </div>
 
       <aside className={`app-sidebar${isSidebarOpen ? " app-sidebar--open" : ""}`}>
-        <div className="app-sidebar__brand">Ultra Teb</div>
+        <div className="app-sidebar__brand">
+          <span>UT</span>
+          <div>
+            <strong>Ultra Teb</strong>
+            <small>Sales Intelligence</small>
+          </div>
+        </div>
         <nav className="app-sidebar__nav" aria-label="Main navigation">
-          <a href="/" className={linkClass("home")}>{t.home}</a>
-          <a href="/customers" className={linkClass("customers")}>{t.customers}</a>
-          <a href="/sales#add-record" className={linkClass("addRecord")}>{t.addRecord}</a>
-          <a href="/sales#all-records" className={linkClass("sales")}>{t.sales}</a>
-          <a href="/sales-reps" className={linkClass("reps")}>{t.reps}</a>
-          <a href="/reports" className={linkClass("reports")}>{t.reports}</a>
+          <span className="app-sidebar__section">{t.workspace}</span>
+          <NavLink href="/" page="home" label={t.home} icon="home" className={linkClass("home")} />
+          <NavLink href="/customers" page="customers" label={t.customers} icon="customers" className={linkClass("customers")} />
+          <NavLink href="/sales#add-record" page="addRecord" label={t.addRecord} icon="add" className={linkClass("addRecord")} />
+          <NavLink href="/sales#all-records" page="sales" label={t.sales} icon="records" className={linkClass("sales")} />
+          <NavLink href="/sales-reps" page="reps" label={t.reps} icon="reps" className={linkClass("reps")} />
+          <NavLink href="/reports" page="reports" label={t.reports} icon="reports" className={linkClass("reports")} />
           {isAdmin && (
-            <a href="/users" className={linkClass("users")}>{t.users}</a>
+            <>
+              <span className="app-sidebar__section app-sidebar__section--admin">{t.administration}</span>
+              <NavLink href="/users" page="users" label={t.users} icon="users" className={linkClass("users")} />
+            </>
           )}
         </nav>
       </aside>
@@ -203,6 +253,63 @@ export default function Header({ active, lang, onToggleLang }: Props) {
         />
       )}
     </header>
+  );
+}
+
+function NavLink({
+  href,
+  label,
+  icon,
+  className,
+}: {
+  href: string;
+  page: string;
+  label: string;
+  icon: "home" | "customers" | "add" | "records" | "reps" | "reports" | "users";
+  className: string;
+}) {
+  return (
+    <a href={href} className={className}>
+      <SidebarIcon name={icon} />
+      <span>{label}</span>
+    </a>
+  );
+}
+
+function SidebarIcon({
+  name,
+}: {
+  name: "home" | "customers" | "add" | "records" | "reps" | "reports" | "users";
+}) {
+  const paths = {
+    home: <><path d="m3 11 9-8 9 8" /><path d="M5 10v10h14V10" /><path d="M9 20v-6h6v6" /></>,
+    customers: <><circle cx="9" cy="8" r="3" /><path d="M3 20v-2a6 6 0 0 1 12 0v2" /><circle cx="17" cy="9" r="2" /><path d="M16 14a5 5 0 0 1 5 5v1" /></>,
+    add: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M12 12v6M9 15h6" /></>,
+    records: <><path d="M6 3h12v18H6z" /><path d="M9 8h6M9 12h6M9 16h4" /></>,
+    reps: <><circle cx="8" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M2.5 20a5.5 5.5 0 0 1 11 0M13 16a4.5 4.5 0 0 1 8.5 2" /></>,
+    reports: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
+    users: <><circle cx="12" cy="7" r="3" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /><path d="M19 5v4M17 7h4" /></>,
+  };
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      {paths[name]}
+    </svg>
+  );
+}
+
+function MenuIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 17l5-5-5-5M15 12H3" /><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" />
+    </svg>
   );
 }
 
