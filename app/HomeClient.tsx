@@ -155,7 +155,23 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
   }, [filteredSales, lang, t.unassigned]);
 
   const chartMaximum = Math.max(...monthlyData.map((month) => month.total), 1);
-  const chartColors = ["#0f766e", "#2563eb", "#f59e0b", "#7c3aed", "#e11d48", "#0891b2"];
+  const chartColors = [
+    "#0f766e", "#2563eb", "#f59e0b", "#7c3aed",
+    "#e11d48", "#0891b2", "#65a30d", "#ea580c",
+    "#4f46e5", "#db2777", "#059669", "#9333ea",
+  ];
+  function repColor(rep: string) {
+    const stableIndex = allSalesReps.indexOf(rep);
+    if (stableIndex >= 0 && stableIndex < chartColors.length) {
+      return chartColors[stableIndex];
+    }
+
+    let hash = 0;
+    for (const character of rep) {
+      hash = character.charCodeAt(0) + ((hash << 5) - hash);
+    }
+    return `hsl(${Math.abs(hash) % 360} 68% 46%)`;
+  }
   const recentInvoices = filteredSales.slice(0, 5);
   const uniqueCustomers = new Set(
     filteredSales.map((sale) => sale.customer_name).filter(Boolean)
@@ -177,10 +193,10 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
   );
   let donutStart = 0;
   const donutGradient = repTotals
-    .map((rep, index) => {
+    .map((rep) => {
       const start = donutStart;
       donutStart += (rep.value / repGrandTotal) * 100;
-      return `${chartColors[index % chartColors.length]} ${start}% ${donutStart}%`;
+      return `${repColor(rep.rep)} ${start}% ${donutStart}%`;
     })
     .join(", ");
 
@@ -270,9 +286,9 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
             {monthlyData.length ? (
               <>
                 <div className="dashboard-chart__legend">
-                  {salesReps.map((rep, index) => (
+                  {salesReps.map((rep) => (
                     <span key={rep}>
-                      <i style={{ background: chartColors[index % chartColors.length] }} />
+                      <i style={{ background: repColor(rep) }} />
                       {rep}
                     </span>
                   ))}
@@ -289,7 +305,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
                           height: `${Math.max((month.total / chartMaximum) * 180, 8)}px`,
                         }}
                       >
-                        {salesReps.map((rep, index) => {
+                        {salesReps.map((rep) => {
                           const repValue = month.values[rep] ?? 0;
                           if (!repValue) return null;
 
@@ -300,7 +316,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
                               title={`${rep}: ${formatMoney(repValue, lang)}`}
                               style={{
                                 height: `${(repValue / month.total) * 100}%`,
-                                background: chartColors[index % chartColors.length],
+                                background: repColor(rep),
                               }}
                             />
                           );
@@ -332,13 +348,13 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
                 <span>{formatMoney(repGrandTotal === 1 ? 0 : repGrandTotal, lang)}</span>
               </div>
               <div className="dashboard-donut-legend">
-                {repTotals.map((rep, index) => (
+                {repTotals.map((rep) => (
                   <button
                     type="button"
                     key={rep.rep}
                     onClick={() => setSelectedRep(rep.rep)}
                   >
-                    <i style={{ background: chartColors[index % chartColors.length] }} />
+                    <i style={{ background: repColor(rep.rep) }} />
                     <span>{rep.rep}</span>
                     <strong>{((rep.value / repGrandTotal) * 100).toFixed(1)}%</strong>
                   </button>
@@ -382,7 +398,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
               <h2>{lang === "ar" ? "أداء المندوبين" : "Rep Performance"}</h2>
             </div>
             <div className="dashboard-rep-bars">
-              {repTotals.map((rep, index) => (
+              {repTotals.map((rep) => (
                 <button
                   type="button"
                   key={rep.rep}
@@ -394,7 +410,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
                     <b
                       style={{
                         width: `${(rep.value / Math.max(repTotals[0]?.value || 1, 1)) * 100}%`,
-                        background: chartColors[index % chartColors.length],
+                        background: repColor(rep.rep),
                       }}
                     />
                   </i>
