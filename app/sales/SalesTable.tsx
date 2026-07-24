@@ -152,6 +152,7 @@ export default function SalesTable({
         .map((customer) => customer.sales_rep_name?.trim())
         .filter((name): name is string => Boolean(name))
         .concat(salesReps)
+        .map((name) => normalizeSalesRep(name))
     )
   ).sort((a, b) => a.localeCompare(b));
 
