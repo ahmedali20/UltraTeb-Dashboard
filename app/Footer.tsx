@@ -2,7 +2,7 @@
 
 const text = {
   en: "Ultra Teb for Trade — Internal Dashboard",
-  ar: "الترا طب للتجارة — لوحة تحكم داخلية",
+  ar: "ألترا طب للتجارة — لوحة تحكم داخلية",
 };
 
 export default function Footer({ lang }: { lang: "en" | "ar" }) {
