@@ -9,19 +9,60 @@ const supabaseServer = createClient(
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const name = String(body.name ?? "").trim();
+  const documentType =
+    body.document_type === "CR_NOTE" || body.document_type === "DR_NOTE"
+      ? body.document_type
+      : "INVOICE";
 
-  if (!name) {
+  if (!body.sales_rep_name) {
     return NextResponse.json(
-      { error: "Sales representative name is required." },
+      { error: "Sales representative is required." },
+      { status: 400 }
+    );
+  }
+  if (
+    documentType !== "INVOICE" &&
+    (!String(body.original_invoice_no ?? "").trim() ||
+      !String(body.note_reason ?? "").trim())
+  ) {
+    return NextResponse.json(
+      { error: "Original invoice number and reason are required for notes." },
+      { status: 400 }
+    );
+  }
+
+  const sign = documentType === "CR_NOTE" ? -1 : 1;
+
+  const { error: customerError } = await supabaseServer
+    .from("customers")
+    .update({ sales_rep_name: body.sales_rep_name })
+    .eq("customer_code", body.customer_code);
+
+  if (customerError) {
+    return NextResponse.json(
+      { error: customerError.message },
       { status: 400 }
     );
   }
 
   const { data, error } = await supabaseServer
-    .from("sales_reps")
-    .insert({ name })
-    .select("id, name")
+    .from("sales")
+    .insert({
+      invoice_no: body.invoice_no,
+      sales_date: body.sales_date,
+      customer_code: body.customer_code,
+      sales_item_total:
+        sign * Math.abs(Number(body.sales_item_total) || 0),
+      tax: sign * Math.abs(Number(body.tax) || 0),
+      document_type: documentType,
+      original_invoice_no:
+        documentType === "INVOICE"
+          ? null
+          : String(body.original_invoice_no).trim(),
+      note_reason:
+        documentType === "INVOICE" ? null : String(body.note_reason).trim(),
+    })
+    .select()
     .single();
 
   if (error) {
@@ -31,45 +72,11 @@ export async function POST(request: Request) {
   return NextResponse.json({ data });
 }
 
-export async function DELETE(request: Request) {
-  const id = new URL(request.url).searchParams.get("id");
-
-  if (!id) {
-    return NextResponse.json({ error: "Missing representative ID." }, { status: 400 });
-  }
-
-  const { data: rep, error: repError } = await supabaseServer
-    .from("sales_reps")
-    .select("name")
-    .eq("id", id)
-    .single();
-
-  if (repError) {
-    return NextResponse.json({ error: repError.message }, { status: 400 });
-  }
-
-  const { count, error: countError } = await supabaseServer
-    .from("customers")
-    .select("*", { count: "exact", head: true })
-    .ilike("sales_rep_name", rep.name.trim());
-
-  if (countError) {
-    return NextResponse.json({ error: countError.message }, { status: 400 });
-  }
-
-  if ((count ?? 0) > 0) {
-    return NextResponse.json(
-      {
-        error: `This representative is assigned to ${count} customer(s). Reassign them before deleting.`,
-      },
-      { status: 409 }
-    );
-  }
-
+export async function DELETE() {
   const { error } = await supabaseServer
-    .from("sales_reps")
+    .from("sales")
     .delete()
-    .eq("id", id);
+    .not("id", "is", null);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
