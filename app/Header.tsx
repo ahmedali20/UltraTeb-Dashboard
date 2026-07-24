@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 type Props = {
-  active: "home" | "customers" | "sales" | "reps";
+  active: "home" | "customers" | "sales" | "reps" | "reports";
   lang: "en" | "ar";
   onToggleLang: () => void;
 };
@@ -15,6 +15,7 @@ const labels = {
     addRecord: "Add Record",
     sales: "All Records",
     reps: "Sales Reps",
+    reports: "Reports",
     switchTo: "العربية",
   },
   ar: {
@@ -23,6 +24,7 @@ const labels = {
     addRecord: "إضافة فاتورة",
     sales: "كل الفواتير",
     reps: "المندوبون",
+    reports: "Reports",
     switchTo: "English",
   },
 };
@@ -124,6 +126,10 @@ export default function Header({
 
           <a href="/sales-reps" style={linkStyle("reps")}>
             {t.reps}
+          </a>
+
+          <a href="/reports" style={linkStyle("reports")}>
+            {t.reports}
           </a>
         </nav>
       </div>
