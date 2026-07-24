@@ -95,6 +95,34 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
     { item: 0, tax: 0, total: 0 }
   );
 
+  const customerSummary = useMemo(() => {
+    const summary = new Map<string, { invoices: number; total: number }>();
+    filtered.forEach((sale) => {
+      const name = sale.customer_name || "Unassigned Customer";
+      const current = summary.get(name) ?? { invoices: 0, total: 0 };
+      current.invoices += 1;
+      current.total += Number(sale.total_sales || 0);
+      summary.set(name, current);
+    });
+    return Array.from(summary.entries())
+      .map(([name, values]) => ({ name, ...values }))
+      .sort((a, b) => b.total - a.total);
+  }, [filtered]);
+
+  const salesRepSummary = useMemo(() => {
+    const summary = new Map<string, { invoices: number; total: number }>();
+    filtered.forEach((sale) => {
+      const name = normalizeRep(sale.sales_rep);
+      const current = summary.get(name) ?? { invoices: 0, total: 0 };
+      current.invoices += 1;
+      current.total += Number(sale.total_sales || 0);
+      summary.set(name, current);
+    });
+    return Array.from(summary.entries())
+      .map(([name, values]) => ({ name, ...values }))
+      .sort((a, b) => b.total - a.total);
+  }, [filtered]);
+
   function clearFilters() {
     setStartDate("");
     setEndDate("");
@@ -199,6 +227,82 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
           <article><span>Item Total</span><strong>{money(totals.item)}</strong></article>
           <article><span>Total TAX</span><strong>{money(totals.tax)}</strong></article>
           <article className="report-kpi-primary"><span>Total Sales</span><strong>{money(totals.total)}</strong></article>
+        </section>
+
+        <section className="report-summary-grid">
+          <article className="report-summary-card">
+            <div className="report-summary-card__heading">
+              <div>
+                <p>SELECTED PERIOD</p>
+                <h2>Customer Sales Summary</h2>
+              </div>
+              <strong>{customerSummary.length} customers</strong>
+            </div>
+            <div className="report-summary-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Customer Name</th>
+                    <th>Invoices</th>
+                    <th>Total Sales</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customerSummary.map((item) => (
+                    <tr key={item.name}>
+                      <td>{item.name}</td>
+                      <td>{item.invoices}</td>
+                      <td><strong>{money(item.total)}</strong></td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td>Grand Total</td>
+                    <td>{filtered.length}</td>
+                    <td>{money(totals.total)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </article>
+
+          <article className="report-summary-card">
+            <div className="report-summary-card__heading">
+              <div>
+                <p>SELECTED PERIOD</p>
+                <h2>Sales Rep Summary</h2>
+              </div>
+              <strong>{salesRepSummary.length} reps</strong>
+            </div>
+            <div className="report-summary-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sales Rep</th>
+                    <th>Invoices</th>
+                    <th>Total Sales</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesRepSummary.map((item) => (
+                    <tr key={item.name}>
+                      <td>{item.name}</td>
+                      <td>{item.invoices}</td>
+                      <td><strong>{money(item.total)}</strong></td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td>Grand Total</td>
+                    <td>{filtered.length}</td>
+                    <td>{money(totals.total)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </article>
         </section>
 
         <section className="report-table-card">
