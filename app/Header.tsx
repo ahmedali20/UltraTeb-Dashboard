@@ -61,10 +61,18 @@ export default function Header({ active, lang, onToggleLang }: Props) {
 
   useEffect(() => {
     const pageShell = headerRef.current?.parentElement;
-    if (!pageShell) return;
-    pageShell.classList.toggle("dashboard-shell--sidebar-open", isSidebarOpen);
-    return () => pageShell.classList.remove("dashboard-shell--sidebar-open");
-  }, [isSidebarOpen]);
+    pageShell?.classList.toggle("dashboard-shell--sidebar-open", isSidebarOpen);
+    document.body.classList.toggle("dashboard-sidebar-open", isSidebarOpen);
+    document.body.classList.toggle("dashboard-sidebar-rtl", lang === "ar");
+
+    return () => {
+      pageShell?.classList.remove("dashboard-shell--sidebar-open");
+      document.body.classList.remove(
+        "dashboard-sidebar-open",
+        "dashboard-sidebar-rtl"
+      );
+    };
+  }, [isSidebarOpen, lang]);
 
   function applyTheme(dark: boolean) {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
