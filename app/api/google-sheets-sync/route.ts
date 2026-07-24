@@ -48,6 +48,29 @@ function parseNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function parseDocumentType(value: string) {
+  const raw = value.trim().toLowerCase();
+  if (!raw) return "INVOICE" as const;
+  if (raw.includes("دائن")) return "CR_NOTE" as const;
+  if (raw.includes("مدين")) return "DR_NOTE" as const;
+  if (raw.includes("فاتورة")) return "INVOICE" as const;
+  const normalized = raw.replace(/[^a-z0-9]+/g, "_");
+  if (["invoice", "sales_invoice", "inv"].includes(normalized)) {
+    return "INVOICE" as const;
+  }
+  if (
+    ["cr", "cr_note", "credit", "credit_note", "creditnote"].includes(normalized)
+  ) {
+    return "CR_NOTE" as const;
+  }
+  if (
+    ["dr", "dr_note", "debit", "debit_note", "debitnote"].includes(normalized)
+  ) {
+    return "DR_NOTE" as const;
+  }
+  return null;
+}
+
 function parseDate(value: string) {
   const trimmed = value
     .trim()
@@ -140,7 +163,7 @@ async function getGoogleAccessToken() {
 
 async function readSheet() {
   const token = await getGoogleAccessToken();
-  const range = encodeURIComponent(`'${SHEET_NAME}'!B:I`);
+  const range = encodeURIComponent(`'${SHEET_NAME}'!B:L`);
   const response = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE`,
     {
@@ -181,9 +204,10 @@ async function readSheet() {
       headers.map((header, index) => [header, String(valuesRow[index] ?? "")])
     ) as SheetRow;
 
-    // The Invoices Sales range is B:I:
+    // The Invoices Sales range is B:L:
     // B invoice, C date, D month, E customer, F item total, G tax,
-    // H total, I sales representative.
+    // H total, I sales representative, J document type,
+    // K original invoice number, L note reason.
     return {
       ...mapped,
       invoice_no:
@@ -216,6 +240,28 @@ async function readSheet() {
           "representative",
           "rep",
         ]) || String(valuesRow[7] ?? ""),
+      document_type:
+        getValue(mapped, [
+          "document_type",
+          "document",
+          "type",
+          "invoice_type",
+          "note_type",
+        ]) || String(valuesRow[8] ?? ""),
+      original_invoice_no:
+        getValue(mapped, [
+          "original_invoice_no",
+          "original_invoice",
+          "related_invoice_no",
+          "reference_invoice",
+        ]) || String(valuesRow[9] ?? ""),
+      note_reason:
+        getValue(mapped, [
+          "note_reason",
+          "reason",
+          "credit_debit_reason",
+          "adjustment_reason",
+        ]) || String(valuesRow[10] ?? ""),
     };
   });
 }
@@ -253,9 +299,14 @@ function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
       return;
     }
 
-    const existing = combined.get(invoiceNo);
+    const documentType =
+      parseDocumentType(
+        getValue(row, ["document_type", "document", "type", "invoice_type"])
+      ) ?? "INVALID";
+    const documentKey = `${documentType}:${invoiceNo}`;
+    const existing = combined.get(documentKey);
     if (!existing) {
-      combined.set(invoiceNo, {
+      combined.set(documentKey, {
         ...row,
         _sheet_row: String(index + 2),
       });
@@ -272,6 +323,9 @@ function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
     existing.customer_name ||= row.customer_name;
     existing.sales_date ||= row.sales_date;
     existing.sales_rep ||= row.sales_rep;
+    existing.document_type ||= row.document_type;
+    existing.original_invoice_no ||= row.original_invoice_no;
+    existing.note_reason ||= row.note_reason;
     duplicateRowsCombined += 1;
   });
 
@@ -291,7 +345,7 @@ async function syncInvoices() {
         .select("customer_code, customer_name, sales_rep_name"),
       supabase
         .from("sales_view")
-        .select("id, invoice_no, customer_code, customer_name"),
+        .select("id, invoice_no, customer_code, customer_name, document_type"),
     ]);
 
   if (customersError) throw new Error(customersError.message);
@@ -302,6 +356,8 @@ async function syncInvoices() {
   let updated = 0;
   let createdCustomers = 0;
   let skippedIncomplete = 0;
+  let creditNotes = 0;
+  let debitNotes = 0;
   const failed: { row: number; invoice?: string; error: string }[] = [];
 
   for (let index = 0; index < combinedRows.rows.length; index += 1) {
@@ -336,6 +392,26 @@ async function syncInvoices() {
       "representative",
       "rep",
     ]);
+    const rawDocumentType = getValue(row, [
+      "document_type",
+      "document",
+      "type",
+      "invoice_type",
+      "note_type",
+    ]);
+    const documentType = parseDocumentType(rawDocumentType);
+    const originalInvoiceNo = getValue(row, [
+      "original_invoice_no",
+      "original_invoice",
+      "related_invoice_no",
+      "reference_invoice",
+    ]);
+    const noteReason = getValue(row, [
+      "note_reason",
+      "reason",
+      "credit_debit_reason",
+      "adjustment_reason",
+    ]);
 
     if (!invoiceNo && !rawSalesDate && !customerName && !sourceCode) continue;
     if (!rawSalesDate && !customerName && !sourceCode) {
@@ -358,6 +434,26 @@ async function syncInvoices() {
         error:
           invalidDate ||
           `Missing ${missing.join(", ")}.`,
+      });
+      continue;
+    }
+    if (!documentType) {
+      failed.push({
+        row: sheetRowNumber,
+        invoice: invoiceNo,
+        error: `Unknown document type "${rawDocumentType}". Use Invoice, CR, Credit Note, DR, or Debit Note.`,
+      });
+      continue;
+    }
+    if (
+      documentType !== "INVOICE" &&
+      (!originalInvoiceNo || !noteReason)
+    ) {
+      failed.push({
+        row: sheetRowNumber,
+        invoice: invoiceNo,
+        error:
+          "Credit and debit notes require Original Invoice No and Note Reason.",
       });
       continue;
     }
@@ -426,15 +522,22 @@ async function syncInvoices() {
       customer.sales_rep_name = salesRep;
     }
 
+    const sign = documentType === "CR_NOTE" ? -1 : 1;
     const payload = {
       invoice_no: invoiceNo,
       sales_date: salesDate,
       customer_code: customer.customer_code,
-      sales_item_total: salesItemTotal,
-      tax,
+      sales_item_total: sign * Math.abs(salesItemTotal),
+      tax: sign * Math.abs(tax),
+      document_type: documentType,
+      original_invoice_no:
+        documentType === "INVOICE" ? null : originalInvoiceNo,
+      note_reason: documentType === "INVOICE" ? null : noteReason,
     };
     const existingMatches = (priorSales ?? []).filter(
-      (sale) => String(sale.invoice_no).trim() === invoiceNo
+      (sale) =>
+        String(sale.invoice_no).trim() === invoiceNo &&
+        (sale.document_type ?? "INVOICE") === documentType
     );
     const existing = existingMatches[0];
     const query = existing
@@ -469,6 +572,8 @@ async function syncInvoices() {
     } else {
       inserted += 1;
     }
+    if (documentType === "CR_NOTE") creditNotes += 1;
+    if (documentType === "DR_NOTE") debitNotes += 1;
   }
 
   const syncedAt = new Date().toISOString();
@@ -494,6 +599,8 @@ async function syncInvoices() {
     inserted,
     updated,
     createdCustomers,
+    creditNotes,
+    debitNotes,
     skippedIncomplete,
     failed,
     syncedAt,
