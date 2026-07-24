@@ -145,6 +145,13 @@ export default function SalesTable({
   >({});
   const [recordRepFilter, setRecordRepFilter] = useState("All");
   const [recordMonthFilter, setRecordMonthFilter] = useState("All");
+  const [recordPage, setRecordPage] = useState(1);
+  const [recordSort, setRecordSort] = useState<
+    "invoice" | "date" | "customer" | "total"
+  >("date");
+  const [recordSortDirection, setRecordSortDirection] =
+    useState<"asc" | "desc">("asc");
+  const recordsPerPage = 25;
   const [activeSalesView, setActiveSalesView] = useState<"add" | "records">(
     "add"
   );
@@ -178,13 +185,25 @@ export default function SalesTable({
   };
 
   const sortedSales = [...sales].sort((a, b) => {
-    const dateComparison = a.sales_date.localeCompare(b.sales_date);
-    if (dateComparison !== 0) return dateComparison;
-
-    return a.invoice_no.localeCompare(b.invoice_no, undefined, {
-      numeric: true,
-      sensitivity: "base",
-    });
+    let comparison = 0;
+    if (recordSort === "invoice") {
+      comparison = a.invoice_no.localeCompare(b.invoice_no, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    } else if (recordSort === "customer") {
+      comparison = (a.customer_name || "").localeCompare(b.customer_name || "");
+    } else if (recordSort === "total") {
+      comparison = Number(a.total_sales || 0) - Number(b.total_sales || 0);
+    } else {
+      comparison =
+        a.sales_date.localeCompare(b.sales_date) ||
+        a.invoice_no.localeCompare(b.invoice_no, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+    }
+    return recordSortDirection === "asc" ? comparison : -comparison;
   });
   const recordReps = Array.from(
     new Set(sales.map((sale) => normalizeSalesRep(sale.sales_rep)))
@@ -202,6 +221,31 @@ export default function SalesTable({
     (total, sale) => total + Number(sale.total_sales || 0),
     0
   );
+  const recordPageCount = Math.max(
+    1,
+    Math.ceil(displayedSales.length / recordsPerPage)
+  );
+  const paginatedSales = displayedSales.slice(
+    (recordPage - 1) * recordsPerPage,
+    recordPage * recordsPerPage
+  );
+
+  useEffect(() => {
+    setRecordPage(1);
+  }, [recordRepFilter, recordMonthFilter, recordSort, recordSortDirection]);
+
+  function toggleRecordSort(
+    key: "invoice" | "date" | "customer" | "total"
+  ) {
+    if (recordSort === key) {
+      setRecordSortDirection((direction) =>
+        direction === "asc" ? "desc" : "asc"
+      );
+    } else {
+      setRecordSort(key);
+      setRecordSortDirection("asc");
+    }
+  }
 
   useEffect(() => {
     function updateViewFromHash() {
@@ -1156,6 +1200,7 @@ export default function SalesTable({
       </div>
 
       <div
+        className="professional-data-table"
         style={{
           display: activeSalesView === "records" ? undefined : "none",
           overflowX: "auto",
@@ -1167,19 +1212,27 @@ export default function SalesTable({
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#2d3748", color: "#fff" }}>
-              <Th align={align}>{t.invoiceNo}</Th>
-              <Th align={align}>{t.date}</Th>
+              <Th align={align}>
+                <SortButton active={recordSort === "invoice"} direction={recordSortDirection} onClick={() => toggleRecordSort("invoice")}>{t.invoiceNo}</SortButton>
+              </Th>
+              <Th align={align}>
+                <SortButton active={recordSort === "date"} direction={recordSortDirection} onClick={() => toggleRecordSort("date")}>{t.date}</SortButton>
+              </Th>
               <Th align={align}>{t.month}</Th>
-              <Th align={align}>{t.customer}</Th>
+              <Th align={align}>
+                <SortButton active={recordSort === "customer"} direction={recordSortDirection} onClick={() => toggleRecordSort("customer")}>{t.customer}</SortButton>
+              </Th>
               <Th align={align}>{t.itemTotal}</Th>
               <Th align={align}>{t.tax}</Th>
-              <Th align={align}>{t.totalSales}</Th>
+              <Th align={align}>
+                <SortButton active={recordSort === "total"} direction={recordSortDirection} onClick={() => toggleRecordSort("total")}>{t.totalSales}</SortButton>
+              </Th>
               <Th align={align}>{t.rep}</Th>
               <Th align={align}>{t.actions}</Th>
             </tr>
           </thead>
           <tbody>
-            {displayedSales.map((s, i) => {
+            {paginatedSales.map((s, i) => {
               const isEditing = editingId === s.id;
               const editedTotal =
                 Number(editForm.sales_item_total || 0) +
@@ -1343,10 +1396,58 @@ export default function SalesTable({
             })}
           </tbody>
         </table>
+        <div className="data-pagination">
+          <span>
+            {lang === "ar" ? "عرض" : "Showing"}{" "}
+            {displayedSales.length
+              ? (recordPage - 1) * recordsPerPage + 1
+              : 0}
+            –{Math.min(recordPage * recordsPerPage, displayedSales.length)}{" "}
+            {lang === "ar" ? "من" : "of"} {displayedSales.length}
+          </span>
+          <div>
+            <button
+              type="button"
+              disabled={recordPage === 1}
+              onClick={() => setRecordPage((page) => Math.max(1, page - 1))}
+            >
+              {lang === "ar" ? "السابق" : "Previous"}
+            </button>
+            <strong>{recordPage} / {recordPageCount}</strong>
+            <button
+              type="button"
+              disabled={recordPage === recordPageCount}
+              onClick={() =>
+                setRecordPage((page) => Math.min(recordPageCount, page + 1))
+              }
+            >
+              {lang === "ar" ? "التالي" : "Next"}
+            </button>
+          </div>
+        </div>
       </div>
       </main>
       <Footer lang={lang} />
     </div>
+  );
+}
+
+function SortButton({
+  children,
+  active,
+  direction,
+  onClick,
+}: {
+  children: React.ReactNode;
+  active: boolean;
+  direction: "asc" | "desc";
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className="table-sort-button" onClick={onClick}>
+      <span>{children}</span>
+      <i>{active ? (direction === "asc" ? "↑" : "↓") : "↕"}</i>
+    </button>
   );
 }
 
