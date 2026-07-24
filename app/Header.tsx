@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 type Props = {
-  active: "home" | "customers" | "sales" | "reps" | "reports";
+  active: "home" | "customers" | "sales" | "reps" | "reports" | "users";
   lang: "en" | "ar";
   onToggleLang: () => void;
 };
@@ -37,6 +37,7 @@ export default function Header({
   const t = labels[lang];
   const [isDark, setIsDark] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("dashboard-theme");
@@ -50,6 +51,11 @@ export default function Header({
     setIsDark(shouldUseDark);
     applyTheme(shouldUseDark);
     setIsMounted(true);
+
+    fetch("/api/auth/me")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((user) => setIsAdmin(user?.role === "admin"))
+      .catch(() => setIsAdmin(false));
   }, []);
 
   function applyTheme(dark: boolean) {
@@ -136,6 +142,12 @@ export default function Header({
           <a href="/reports" style={linkStyle("reports")}>
             {t.reports}
           </a>
+
+          {isAdmin && (
+            <a href="/users" style={linkStyle("users")}>
+              Users
+            </a>
+          )}
         </nav>
       </div>
 
