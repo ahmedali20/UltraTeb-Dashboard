@@ -69,6 +69,11 @@ export default function Header({
     );
   }
 
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  }
+
   const linkStyle = (page: string): React.CSSProperties => ({
     padding: "6px 14px",
     borderRadius: 6,
@@ -238,6 +243,22 @@ export default function Header({
           }}
         >
           {t.switchTo}
+        </button>
+
+        <button
+          type="button"
+          onClick={logout}
+          style={{
+            padding: "6px 13px",
+            borderRadius: 6,
+            border: "1px solid rgba(255,255,255,0.28)",
+            background: "rgba(255,255,255,0.08)",
+            color: "#fff",
+            cursor: "pointer",
+            fontSize: 12,
+          }}
+        >
+          Logout
         </button>
       </div>
     </header>
