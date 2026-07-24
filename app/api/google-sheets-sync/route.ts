@@ -471,6 +471,21 @@ async function syncInvoices() {
     }
   }
 
+  const syncedAt = new Date().toISOString();
+
+  const { error: statusError } = await supabase
+    .from("dashboard_settings")
+    .upsert(
+      {
+        key: "google_sheet_last_success",
+        value: syncedAt,
+        updated_at: syncedAt,
+      },
+      { onConflict: "key" }
+    );
+
+  if (statusError) throw new Error(statusError.message);
+
   return {
     success: true,
     rowsRead: sheetRows.length,
@@ -481,7 +496,8 @@ async function syncInvoices() {
     createdCustomers,
     skippedIncomplete,
     failed,
-    syncedAt: new Date().toISOString(),
+    syncedAt,
+    lastSuccessfulSync: syncedAt,
   };
 }
 
