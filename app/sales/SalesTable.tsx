@@ -160,6 +160,8 @@ export default function SalesTable({
   const [bulkRows, setBulkRows] = useState<BulkInvoiceRow[]>([]);
   const [bulkStatus, setBulkStatus] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [syncingSheet, setSyncingSheet] = useState(false);
+  const [sheetSyncStatus, setSheetSyncStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const inputStyle: React.CSSProperties = {
@@ -315,6 +317,34 @@ export default function SalesTable({
         setBulkStatus(err.message);
       },
     });
+  }
+
+  async function syncGoogleSheet() {
+    setSyncingSheet(true);
+    setSheetSyncStatus("");
+
+    try {
+      const response = await fetch("/api/google-sheets-sync", {
+        method: "POST",
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        setSheetSyncStatus(result.error || "Google Sheet sync failed.");
+        return;
+      }
+
+      setSheetSyncStatus(
+        `Sync complete: ${result.inserted} added, ${result.updated} updated, ` +
+          `${result.createdCustomers} customers created` +
+          (result.failed?.length ? `, ${result.failed.length} rows failed.` : ".")
+      );
+      router.refresh();
+    } catch {
+      setSheetSyncStatus("Google Sheet sync failed. Please try again.");
+    } finally {
+      setSyncingSheet(false);
+    }
   }
 
   function normalizeCustomerValue(value: unknown) {
@@ -598,6 +628,23 @@ export default function SalesTable({
       <p style={{ color: "var(--text-secondary)", marginBottom: 20 }}>
         {t.total} {sales.length}
       </p>
+
+      <section className="sheet-sync-panel">
+        <div>
+          <strong>Google Sheet Sync</strong>
+          <span>
+            Invoices Sales · Automatic daily sync at 11:59 AM Cairo
+          </span>
+          {sheetSyncStatus && <p>{sheetSyncStatus}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={syncGoogleSheet}
+          disabled={syncingSheet}
+        >
+          {syncingSheet ? "Syncing..." : "Sync Now"}
+        </button>
+      </section>
 
       <section
         className="entry-form"
