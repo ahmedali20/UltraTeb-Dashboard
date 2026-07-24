@@ -42,6 +42,9 @@ const text = {
     total: "Total",
     noInvoices: "No invoices have been added yet.",
     unassigned: "Unassigned",
+    vsPrevious: "vs previous month",
+    newActivity: "New",
+    noChange: "No change",
   },
   ar: {
     title: "نظرة عامة على الأعمال",
@@ -63,6 +66,9 @@ const text = {
     total: "الإجمالي",
     noInvoices: "لم تتم إضافة فواتير بعد.",
     unassigned: "بدون مندوب",
+    vsPrevious: "مقارنة بالشهر السابق",
+    newActivity: "جديد",
+    noChange: "بدون تغيير",
   },
 };
 
@@ -113,6 +119,59 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     (total, sale) => total + Number(sale.tax || 0),
     0
   );
+
+  const periodComparison = useMemo(() => {
+    const monthKeys = Array.from(
+      new Set(
+        filteredSales
+          .map((sale) => sale.sales_date?.slice(0, 7))
+          .filter(Boolean)
+      )
+    ).sort();
+    const currentKey = monthKeys[monthKeys.length - 1];
+    if (!currentKey) return null;
+
+    const currentDate = new Date(`${currentKey}-01T00:00:00`);
+    const previousDate = new Date(currentDate);
+    previousDate.setMonth(previousDate.getMonth() - 1);
+    const previousKey = `${previousDate.getFullYear()}-${String(
+      previousDate.getMonth() + 1
+    ).padStart(2, "0")}`;
+
+    const summarize = (monthKey: string) => {
+      const rows = filteredSales.filter(
+        (sale) => sale.sales_date?.slice(0, 7) === monthKey
+      );
+      return {
+        sales: rows.reduce(
+          (sum, sale) => sum + Number(sale.total_sales || 0),
+          0
+        ),
+        tax: rows.reduce((sum, sale) => sum + Number(sale.tax || 0), 0),
+        invoices: rows.length,
+        customers: new Set(
+          rows.map((sale) => sale.customer_name).filter(Boolean)
+        ).size,
+      };
+    };
+
+    const formatPeriod = (key: string) =>
+      new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
+        month: "short",
+        year: "numeric",
+      }).format(new Date(`${key}-01T00:00:00`));
+
+    return {
+      current: summarize(currentKey),
+      previous: summarize(previousKey),
+      label: `${formatPeriod(currentKey)} · ${t.vsPrevious}`,
+    };
+  }, [filteredSales, lang, t.vsPrevious]);
+
+  function trend(current: number, previous: number) {
+    if (!previous) return current ? null : 0;
+    return ((current - previous) / previous) * 100;
+  }
 
   const { monthlyData, salesReps } = useMemo(() => {
     const totals = new Map<string, Map<string, number>>();
@@ -270,10 +329,46 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
         </div>
 
         <section className="dashboard-stats" aria-label={t.title}>
-          <StatCard label={t.totalSales} value={formatMoney(totalSales, lang)} icon="↗" tone="teal" />
-          <StatCard label={t.totalTax} value={formatMoney(totalTax, lang)} icon="%" tone="blue" />
-          <StatCard label={t.invoices} value={filteredSales.length.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} icon="#" tone="amber" />
-          <StatCard label={t.customers} value={(selectedRep === "All" ? customerCount : uniqueCustomers).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} icon="◎" tone="purple" />
+          <StatCard
+            label={t.totalSales}
+            value={formatMoney(totalSales, lang)}
+            icon="↗"
+            tone="teal"
+            trend={periodComparison && trend(periodComparison.current.sales, periodComparison.previous.sales)}
+            period={periodComparison?.label}
+            newLabel={t.newActivity}
+            noChangeLabel={t.noChange}
+          />
+          <StatCard
+            label={t.totalTax}
+            value={formatMoney(totalTax, lang)}
+            icon="%"
+            tone="blue"
+            trend={periodComparison && trend(periodComparison.current.tax, periodComparison.previous.tax)}
+            period={periodComparison?.label}
+            newLabel={t.newActivity}
+            noChangeLabel={t.noChange}
+          />
+          <StatCard
+            label={t.invoices}
+            value={filteredSales.length.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
+            icon="#"
+            tone="amber"
+            trend={periodComparison && trend(periodComparison.current.invoices, periodComparison.previous.invoices)}
+            period={periodComparison?.label}
+            newLabel={t.newActivity}
+            noChangeLabel={t.noChange}
+          />
+          <StatCard
+            label={t.customers}
+            value={(selectedRep === "All" ? customerCount : uniqueCustomers).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
+            icon="◎"
+            tone="purple"
+            trend={periodComparison && trend(periodComparison.current.customers, periodComparison.previous.customers)}
+            period={periodComparison?.label}
+            newLabel={t.newActivity}
+            noChangeLabel={t.noChange}
+          />
         </section>
 
         <section className="dashboard-grid">
@@ -465,12 +560,29 @@ function StatCard({
   value,
   icon,
   tone,
+  trend,
+  period,
+  newLabel,
+  noChangeLabel,
 }: {
   label: string;
   value: string;
   icon: string;
   tone: "teal" | "blue" | "amber" | "purple";
+  trend: number | null;
+  period?: string;
+  newLabel: string;
+  noChangeLabel: string;
 }) {
+  const trendDirection =
+    trend === null ? "new" : trend > 0 ? "up" : trend < 0 ? "down" : "flat";
+  const trendText =
+    trend === null
+      ? newLabel
+      : trend === 0
+        ? noChangeLabel
+        : `${trend > 0 ? "↑" : "↓"} ${Math.abs(trend).toFixed(1)}%`;
+
   return (
     <article className="dashboard-stat">
       <span className={`dashboard-stat__icon dashboard-stat__icon--${tone}`}>
@@ -479,6 +591,14 @@ function StatCard({
       <div>
         <p>{label}</p>
         <strong>{value}</strong>
+        {period && (
+          <div className="dashboard-stat__trend">
+            <span className={`dashboard-stat__badge dashboard-stat__badge--${trendDirection}`}>
+              {trendText}
+            </span>
+            <small>{period}</small>
+          </div>
+        )}
       </div>
     </article>
   );
