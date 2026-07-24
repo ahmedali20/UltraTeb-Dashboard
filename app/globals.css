@@ -2231,3 +2231,46 @@ body.dashboard-sidebar-open.dashboard-sidebar-rtl {
 :root[data-theme="dark"] .document-type-badge--invoice { color: #93c5fd; }
 :root[data-theme="dark"] .document-type-badge--cr_note { color: #fca5a5; }
 :root[data-theme="dark"] .document-type-badge--dr_note { color: #6ee7b7; }
+
+.document-type-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.document-type-options__button {
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+.document-type-options__button:hover {
+  border-color: #178a6b;
+  color: var(--text-primary);
+}
+.document-type-options__button--active {
+  color: #fff;
+  box-shadow: 0 5px 14px rgba(15,23,42,.12);
+}
+.document-type-options__button--invoice {
+  border-color: #2563eb;
+  background: #2563eb;
+}
+.document-type-options__button--cr_note {
+  border-color: #dc2626;
+  background: #dc2626;
+}
+.document-type-options__button--dr_note {
+  border-color: #059669;
+  background: #059669;
+}
+
+@media (max-width: 620px) {
+  .document-type-options {
+    grid-template-columns: 1fr;
+  }
+}
