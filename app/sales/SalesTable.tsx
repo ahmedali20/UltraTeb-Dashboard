@@ -394,7 +394,10 @@ export default function SalesTable({
           `${result.createdCustomers} customers created, ` +
           `${result.creditNotes ?? 0} credit notes, ` +
           `${result.debitNotes ?? 0} debit notes, ` +
-          `${result.deleted ?? 0} old records deleted` +
+          `${result.deleted ?? 0} old records deleted, ` +
+          `${result.cleanedCustomers ?? 0} invalid customers removed, ` +
+          `${result.cleanedSalesReps ?? 0} invalid reps removed, ` +
+          `${result.cleanedCustomerReps ?? 0} invalid assignments cleared` +
           (result.failed?.length
             ? `, ${result.failed.length} rows failed. First error: row ${
                 result.failed[0].row
