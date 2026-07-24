@@ -140,7 +140,7 @@ async function getGoogleAccessToken() {
 
 async function readSheet() {
   const token = await getGoogleAccessToken();
-  const range = encodeURIComponent(`'${SHEET_NAME}'!A:Z`);
+  const range = encodeURIComponent(`'${SHEET_NAME}'!B:I`);
   const response = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE`,
     {
@@ -181,8 +181,9 @@ async function readSheet() {
       headers.map((header, index) => [header, String(valuesRow[index] ?? "")])
     ) as SheetRow;
 
-    // The Invoices Sales sheet uses columns A:E in this order. Keep this
-    // positional fallback so renamed or formatted headers cannot block sync.
+    // The Invoices Sales range is B:I:
+    // B invoice, C date, D month, E customer, F item total, G tax,
+    // H total, I sales representative.
     return {
       ...mapped,
       invoice_no:
@@ -197,17 +198,24 @@ async function readSheet() {
           "customer",
           "hospital",
           "hospital_name",
-        ]) || String(valuesRow[2] ?? ""),
+        ]) || String(valuesRow[3] ?? ""),
       sales_item_total:
         getValue(mapped, [
           "sales_item_total",
           "item_total",
           "net_sales",
           "sales_total",
-        ]) || String(valuesRow[3] ?? ""),
+        ]) || String(valuesRow[4] ?? ""),
       tax:
         getValue(mapped, ["tax", "tax_value", "vat"]) ||
-        String(valuesRow[4] ?? ""),
+        String(valuesRow[5] ?? ""),
+      sales_rep:
+        getValue(mapped, [
+          "sales_rep",
+          "sales_representative",
+          "representative",
+          "rep",
+        ]) || String(valuesRow[7] ?? ""),
     };
   });
 }
@@ -273,6 +281,12 @@ async function syncInvoices() {
       ])
     );
     const tax = parseNumber(getValue(row, ["tax", "tax_value", "vat"]));
+    const salesRep = getValue(row, [
+      "sales_rep",
+      "sales_representative",
+      "representative",
+      "rep",
+    ]);
 
     if (!invoiceNo && !rawSalesDate && !customerName && !sourceCode) continue;
     if (!rawSalesDate && !customerName && !sourceCode) {
@@ -344,6 +358,23 @@ async function syncInvoices() {
         error: "Customer could not be matched.",
       });
       continue;
+    }
+
+    if (salesRep && customer.sales_rep_name !== salesRep) {
+      const { error: repError } = await supabase
+        .from("customers")
+        .update({ sales_rep_name: salesRep })
+        .eq("customer_code", customer.customer_code);
+
+      if (repError) {
+        failed.push({
+          row: index + 2,
+          invoice: invoiceNo,
+          error: repError.message,
+        });
+        continue;
+      }
+      customer.sales_rep_name = salesRep;
     }
 
     const payload = {
