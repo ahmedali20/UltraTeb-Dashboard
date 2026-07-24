@@ -642,20 +642,22 @@ export default function SalesTable({
       <section className="sheet-sync-panel">
         <div>
           <div className="sheet-sync-panel__title">
-            <strong>Google Sheet Sync</strong>
+            <strong>{lang === "ar" ? "مزامنة Google Sheet" : "Google Sheet Sync"}</strong>
             <small>
-              Last successful sync:{" "}
+              {lang === "ar" ? "آخر مزامنة ناجحة: " : "Last successful sync: "}
               {lastSheetSync
-                ? new Intl.DateTimeFormat("en-EG", {
+                ? new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-EG", {
                     timeZone: "Africa/Cairo",
                     dateStyle: "medium",
                     timeStyle: "short",
                   }).format(new Date(lastSheetSync))
-                : "Not synced yet"}
+                : lang === "ar" ? "لم تتم المزامنة بعد" : "Not synced yet"}
             </small>
           </div>
           <span>
-            Invoices Sales · Automatic daily sync at 11:59 AM Cairo
+            {lang === "ar"
+              ? "مبيعات الفواتير · مزامنة تلقائية يومياً الساعة 11:59 صباحاً بتوقيت القاهرة"
+              : "Invoice Sales · Automatic daily sync at 11:59 AM Cairo"}
           </span>
           {sheetSyncStatus && <p>{sheetSyncStatus}</p>}
         </div>
@@ -664,7 +666,9 @@ export default function SalesTable({
           onClick={syncGoogleSheet}
           disabled={syncingSheet}
         >
-          {syncingSheet ? "Syncing..." : "Sync Now"}
+          {syncingSheet
+            ? lang === "ar" ? "جارٍ المزامنة..." : "Syncing..."
+            : lang === "ar" ? "مزامنة الآن" : "Sync Now"}
         </button>
       </section>
 
@@ -1290,7 +1294,7 @@ export default function SalesTable({
                         })
                       }
                     >
-                      <option value="">Select rep</option>
+                      <option value="">{lang === "ar" ? "اختر المندوب" : "Select rep"}</option>
                       {salesRepOptions.map((rep) => (
                         <option key={rep} value={rep}>{rep}</option>
                       ))}
