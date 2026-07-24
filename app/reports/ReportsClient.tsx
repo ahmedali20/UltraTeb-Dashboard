@@ -38,6 +38,9 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
   const [month, setMonth] = useState("All");
   const [customer, setCustomer] = useState("All");
   const [salesRep, setSalesRep] = useState("All");
+  const [reportType, setReportType] = useState<
+    "summary" | "details" | "both"
+  >("both");
   const dir = lang === "ar" ? "rtl" : "ltr";
 
   const months = useMemo(
@@ -132,7 +135,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
   }
 
   function exportCsv() {
-    const rows = [
+    const detailRows = [
       [
         "Invoice No",
         "Sales Date",
@@ -154,6 +157,31 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         sale.total_sales,
       ]),
     ];
+    const summaryRows = [
+      ["Customer Sales Summary"],
+      ["Customer Name", "Invoices", "Total Sales"],
+      ...customerSummary.map((item) => [
+        item.name,
+        item.invoices,
+        item.total,
+      ]),
+      ["Customer Grand Total", filtered.length, totals.total],
+      [],
+      ["Sales Rep Summary"],
+      ["Sales Rep", "Invoices", "Total Sales"],
+      ...salesRepSummary.map((item) => [
+        item.name,
+        item.invoices,
+        item.total,
+      ]),
+      ["Sales Rep Grand Total", filtered.length, totals.total],
+    ];
+    const rows =
+      reportType === "summary"
+        ? summaryRows
+        : reportType === "details"
+          ? detailRows
+          : [...summaryRows, [], ["Detailed Invoice Records"], ...detailRows];
     const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
     const url = URL.createObjectURL(
       new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" })
@@ -190,6 +218,21 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         </section>
 
         <section className="report-filters">
+          <label>
+            Report Type
+            <select
+              value={reportType}
+              onChange={(event) =>
+                setReportType(
+                  event.target.value as "summary" | "details" | "both"
+                )
+              }
+            >
+              <option value="summary">Summary Only</option>
+              <option value="details">Details Only</option>
+              <option value="both">Summary + Details</option>
+            </select>
+          </label>
           <label>
             From
             <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
@@ -229,6 +272,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
           <article className="report-kpi-primary"><span>Total Sales</span><strong>{money(totals.total)}</strong></article>
         </section>
 
+        {(reportType === "summary" || reportType === "both") && (
         <section className="report-summary-grid">
           <article className="report-summary-card">
             <div className="report-summary-card__heading">
@@ -304,7 +348,9 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
             </div>
           </article>
         </section>
+        )}
 
+        {(reportType === "details" || reportType === "both") && (
         <section className="report-table-card">
           <div className="report-table-title">
             <div><p>DETAILED RECORDS</p><h2>Invoice Sales</h2></div>
@@ -334,6 +380,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
           </div>
           {!filtered.length && <div className="report-empty">No records match these filters.</div>}
         </section>
+        )}
       </main>
       <Footer lang={lang} />
     </div>
