@@ -391,7 +391,9 @@ export default function SalesTable({
 
       setSheetSyncStatus(
         `Sync complete: ${result.inserted} added, ${result.updated} updated, ` +
-          `${result.createdCustomers} customers created` +
+          `${result.createdCustomers} customers created, ` +
+          `${result.creditNotes ?? 0} credit notes, ` +
+          `${result.debitNotes ?? 0} debit notes` +
           (result.failed?.length
             ? `, ${result.failed.length} rows failed. First error: row ${
                 result.failed[0].row
