@@ -12,6 +12,10 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const body = await request.json();
+  const documentType =
+    body.document_type === "CR_NOTE" || body.document_type === "DR_NOTE"
+      ? body.document_type
+      : "INVOICE";
 
   if (!body.sales_rep_name) {
     return NextResponse.json(
@@ -19,6 +23,18 @@ export async function PATCH(
       { status: 400 }
     );
   }
+  if (
+    documentType !== "INVOICE" &&
+    (!String(body.original_invoice_no ?? "").trim() ||
+      !String(body.note_reason ?? "").trim())
+  ) {
+    return NextResponse.json(
+      { error: "Original invoice number and reason are required for notes." },
+      { status: 400 }
+    );
+  }
+
+  const sign = documentType === "CR_NOTE" ? -1 : 1;
 
   const { error: customerError } = await supabaseServer
     .from("customers")
@@ -38,8 +54,16 @@ export async function PATCH(
       invoice_no: body.invoice_no,
       sales_date: body.sales_date,
       customer_code: body.customer_code,
-      sales_item_total: Number(body.sales_item_total) || 0,
-      tax: Number(body.tax) || 0,
+      sales_item_total:
+        sign * Math.abs(Number(body.sales_item_total) || 0),
+      tax: sign * Math.abs(Number(body.tax) || 0),
+      document_type: documentType,
+      original_invoice_no:
+        documentType === "INVOICE"
+          ? null
+          : String(body.original_invoice_no).trim(),
+      note_reason:
+        documentType === "INVOICE" ? null : String(body.note_reason).trim(),
     })
     .eq("id", params.id)
     .select()
