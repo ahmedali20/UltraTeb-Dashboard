@@ -14,6 +14,7 @@ type DashboardSale = {
   sales_item_total: number;
   tax: number;
   total_sales: number;
+  document_type: "INVOICE" | "CR_NOTE" | "DR_NOTE" | null;
 };
 
 type HomeClientProps = {
@@ -28,6 +29,11 @@ const text = {
     totalSales: "Total Sales",
     totalTax: "Total Tax",
     invoices: "Total Invoices",
+    invoiceSales: "Sales Invoices",
+    creditNotes: "Credit Notes",
+    debitNotes: "Debit Notes",
+    netSales: "Net Sales",
+    records: "records",
     customers: "Total Customers",
     monthlySales: "Monthly Sales by Sales Rep",
     recentInvoices: "Recent Invoices",
@@ -47,6 +53,11 @@ const text = {
     noChange: "No change",
   },
   ar: {
+    invoiceSales: "فواتير المبيعات",
+    creditNotes: "الإشعارات الدائنة",
+    debitNotes: "الإشعارات المدينة",
+    netSales: "صافي المبيعات",
+    records: "سجلات",
     title: "نظرة عامة على الأعمال",
     subtitle: "عرض واضح لأداء المبيعات وأحدث العمليات.",
     totalSales: "إجمالي المبيعات",
@@ -119,6 +130,27 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     (total, sale) => total + Number(sale.tax || 0),
     0
   );
+  const invoiceRows = filteredSales.filter(
+    (sale) => (sale.document_type ?? "INVOICE") === "INVOICE"
+  );
+  const creditNoteRows = filteredSales.filter(
+    (sale) => sale.document_type === "CR_NOTE"
+  );
+  const debitNoteRows = filteredSales.filter(
+    (sale) => sale.document_type === "DR_NOTE"
+  );
+  const invoiceSalesTotal = invoiceRows.reduce(
+    (total, sale) => total + Number(sale.total_sales || 0),
+    0
+  );
+  const creditNotesTotal = creditNoteRows.reduce(
+    (total, sale) => total + Math.abs(Number(sale.total_sales || 0)),
+    0
+  );
+  const debitNotesTotal = debitNoteRows.reduce(
+    (total, sale) => total + Math.abs(Number(sale.total_sales || 0)),
+    0
+  );
 
   const periodComparison = useMemo(() => {
     const monthKeys = Array.from(
@@ -177,7 +209,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     const totals = new Map<string, Map<string, number>>();
     const reps = new Set<string>();
 
-    filteredSales.forEach((sale) => {
+    invoiceRows.forEach((sale) => {
       if (!sale.sales_date) return;
       const date = new Date(`${sale.sales_date}T00:00:00`);
       if (Number.isNaN(date.getTime())) return;
@@ -211,7 +243,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
       monthlyData: data,
       salesReps: Array.from(reps).sort((a, b) => a.localeCompare(b)),
     };
-  }, [filteredSales, lang, t.unassigned]);
+  }, [invoiceRows, lang, t.unassigned]);
 
   const chartMaximum = Math.max(...monthlyData.map((month) => month.total), 1);
   const chartColors = [
@@ -231,7 +263,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     }
     return `hsl(${Math.abs(hash) % 360} 68% 46%)`;
   }
-  const recentInvoices = filteredSales.slice(0, 5);
+  const recentInvoices = invoiceRows.slice(0, 5);
   const uniqueCustomers = new Set(
     filteredSales.map((sale) => sale.customer_name).filter(Boolean)
   ).size;
@@ -241,7 +273,9 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
       rep,
       value: sales
         .filter(
-          (sale) => normalizeSalesRep(sale.sales_rep, t.unassigned) === rep
+          (sale) =>
+            (sale.document_type ?? "INVOICE") === "INVOICE" &&
+            normalizeSalesRep(sale.sales_rep, t.unassigned) === rep
         )
         .reduce((sum, sale) => sum + Number(sale.total_sales || 0), 0),
     }))
@@ -260,7 +294,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     .join(", ");
 
   const customerTotals = Array.from(
-    filteredSales.reduce((totals, sale) => {
+    invoiceRows.reduce((totals, sale) => {
       const name = sale.customer_name || "-";
       const current = totals.get(name) ?? {
         name,
@@ -330,10 +364,37 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
 
         <section className="dashboard-stats" aria-label={t.title}>
           <StatCard
-            label={t.totalSales}
-            value={formatMoney(totalSales, lang)}
+            label={t.invoiceSales}
+            value={formatMoney(invoiceSalesTotal, lang)}
             icon="↗"
             tone="teal"
+            meta={`${invoiceRows.length.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} ${t.records}`}
+            newLabel={t.newActivity}
+            noChangeLabel={t.noChange}
+          />
+          <StatCard
+            label={t.creditNotes}
+            value={formatMoney(creditNotesTotal, lang)}
+            icon="CR"
+            tone="blue"
+            meta={`${creditNoteRows.length.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} ${t.records}`}
+            newLabel={t.newActivity}
+            noChangeLabel={t.noChange}
+          />
+          <StatCard
+            label={t.debitNotes}
+            value={formatMoney(debitNotesTotal, lang)}
+            icon="DR"
+            tone="amber"
+            meta={`${debitNoteRows.length.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} ${t.records}`}
+            newLabel={t.newActivity}
+            noChangeLabel={t.noChange}
+          />
+          <StatCard
+            label={t.netSales}
+            value={formatMoney(totalSales, lang)}
+            icon="◎"
+            tone="purple"
             trend={periodComparison && trend(periodComparison.current.sales, periodComparison.previous.sales)}
             period={periodComparison?.label}
             newLabel={t.newActivity}
@@ -350,20 +411,10 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
             noChangeLabel={t.noChange}
           />
           <StatCard
-            label={t.invoices}
-            value={filteredSales.length.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
-            icon="#"
-            tone="amber"
-            trend={periodComparison && trend(periodComparison.current.invoices, periodComparison.previous.invoices)}
-            period={periodComparison?.label}
-            newLabel={t.newActivity}
-            noChangeLabel={t.noChange}
-          />
-          <StatCard
             label={t.customers}
             value={(selectedRep === "All" ? customerCount : uniqueCustomers).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
             icon="◎"
-            tone="purple"
+            tone="teal"
             trend={periodComparison && trend(periodComparison.current.customers, periodComparison.previous.customers)}
             period={periodComparison?.label}
             newLabel={t.newActivity}
@@ -560,8 +611,9 @@ function StatCard({
   value,
   icon,
   tone,
-  trend,
+  trend = null,
   period,
+  meta,
   newLabel,
   noChangeLabel,
 }: {
@@ -569,8 +621,9 @@ function StatCard({
   value: string;
   icon: string;
   tone: "teal" | "blue" | "amber" | "purple";
-  trend: number | null;
+  trend?: number | null;
   period?: string;
+  meta?: string;
   newLabel: string;
   noChangeLabel: string;
 }) {
@@ -584,13 +637,14 @@ function StatCard({
         : `${trend > 0 ? "↑" : "↓"} ${Math.abs(trend).toFixed(1)}%`;
 
   return (
-    <article className="dashboard-stat">
+    <article className={`dashboard-stat dashboard-stat--${tone}`}>
       <span className={`dashboard-stat__icon dashboard-stat__icon--${tone}`}>
         {icon}
       </span>
       <div>
         <p>{label}</p>
         <strong>{value}</strong>
+        {meta && <small className="dashboard-stat__meta">{meta}</small>}
         {period && (
           <div className="dashboard-stat__trend">
             <span className={`dashboard-stat__badge dashboard-stat__badge--${trendDirection}`}>
