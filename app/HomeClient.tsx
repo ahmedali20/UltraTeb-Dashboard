@@ -51,8 +51,12 @@ const text = {
     vsPrevious: "vs previous month",
     newActivity: "New",
     noChange: "No change",
+    month: "Month",
+    allMonths: "All Months",
   },
   ar: {
+    month: "الشهر",
+    allMonths: "كل الشهور",
     invoiceSales: "فواتير المبيعات",
     creditNotes: "الإشعارات الدائنة",
     debitNotes: "الإشعارات المدينة",
@@ -102,6 +106,7 @@ function normalizeSalesRep(value: string | null, fallback: string) {
 export default function HomeClient({ sales, customerCount }: HomeClientProps) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [selectedRep, setSelectedRep] = useState("All");
+  const [selectedMonth, setSelectedMonth] = useState("All");
   const t = text[lang];
   const dir = lang === "ar" ? "rtl" : "ltr";
 
@@ -114,13 +119,24 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
       ).sort((a, b) => a.localeCompare(b)),
     [sales, t.unassigned]
   );
-  const filteredSales =
-    selectedRep === "All"
-      ? sales
-      : sales.filter(
-          (sale) =>
-            normalizeSalesRep(sale.sales_rep, t.unassigned) === selectedRep
-        );
+  const availableMonths = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          sales
+            .map((sale) => sale.sales_date?.slice(0, 7))
+            .filter((month): month is string => Boolean(month))
+        )
+      ).sort((a, b) => b.localeCompare(a)),
+    [sales]
+  );
+  const filteredSales = sales.filter(
+    (sale) =>
+      (selectedRep === "All" ||
+        normalizeSalesRep(sale.sales_rep, t.unassigned) === selectedRep) &&
+      (selectedMonth === "All" ||
+        sale.sales_date?.slice(0, 7) === selectedMonth)
+  );
 
   const totalSales = filteredSales.reduce(
     (total, sale) => total + Number(sale.total_sales || 0),
@@ -360,6 +376,23 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
               ))}
             </select>
           </label>
+          <label>
+            {t.month}
+            <select
+              value={selectedMonth}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+            >
+              <option value="All">{t.allMonths}</option>
+              {availableMonths.map((month) => (
+                <option key={month} value={month}>
+                  {new Intl.DateTimeFormat(
+                    lang === "ar" ? "ar-EG" : "en-US",
+                    { month: "long", year: "numeric" }
+                  ).format(new Date(`${month}-01T00:00:00`))}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <section className="dashboard-stats" aria-label={t.title}>
@@ -412,7 +445,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
           />
           <StatCard
             label={t.customers}
-            value={(selectedRep === "All" ? customerCount : uniqueCustomers).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
+            value={(selectedRep === "All" && selectedMonth === "All" ? customerCount : uniqueCustomers).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
             icon="◎"
             tone="teal"
             trend={periodComparison && trend(periodComparison.current.customers, periodComparison.previous.customers)}
