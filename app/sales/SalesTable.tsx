@@ -151,9 +151,6 @@ export default function SalesTable({
   >({});
   const [recordRepFilter, setRecordRepFilter] = useState("All");
   const [recordMonthFilter, setRecordMonthFilter] = useState("All");
-  const [recordTaxFilter, setRecordTaxFilter] = useState<
-    "All" | "with" | "without"
-  >("All");
   const [recordPage, setRecordPage] = useState(1);
   const [recordSort, setRecordSort] = useState<
     "invoice" | "date" | "customer" | "total"
@@ -222,11 +219,7 @@ export default function SalesTable({
     (sale) =>
       (recordRepFilter === "All" ||
         normalizeSalesRep(sale.sales_rep) === recordRepFilter) &&
-      (recordMonthFilter === "All" || sale.month === recordMonthFilter) &&
-      (recordTaxFilter === "All" ||
-        (recordTaxFilter === "with"
-          ? Math.abs(Number(sale.tax || 0)) > 0
-          : Math.abs(Number(sale.tax || 0)) === 0))
+      (recordMonthFilter === "All" || sale.month === recordMonthFilter)
   );
   const displayedSalesTotal = displayedSales.reduce(
     (total, sale) => total + Number(sale.total_sales || 0),
@@ -250,7 +243,6 @@ export default function SalesTable({
   }, [
     recordRepFilter,
     recordMonthFilter,
-    recordTaxFilter,
     recordSort,
     recordSortDirection,
   ]);
@@ -1323,27 +1315,6 @@ export default function SalesTable({
             {recordReps.map((rep) => (
               <option key={rep} value={rep}>{rep}</option>
             ))}
-          </select>
-        </label>
-        <label>
-          {lang === "ar" ? "الضريبة" : "Tax"}
-          <select
-            value={recordTaxFilter}
-            onChange={(event) =>
-              setRecordTaxFilter(
-                event.target.value as "All" | "with" | "without"
-              )
-            }
-          >
-            <option value="All">
-              {lang === "ar" ? "كل السجلات" : "All Records"}
-            </option>
-            <option value="with">
-              {lang === "ar" ? "بضريبة" : "With Tax"}
-            </option>
-            <option value="without">
-              {lang === "ar" ? "بدون ضريبة" : "Without Tax"}
-            </option>
           </select>
         </label>
       </div>
