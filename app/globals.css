@@ -1588,14 +1588,19 @@ input::placeholder {
 }
 
 @page {
-  size: A4 landscape;
-  margin: 26mm 10mm 18mm;
+  size: A4 portrait;
+  margin: 27mm 12mm 19mm;
 }
 
 @media print {
+  :root {
+    color-scheme: light !important;
+  }
+
   html,
   body {
-    width: auto !important;
+    width: 100% !important;
+    min-height: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
@@ -1616,13 +1621,13 @@ input::placeholder {
   .report-print-header {
     position: fixed;
     z-index: 5;
-    top: -21mm;
+    top: -22mm;
     left: 0;
     right: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 17mm;
+    height: 17.5mm;
     padding-bottom: 2.5mm;
     border-bottom: .65mm solid #6aa1aa;
     color: #4f2f82;
@@ -1669,7 +1674,7 @@ input::placeholder {
   .report-print-footer {
     position: fixed;
     z-index: 5;
-    bottom: -13mm;
+    bottom: -14mm;
     left: 0;
     right: 0;
     display: flex;
@@ -1685,15 +1690,15 @@ input::placeholder {
   .report-print-watermark {
     position: fixed;
     z-index: 0;
-    inset: 18mm 30mm 14mm;
+    inset: 25mm 18mm 20mm;
     display: grid;
     place-items: center;
     pointer-events: none;
   }
 
   .report-print-watermark img {
-    width: 92mm;
-    max-height: 125mm;
+    width: 82mm;
+    max-height: 118mm;
     object-fit: contain;
     opacity: .035;
   }
@@ -1711,6 +1716,7 @@ input::placeholder {
     max-width: none;
     margin: 0;
     padding: 0;
+    background: #fff !important;
   }
 
   .report-heading {
@@ -1819,7 +1825,7 @@ input::placeholder {
   .report-summary-table table,
   .report-table-card table {
     width: 100%;
-    table-layout: auto;
+    table-layout: fixed;
     border-collapse: collapse;
   }
 
@@ -1844,11 +1850,13 @@ input::placeholder {
   .report-table-card th,
   .report-table-card td {
     position: static;
-    padding: 2mm 2.3mm;
+    padding: 1.7mm 1.4mm;
     border-color: #dbe3ec;
     color: #111827 !important;
-    font-size: 7.2pt;
-    line-height: 1.25;
+    font-size: 6.4pt;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 
   .report-summary-table th,
@@ -1867,6 +1875,30 @@ input::placeholder {
   .document-type-badge {
     border: 1px solid currentColor;
     background: transparent !important;
+    padding: .7mm 1mm;
+    font-size: 5.5pt;
+  }
+
+  .report-table-card th:nth-child(1),
+  .report-table-card td:nth-child(1) { width: 10%; }
+  .report-table-card th:nth-child(2),
+  .report-table-card td:nth-child(2) { width: 8%; }
+  .report-table-card th:nth-child(3),
+  .report-table-card td:nth-child(3) { width: 11%; }
+  .report-table-card th:nth-child(4),
+  .report-table-card td:nth-child(4) { width: 9%; }
+  .report-table-card th:nth-child(5),
+  .report-table-card td:nth-child(5) { width: 16%; }
+  .report-table-card th:nth-child(6),
+  .report-table-card td:nth-child(6) { width: 13%; }
+  .report-table-card th:nth-child(7),
+  .report-table-card td:nth-child(7),
+  .report-table-card th:nth-child(8),
+  .report-table-card td:nth-child(8),
+  .report-table-card th:nth-child(9),
+  .report-table-card td:nth-child(9) {
+    width: 11%;
+    text-align: end;
   }
 }
 
