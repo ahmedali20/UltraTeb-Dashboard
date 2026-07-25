@@ -44,6 +44,17 @@ export default function SalesRepsClient({
   const [savingRep, setSavingRep] = useState(false);
   const dir = lang === "ar" ? "rtl" : "ltr";
 
+  const uniqueManagedReps = useMemo(() => {
+    const seen = new Set<string>();
+
+    return managedReps.filter((rep) => {
+      const key = rep.name.trim().toLocaleLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [managedReps]);
+
   const reps = useMemo(() => {
     const totals = new Map<
       string,
@@ -226,7 +237,7 @@ export default function SalesRepsClient({
             </button>
           </div>
           <div className="rep-manager__list">
-            {managedReps.map((rep) => (
+            {uniqueManagedReps.map((rep) => (
               <span key={rep.id}>
                 {rep.name}
                 <button
