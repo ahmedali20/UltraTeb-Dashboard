@@ -815,22 +815,22 @@ input::placeholder {
   box-shadow: 0 0 0 3px rgba(23, 138, 107, 0.12);
 }
 .dashboard-page {
-  --dash-topbar: #dfe8f2;
-  --dash-card: #ffffff;
-  --dash-muted: #edf3f8;
-  --dash-border: #cad8e6;
-  --dash-copy: #152640;
-  --dash-secondary: #58708c;
+  --dash-topbar: var(--surface-muted);
+  --dash-card: var(--surface-bg);
+  --dash-muted: var(--input-bg);
+  --dash-border: var(--border-color);
+  --dash-copy: var(--text-primary);
+  --dash-secondary: var(--text-secondary);
   background: var(--page-bg) !important;
 }
 
 :root[data-theme="dark"] .dashboard-page {
-  --dash-topbar: #112038;
-  --dash-card: #243b60;
-  --dash-muted: #1b3255;
-  --dash-border: #2e4b7a;
-  --dash-copy: #ffffff;
-  --dash-secondary: #7fa8d4;
+  --dash-topbar: var(--surface-muted);
+  --dash-card: var(--surface-bg);
+  --dash-muted: var(--input-bg);
+  --dash-border: var(--border-color);
+  --dash-copy: var(--text-primary);
+  --dash-secondary: var(--text-secondary);
 }
 
 .dashboard-home--reference {
@@ -898,6 +898,23 @@ input::placeholder {
   content: "";
 }
 
+.dashboard-home--reference .dashboard-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-home--reference .dashboard-stat--teal::before { background: #0f9f7f; }
+.dashboard-home--reference .dashboard-stat--blue::before { background: #3b82f6; }
+.dashboard-home--reference .dashboard-stat--amber::before { background: #f59e0b; }
+.dashboard-home--reference .dashboard-stat--purple::before { background: #8b5cf6; }
+
+.dashboard-stat__meta {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 [dir="rtl"] .dashboard-home--reference .dashboard-stat::before {
   inset: 0 0 0 auto;
 }
@@ -917,10 +934,22 @@ input::placeholder {
 }
 
 .dashboard-home--reference .dashboard-panel__header h2 {
-  color: #7fa8d4;
+  color: var(--text-secondary);
   font-size: 11px;
   letter-spacing: 0.07em;
   text-transform: uppercase;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-home--reference .dashboard-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-home--reference .dashboard-stats {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dashboard-donut-wrap {
