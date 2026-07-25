@@ -46,6 +46,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
   >("both");
   const dir = lang === "ar" ? "rtl" : "ltr";
   const t = lang === "ar" ? {
+    creditNotes: "الإشعارات الدائنة", debitNotes: "الإشعارات المدينة",
     title: "تقرير المبيعات", subtitle: "تصفية ومراجعة وطباعة أو تصدير أداء الفواتير.",
     export: "تصدير CSV", print: "طباعة / حفظ PDF", reportType: "نوع التقرير",
     summaryOnly: "الملخص فقط", detailsOnly: "التفاصيل فقط", both: "الملخص + التفاصيل",
@@ -59,6 +60,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
     invoiceSales: "مبيعات الفواتير", records: "سجلات", invoiceNo: "رقم الفاتورة",
     date: "التاريخ", tax: "الضريبة", noRecords: "لا توجد سجلات تطابق هذه الفلاتر.",
   } : {
+    creditNotes: "Credit Notes", debitNotes: "Debit Notes",
     title: "Sales Report", subtitle: "Filter, review, print, or export your invoice performance.",
     export: "Export CSV", print: "Print / Save PDF", reportType: "Report Type",
     summaryOnly: "Summary Only", detailsOnly: "Details Only", both: "Summary + Details",
@@ -127,13 +129,45 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
     }),
     { item: 0, tax: 0, total: 0 }
   );
+  const documentTotals = filtered.reduce(
+    (result, sale) => {
+      const type = sale.document_type ?? "INVOICE";
+      if (type === "CR_NOTE") {
+        result.creditNotes += 1;
+        result.creditTotal += Math.abs(Number(sale.total_sales || 0));
+      } else if (type === "DR_NOTE") {
+        result.debitNotes += 1;
+        result.debitTotal += Math.abs(Number(sale.total_sales || 0));
+      } else {
+        result.invoices += 1;
+      }
+      return result;
+    },
+    {
+      invoices: 0,
+      creditNotes: 0,
+      debitNotes: 0,
+      creditTotal: 0,
+      debitTotal: 0,
+    }
+  );
 
   const customerSummary = useMemo(() => {
-    const summary = new Map<string, { invoices: number; total: number }>();
+    const summary = new Map<
+      string,
+      { invoices: number; creditNotes: number; debitNotes: number; total: number }
+    >();
     filtered.forEach((sale) => {
       const name = sale.customer_name || "Unassigned Customer";
-      const current = summary.get(name) ?? { invoices: 0, total: 0 };
-      current.invoices += 1;
+      const current = summary.get(name) ?? {
+        invoices: 0,
+        creditNotes: 0,
+        debitNotes: 0,
+        total: 0,
+      };
+      if (sale.document_type === "CR_NOTE") current.creditNotes += 1;
+      else if (sale.document_type === "DR_NOTE") current.debitNotes += 1;
+      else current.invoices += 1;
       current.total += Number(sale.total_sales || 0);
       summary.set(name, current);
     });
@@ -143,11 +177,21 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
   }, [filtered]);
 
   const salesRepSummary = useMemo(() => {
-    const summary = new Map<string, { invoices: number; total: number }>();
+    const summary = new Map<
+      string,
+      { invoices: number; creditNotes: number; debitNotes: number; total: number }
+    >();
     filtered.forEach((sale) => {
       const name = normalizeRep(sale.sales_rep);
-      const current = summary.get(name) ?? { invoices: 0, total: 0 };
-      current.invoices += 1;
+      const current = summary.get(name) ?? {
+        invoices: 0,
+        creditNotes: 0,
+        debitNotes: 0,
+        total: 0,
+      };
+      if (sale.document_type === "CR_NOTE") current.creditNotes += 1;
+      else if (sale.document_type === "DR_NOTE") current.debitNotes += 1;
+      else current.invoices += 1;
       current.total += Number(sale.total_sales || 0);
       summary.set(name, current);
     });
@@ -195,22 +239,38 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
     ];
     const summaryRows = [
       ["Customer Sales Summary"],
-      ["Customer Name", "Invoices", "Total Sales"],
+      ["Customer Name", "Invoices", "Credit Notes", "Debit Notes", "Total Sales"],
       ...customerSummary.map((item) => [
         item.name,
         item.invoices,
+        item.creditNotes,
+        item.debitNotes,
         item.total,
       ]),
-      ["Customer Grand Total", filtered.length, totals.total],
+      [
+        "Customer Grand Total",
+        documentTotals.invoices,
+        documentTotals.creditNotes,
+        documentTotals.debitNotes,
+        totals.total,
+      ],
       [],
       ["Sales Rep Summary"],
-      ["Sales Rep", "Invoices", "Total Sales"],
+      ["Sales Rep", "Invoices", "Credit Notes", "Debit Notes", "Total Sales"],
       ...salesRepSummary.map((item) => [
         item.name,
         item.invoices,
+        item.creditNotes,
+        item.debitNotes,
         item.total,
       ]),
-      ["Sales Rep Grand Total", filtered.length, totals.total],
+      [
+        "Sales Rep Grand Total",
+        documentTotals.invoices,
+        documentTotals.creditNotes,
+        documentTotals.debitNotes,
+        totals.total,
+      ],
     ];
     const rows =
       reportType === "summary"
@@ -302,7 +362,17 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         </section>
 
         <section className="report-kpis">
-          <article><span>{t.invoices}</span><strong>{filtered.length}</strong></article>
+          <article><span>{t.invoices}</span><strong>{documentTotals.invoices}</strong></article>
+          <article>
+            <span>{t.creditNotes}</span>
+            <strong>{money(documentTotals.creditTotal)}</strong>
+            <small>{documentTotals.creditNotes} {t.records}</small>
+          </article>
+          <article>
+            <span>{t.debitNotes}</span>
+            <strong>{money(documentTotals.debitTotal)}</strong>
+            <small>{documentTotals.debitNotes} {t.records}</small>
+          </article>
           <article><span>{t.itemTotal}</span><strong>{money(totals.item)}</strong></article>
           <article><span>{t.totalTax}</span><strong>{money(totals.tax)}</strong></article>
           <article className="report-kpi-primary"><span>{t.totalSales}</span><strong>{money(totals.total)}</strong></article>
@@ -324,6 +394,8 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                   <tr>
                     <th>{t.customerName}</th>
                     <th>{t.invoices}</th>
+                    <th>{t.creditNotes}</th>
+                    <th>{t.debitNotes}</th>
                     <th>{t.totalSales}</th>
                   </tr>
                 </thead>
@@ -332,6 +404,8 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                     <tr key={item.name}>
                       <td>{item.name}</td>
                       <td>{item.invoices}</td>
+                      <td>{item.creditNotes}</td>
+                      <td>{item.debitNotes}</td>
                       <td><strong>{money(item.total)}</strong></td>
                     </tr>
                   ))}
@@ -339,7 +413,9 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                 <tfoot>
                   <tr>
                     <td>{t.grandTotal}</td>
-                    <td>{filtered.length}</td>
+                    <td>{documentTotals.invoices}</td>
+                    <td>{documentTotals.creditNotes}</td>
+                    <td>{documentTotals.debitNotes}</td>
                     <td>{money(totals.total)}</td>
                   </tr>
                 </tfoot>
@@ -361,6 +437,8 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                   <tr>
                     <th>{t.salesRep}</th>
                     <th>{t.invoices}</th>
+                    <th>{t.creditNotes}</th>
+                    <th>{t.debitNotes}</th>
                     <th>{t.totalSales}</th>
                   </tr>
                 </thead>
@@ -369,6 +447,8 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                     <tr key={item.name}>
                       <td>{item.name}</td>
                       <td>{item.invoices}</td>
+                      <td>{item.creditNotes}</td>
+                      <td>{item.debitNotes}</td>
                       <td><strong>{money(item.total)}</strong></td>
                     </tr>
                   ))}
@@ -376,7 +456,9 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                 <tfoot>
                   <tr>
                     <td>{t.grandTotal}</td>
-                    <td>{filtered.length}</td>
+                    <td>{documentTotals.invoices}</td>
+                    <td>{documentTotals.creditNotes}</td>
+                    <td>{documentTotals.debitNotes}</td>
                     <td>{money(totals.total)}</td>
                   </tr>
                 </tfoot>
