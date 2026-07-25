@@ -298,19 +298,45 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         lang={lang}
         onToggleLang={() => setLang(lang === "en" ? "ar" : "en")}
       />
+      <div className="report-print-header" aria-hidden="true">
+        <div className="report-print-brand">
+          <img src="/brand/ultra-teb-logo.png" alt="" />
+          <div>
+            <strong>ULTRA TEB</strong>
+            <span>Sales Intelligence Report</span>
+          </div>
+        </div>
+        <div className="report-print-header__meta">
+          <strong>{t.title}</strong>
+          <span>
+            {new Date().toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB")}
+          </span>
+        </div>
+      </div>
+      <div className="report-print-watermark" aria-hidden="true">
+        <img src="/brand/ultra-teb-logo.png" alt="" />
+      </div>
+      <div className="report-print-footer" aria-hidden="true">
+        <span>19 Sayed Zakaria St., Sq. 1166, Sheraton</span>
+        <span>www.ultrateb.com</span>
+        <span>Info@ultrateb.com</span>
+      </div>
       <main className="report-layout">
         <section className="report-heading">
-          <div>
-            <p>ULTRA TEB</p>
-            <h1>{t.title}</h1>
-            <span>{t.subtitle}</span>
-            <div className="report-print-meta">
+          <div className="report-heading-brand">
+            <img src="/brand/ultra-teb-logo.png" alt="Ultra Teb" />
+            <div>
+              <p>ULTRA TEB</p>
+              <h1>{t.title}</h1>
+              <span>{t.subtitle}</span>
+              <div className="report-print-meta">
               <strong>
                 {lang === "ar" ? "الفترة" : "Period"}:
               </strong>{" "}
               {startDate || (lang === "ar" ? "البداية" : "Beginning")}
               {" — "}
               {endDate || (lang === "ar" ? "الآن" : "Present")}
+              </div>
             </div>
           </div>
           <div className="report-actions">
