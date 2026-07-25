@@ -232,6 +232,10 @@ export default function SalesTable({
     (total, sale) => total + Number(sale.total_sales || 0),
     0
   );
+  const displayedSalesItemTotal = displayedSales.reduce(
+    (total, sale) => total + Number(sale.sales_item_total || 0),
+    0
+  );
   const recordPageCount = Math.max(
     1,
     Math.ceil(displayedSales.length / recordsPerPage)
@@ -1282,7 +1286,15 @@ export default function SalesTable({
             {lang === "ar" ? "إجمالي الفواتير" : "Total Invoices"}:{" "}
             {displayedSales.length}
             {" · "}
-            {lang === "ar" ? "إجمالي المبيعات" : "Total Sales"}:{" "}
+            {lang === "ar"
+              ? "إجمالي الأصناف بدون الضريبة"
+              : "Sales Item Total Without Tax"}:{" "}
+            {displayedSalesItemTotal.toLocaleString(
+              lang === "ar" ? "ar-EG" : "en-US",
+              { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+            )}
+            {" · "}
+            {lang === "ar" ? "إجمالي الأصناف شامل الضريبة" : "Sales Item Total With Tax"}:{" "}
             {displayedSalesTotal.toLocaleString(
               lang === "ar" ? "ar-EG" : "en-US",
               { minimumFractionDigits: 2, maximumFractionDigits: 2 }
