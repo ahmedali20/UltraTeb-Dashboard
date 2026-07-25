@@ -292,7 +292,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
   }
 
   async function downloadPdf() {
-    const [{ jsPDF }, { autoTable }] = await Promise.all([
+    const [{ jsPDF }, { default: autoTable }] = await Promise.all([
       import("jspdf"),
       import("jspdf-autotable"),
     ]);
