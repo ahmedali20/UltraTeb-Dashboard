@@ -62,7 +62,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
   } : {
     creditNotes: "Credit Notes", debitNotes: "Debit Notes",
     title: "Sales Report", subtitle: "Filter, review, print, or export your invoice performance.",
-    export: "Export CSV", print: "Print / Save PDF", reportType: "Report Type",
+    export: "Export CSV", print: "Download PDF", reportType: "Report Type",
     summaryOnly: "Summary Only", detailsOnly: "Details Only", both: "Summary + Details",
     from: "From", to: "To", month: "Month", allMonths: "All Months",
     customer: "Customer", allCustomers: "All Customers", salesRep: "Sales Rep",
@@ -291,6 +291,249 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
     URL.revokeObjectURL(url);
   }
 
+  async function downloadPdf() {
+    const [{ jsPDF }, { autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const purple: [number, number, number] = [80, 35, 155];
+    const teal: [number, number, number] = [103, 157, 166];
+    const palePurple: [number, number, number] = [239, 234, 247];
+    const alternate: [number, number, number] = [248, 246, 251];
+    const logo = await fetch("/brand/ultra-teb-logo.png")
+      .then((response) => response.blob())
+      .then(
+        (blob) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          })
+      )
+      .catch(() => "");
+
+    const period =
+      startDate || endDate
+        ? `${startDate || "Beginning"} - ${endDate || "Present"}`
+        : month !== "All"
+          ? month
+          : "Beginning - Present";
+    const subject =
+      customer !== "All"
+        ? customer
+        : salesRep !== "All"
+          ? salesRep
+          : "All Customers and Sales Representatives";
+
+    function drawPageBrand() {
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      if (logo) {
+        doc.addImage(logo, "PNG", 15, 10, 27, 39, undefined, "FAST");
+        doc.saveGraphicsState();
+        doc.setGState(new (doc as any).GState({ opacity: 0.035 }));
+        doc.addImage(logo, "PNG", 66, 94, 78, 112, undefined, "FAST");
+        doc.restoreGraphicsState();
+      }
+      doc.setTextColor(...purple);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("ULTRA TEB", pageWidth - 15, 17, { align: "right" });
+      doc.setFontSize(7);
+      doc.setTextColor(90, 105, 120);
+      doc.text("Sales Intelligence Report", pageWidth - 15, 22, {
+        align: "right",
+      });
+      doc.setDrawColor(205, 210, 218);
+      doc.line(15, 52, pageWidth - 15, 52);
+
+      doc.setDrawColor(...teal);
+      doc.line(15, pageHeight - 20, pageWidth - 15, pageHeight - 20);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...purple);
+      doc.text("19 Sayed Zakaria St., Sq. 1166, Sheraton", 15, pageHeight - 13);
+      doc.text("www.ultrateb.com", pageWidth / 2, pageHeight - 13, {
+        align: "center",
+      });
+      doc.text("Info@ultrateb.com", pageWidth - 15, pageHeight - 13, {
+        align: "right",
+      });
+    }
+
+    function sectionTitle(title: string, y: number) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(...purple);
+      doc.text(title, 15, y);
+      return y + 4;
+    }
+
+    drawPageBrand();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(25, 35, 50);
+    doc.text("Sales Report", 15, 64);
+    doc.setFontSize(9);
+    doc.setTextColor(...purple);
+    doc.text(subject, 15, 71);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(85, 95, 110);
+    doc.text(`Period: ${period}`, 15, 77);
+
+    autoTable(doc, {
+      startY: 83,
+      margin: { left: 15, right: 15, top: 58, bottom: 25 },
+      head: [["Invoices", "Credit Notes", "Debit Notes", "Item Total", "TAX", "Total Sales"]],
+      body: [[
+        documentTotals.invoices,
+        money(documentTotals.creditTotal),
+        money(documentTotals.debitTotal),
+        money(totals.item),
+        money(totals.tax),
+        money(totals.total),
+      ]],
+      theme: "grid",
+      styles: { halign: "center", fontSize: 7, cellPadding: 2.2 },
+      headStyles: { fillColor: purple, textColor: 255, fontStyle: "bold" },
+      bodyStyles: { fillColor: palePurple, fontStyle: "bold" },
+      didDrawPage: drawPageBrand,
+    });
+
+    let nextY = ((doc as any).lastAutoTable?.finalY ?? 100) + 10;
+
+    if (reportType === "summary" || reportType === "both") {
+      nextY = sectionTitle("Customer Sales Summary", nextY);
+      autoTable(doc, {
+        startY: nextY,
+        margin: { left: 15, right: 15, top: 58, bottom: 25 },
+        head: [["Customer", "Invoices", "CR Notes", "DR Notes", "Total Sales"]],
+        body: customerSummary.map((item) => [
+          item.name,
+          item.invoices,
+          item.creditNotes,
+          item.debitNotes,
+          money(item.total),
+        ]),
+        foot: [[
+          "Grand Total",
+          documentTotals.invoices,
+          documentTotals.creditNotes,
+          documentTotals.debitNotes,
+          money(totals.total),
+        ]],
+        theme: "grid",
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: { fillColor: purple, textColor: 255 },
+        alternateRowStyles: { fillColor: alternate },
+        footStyles: { fillColor: palePurple, textColor: 30, fontStyle: "bold" },
+        columnStyles: { 0: { cellWidth: 70 }, 4: { halign: "right" } },
+        didDrawPage: drawPageBrand,
+      });
+
+      nextY = ((doc as any).lastAutoTable?.finalY ?? nextY) + 10;
+      if (nextY > 225) {
+        doc.addPage();
+        drawPageBrand();
+        nextY = 64;
+      }
+      nextY = sectionTitle("Sales Rep Summary", nextY);
+      autoTable(doc, {
+        startY: nextY,
+        margin: { left: 15, right: 15, top: 58, bottom: 25 },
+        head: [["Sales Rep", "Invoices", "CR Notes", "DR Notes", "Total Sales"]],
+        body: salesRepSummary.map((item) => [
+          item.name,
+          item.invoices,
+          item.creditNotes,
+          item.debitNotes,
+          money(item.total),
+        ]),
+        foot: [[
+          "Grand Total",
+          documentTotals.invoices,
+          documentTotals.creditNotes,
+          documentTotals.debitNotes,
+          money(totals.total),
+        ]],
+        theme: "grid",
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: { fillColor: purple, textColor: 255 },
+        alternateRowStyles: { fillColor: alternate },
+        footStyles: { fillColor: palePurple, textColor: 30, fontStyle: "bold" },
+        columnStyles: { 0: { cellWidth: 70 }, 4: { halign: "right" } },
+        didDrawPage: drawPageBrand,
+      });
+    }
+
+    if (reportType === "details" || reportType === "both") {
+      doc.addPage();
+      drawPageBrand();
+      sectionTitle("Detailed Records", 64);
+      autoTable(doc, {
+        startY: 69,
+        margin: { left: 10, right: 10, top: 58, bottom: 25 },
+        head: [[
+          "Document",
+          "No.",
+          "Date",
+          "Customer",
+          "Sales Rep",
+          "Item Total",
+          "TAX",
+          "Total",
+        ]],
+        body: filtered.map((sale) => [
+          sale.document_type === "CR_NOTE"
+            ? "CR Note"
+            : sale.document_type === "DR_NOTE"
+              ? "DR Note"
+              : "Invoice",
+          sale.invoice_no,
+          sale.sales_date,
+          sale.customer_name || "-",
+          normalizeRep(sale.sales_rep),
+          money(Number(sale.sales_item_total || 0)),
+          money(Number(sale.tax || 0)),
+          money(Number(sale.total_sales || 0)),
+        ]),
+        theme: "grid",
+        styles: { fontSize: 5.8, cellPadding: 1.55, overflow: "linebreak" },
+        headStyles: { fillColor: purple, textColor: 255, fontSize: 5.7 },
+        alternateRowStyles: { fillColor: alternate },
+        columnStyles: {
+          0: { cellWidth: 16 },
+          1: { cellWidth: 13 },
+          2: { cellWidth: 19 },
+          3: { cellWidth: 34 },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 24, halign: "right" },
+          6: { cellWidth: 20, halign: "right" },
+          7: { cellWidth: 26, halign: "right", fontStyle: "bold" },
+        },
+        didDrawPage: drawPageBrand,
+      });
+    }
+
+    const pageCount = doc.getNumberOfPages();
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      doc.setPage(pageNumber);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(110, 115, 125);
+      doc.text(
+        `${pageNumber} / ${pageCount}`,
+        doc.internal.pageSize.getWidth() - 15,
+        doc.internal.pageSize.getHeight() - 7,
+        { align: "right" }
+      );
+    }
+
+    doc.save(`ultra-teb-sales-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+  }
+
   return (
     <div dir={dir} className="report-page">
       <Header
@@ -341,7 +584,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
           </div>
           <div className="report-actions">
             <button type="button" onClick={exportCsv}>{t.export}</button>
-            <button type="button" onClick={() => window.print()}>
+            <button type="button" onClick={downloadPdf}>
               {t.print}
             </button>
           </div>
