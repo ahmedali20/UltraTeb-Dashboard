@@ -1067,7 +1067,7 @@ input::placeholder {
 
 .dashboard-home--reference .dashboard-table th,
 .dashboard-home--reference .dashboard-table td {
-  border-color: #1b2a4a;
+  border-color: var(--border-color);
 }
 
 @media (max-width: 700px) {
