@@ -231,7 +231,6 @@ export default function Header({ active, lang, onToggleLang }: Props) {
           <span className="app-sidebar__section">{t.workspace}</span>
           <NavLink href="/" page="home" label={t.home} icon="home" className={linkClass("home")} />
           <NavLink href="/customers" page="customers" label={t.customers} icon="customers" className={linkClass("customers")} />
-          <NavLink href="/sales#add-record" page="addRecord" label={t.addRecord} icon="add" className={linkClass("addRecord")} />
           <NavLink href="/sales#all-records" page="sales" label={t.sales} icon="records" className={linkClass("sales")} />
           <NavLink href="/sales-reps" page="reps" label={t.reps} icon="reps" className={linkClass("reps")} />
           <NavLink href="/reports" page="reports" label={t.reports} icon="reports" className={linkClass("reports")} />
