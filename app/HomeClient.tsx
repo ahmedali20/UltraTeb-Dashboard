@@ -295,17 +295,14 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     filteredSales.map((sale) => sale.customer_name).filter(Boolean)
   ).size;
 
-  const repTotals = allSalesReps
-    .map((rep) => ({
-      rep,
-      value: sales
-        .filter(
-          (sale) =>
-            (sale.document_type ?? "INVOICE") === "INVOICE" &&
-            normalizeSalesRep(sale.sales_rep, t.unassigned) === rep
-        )
-        .reduce((sum, sale) => sum + Number(sale.total_sales || 0), 0),
-    }))
+  const repTotals = Array.from(
+    invoiceRows.reduce((totals, sale) => {
+      const rep = normalizeSalesRep(sale.sales_rep, t.unassigned);
+      totals.set(rep, (totals.get(rep) ?? 0) + Number(sale.total_sales || 0));
+      return totals;
+    }, new Map<string, number>())
+  )
+    .map(([rep, value]) => ({ rep, value }))
     .sort((a, b) => b.value - a.value);
   const repGrandTotal = Math.max(
     repTotals.reduce((sum, rep) => sum + rep.value, 0),
