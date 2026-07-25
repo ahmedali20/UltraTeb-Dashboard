@@ -130,10 +130,13 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
       ).sort((a, b) => b.localeCompare(a)),
     [sales]
   );
-  const filteredSales = sales.filter(
+  const salesForSelectedRep = sales.filter(
     (sale) =>
-      (selectedRep === "All" ||
-        normalizeSalesRep(sale.sales_rep, t.unassigned) === selectedRep) &&
+      selectedRep === "All" ||
+      normalizeSalesRep(sale.sales_rep, t.unassigned) === selectedRep
+  );
+  const filteredSales = salesForSelectedRep.filter(
+    (sale) =>
       (selectedMonth === "All" ||
         sale.sales_date?.slice(0, 7) === selectedMonth)
   );
@@ -171,12 +174,15 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
   const periodComparison = useMemo(() => {
     const monthKeys = Array.from(
       new Set(
-        filteredSales
+        salesForSelectedRep
           .map((sale) => sale.sales_date?.slice(0, 7))
           .filter(Boolean)
       )
     ).sort();
-    const currentKey = monthKeys[monthKeys.length - 1];
+    const currentKey =
+      selectedMonth === "All"
+        ? monthKeys[monthKeys.length - 1]
+        : selectedMonth;
     if (!currentKey) return null;
 
     const currentDate = new Date(`${currentKey}-01T00:00:00`);
@@ -187,7 +193,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     ).padStart(2, "0")}`;
 
     const summarize = (monthKey: string) => {
-      const rows = filteredSales.filter(
+      const rows = salesForSelectedRep.filter(
         (sale) => sale.sales_date?.slice(0, 7) === monthKey
       );
       return {
@@ -214,7 +220,12 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
       previous: summarize(previousKey),
       label: `${formatPeriod(currentKey)} · ${t.vsPrevious}`,
     };
-  }, [filteredSales, lang, t.vsPrevious]);
+  }, [
+    salesForSelectedRep,
+    selectedMonth,
+    lang,
+    t.vsPrevious,
+  ]);
 
   function trend(current: number, previous: number) {
     if (!previous) return current ? null : 0;
