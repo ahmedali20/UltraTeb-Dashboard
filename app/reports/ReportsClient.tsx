@@ -313,18 +313,23 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
     const palePurple: [number, number, number] = [239, 234, 247];
     const alternate: [number, number, number] = [248, 246, 251];
     const brandedPages = new Set<number>();
-    const logo = await fetch("/brand/ultra-teb-logo.png")
-      .then((response) => response.blob())
-      .then(
-        (blob) =>
-          new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result));
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          })
-      )
-      .catch(() => "");
+    const loadBrandImage = (path: string) =>
+      fetch(path)
+        .then((response) => response.blob())
+        .then(
+          (blob) =>
+            new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result));
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            })
+        )
+        .catch(() => "");
+    const [logo, headerLogo] = await Promise.all([
+      loadBrandImage("/brand/ultra-teb-logo.png"),
+      loadBrandImage("/brand/ultra-teb-header.png"),
+    ]);
 
     const period =
       startDate || endDate
@@ -359,8 +364,10 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
       brandedPages.add(currentPage);
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
+      if (headerLogo) {
+        doc.addImage(headerLogo, "PNG", 15, 8, 62, 18, undefined, "FAST");
+      }
       if (logo) {
-        doc.addImage(logo, "PNG", 15, 7, 25, 36, undefined, "FAST");
         doc.saveGraphicsState();
         doc.setGState(new (doc as any).GState({ opacity: 0.04 }));
         doc.addImage(logo, "PNG", 69, 91, 72, 104, undefined, "FAST");
@@ -372,8 +379,9 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
       doc.text(new Date().toLocaleDateString("en-GB"), pageWidth - 15, 17, {
         align: "right",
       });
-      doc.setDrawColor(205, 210, 218);
-      doc.line(15, 43, pageWidth - 15, 43);
+      doc.setDrawColor(76, 127, 184);
+      doc.setLineWidth(0.7);
+      doc.line(15, 35, pageWidth - 15, 35);
 
       doc.setDrawColor(205, 210, 218);
       doc.line(15, pageHeight - 27, pageWidth - 15, pageHeight - 27);
