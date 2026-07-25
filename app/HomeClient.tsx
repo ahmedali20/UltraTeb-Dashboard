@@ -434,16 +434,6 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
             noChangeLabel={t.noChange}
           />
           <StatCard
-            label={t.totalTax}
-            value={formatMoney(totalTax, lang)}
-            icon="%"
-            tone="blue"
-            trend={periodComparison && trend(periodComparison.current.tax, periodComparison.previous.tax)}
-            period={periodComparison?.label}
-            newLabel={t.newActivity}
-            noChangeLabel={t.noChange}
-          />
-          <StatCard
             label={t.customers}
             value={(selectedRep === "All" && selectedMonth === "All" ? customerCount : uniqueCustomers).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
             icon="◎"
