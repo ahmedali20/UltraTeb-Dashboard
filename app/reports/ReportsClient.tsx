@@ -312,6 +312,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
     const teal: [number, number, number] = [103, 157, 166];
     const palePurple: [number, number, number] = [239, 234, 247];
     const alternate: [number, number, number] = [248, 246, 251];
+    const brandedPages = new Set<number>();
     const logo = await fetch("/brand/ultra-teb-logo.png")
       .then((response) => response.blob())
       .then(
@@ -331,36 +332,44 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         : month !== "All"
           ? month
           : "Beginning - Present";
-    const subject =
+    const subject = (
       customer !== "All"
         ? customer
         : salesRep !== "All"
           ? salesRep
-          : "All Customers and Sales Representatives";
+          : "All Customers and Sales Representatives"
+    ).replace(/_/g, " ");
+
+    function pdfDate(value: string) {
+      if (!value) return "-";
+      const parsed = new Date(`${value}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) return value;
+      return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "2-digit",
+      })
+        .format(parsed)
+        .replace(/ /g, "-");
+    }
 
     function drawPageBrand() {
+      const currentPage = doc.getCurrentPageInfo().pageNumber;
+      if (brandedPages.has(currentPage)) return;
+      brandedPages.add(currentPage);
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       if (logo) {
-        doc.addImage(logo, "PNG", 15, 8, 21, 30, undefined, "FAST");
+        doc.addImage(logo, "PNG", 15, 7, 25, 36, undefined, "FAST");
         doc.saveGraphicsState();
-        doc.setGState(new (doc as any).GState({ opacity: 0.035 }));
+        doc.setGState(new (doc as any).GState({ opacity: 0.04 }));
         doc.addImage(logo, "PNG", 69, 91, 72, 104, undefined, "FAST");
         doc.restoreGraphicsState();
       }
-      doc.setTextColor(...purple);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(21);
-      doc.text("ULTRA", 39, 23);
-      doc.text("TEB", 71, 23);
-      doc.setFontSize(7.5);
-      doc.setTextColor(...teal);
-      doc.text("FOR TRADE", 40, 29);
-      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
       doc.setTextColor(70, 78, 92);
-      doc.text("Sales Report", pageWidth - 15, 16, { align: "right" });
-      doc.setFontSize(6.5);
-      doc.text(new Date().toLocaleDateString("en-GB"), pageWidth - 15, 21, {
+      doc.text(new Date().toLocaleDateString("en-GB"), pageWidth - 15, 17, {
         align: "right",
       });
       doc.setDrawColor(205, 210, 218);
@@ -372,22 +381,22 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         doc.addImage(
           logo,
           "PNG",
-          pageWidth / 2 - 4,
+          pageWidth / 2 - 10,
           pageHeight - 25,
-          8,
-          11,
+          10,
+          14,
           undefined,
           "FAST"
         );
       }
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(6.5);
+      doc.setFontSize(7);
       doc.setTextColor(...purple);
       doc.text("ULTRATEB", pageWidth / 2 + 5, pageHeight - 19, {
         align: "left",
       });
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.8);
+      doc.setFontSize(7);
       doc.setTextColor(...purple);
       doc.text("19 Sayed Zakaria St., Sq. 1166, Sheraton", 15, pageHeight - 10);
       doc.text("www.ultrateb.com", pageWidth / 2, pageHeight - 10, {
@@ -406,6 +415,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
       return y + 4;
     }
 
+    drawPageBrand();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(17);
     doc.setTextColor(25, 35, 50);
@@ -466,7 +476,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
           5: { cellWidth: 24, halign: "right" },
           6: { cellWidth: 33, halign: "right", fontStyle: "bold" },
         },
-        willDrawPage: drawPageBrand,
+        didDrawPage: drawPageBrand,
       });
 
       nextY = ((doc as any).lastAutoTable?.finalY ?? nextY) + 10;
@@ -511,8 +521,9 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
             3: { cellWidth: 25, halign: "center" },
             4: { cellWidth: 49, halign: "right", fontStyle: "bold" },
           },
-          willDrawPage: drawPageBrand,
+          didDrawPage: drawPageBrand,
         });
+        nextY = ((doc as any).lastAutoTable?.finalY ?? nextY) + 5;
       }
     }
 
@@ -532,14 +543,15 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         { title: "Credit Notes", rows: creditRows, noteType: true },
         { title: "Debit Notes", rows: debitRows, noteType: true },
       ];
-      let firstDetailSection = true;
-
       detailGroups.forEach((group) => {
         if (!group.rows.length) return;
-        const useOpeningPage =
-          reportType === "details" && firstDetailSection;
-        if (!useOpeningPage) doc.addPage();
-        sectionTitle(group.title, useOpeningPage ? 78 : 55);
+        if (reportType === "details" && nextY < 78) nextY = 78;
+        if (nextY > 242) {
+          doc.addPage();
+          drawPageBrand();
+          nextY = 55;
+        }
+        sectionTitle(group.title, nextY);
         const groupTotals = group.rows.reduce(
           (result, sale) => ({
             item: result.item + Number(sale.sales_item_total || 0),
@@ -550,7 +562,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         );
 
         autoTable(doc, {
-          startY: useOpeningPage ? 84 : 61,
+          startY: nextY + 5,
           margin: { left: 10, right: 10, top: 48, bottom: 32 },
           tableWidth: 190,
           head: [
@@ -580,7 +592,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
               ? [
                   sale.invoice_no,
                   sale.original_invoice_no || "-",
-                  sale.sales_date,
+                  pdfDate(sale.sales_date),
                   sale.customer_name || "-",
                   normalizeRep(sale.sales_rep),
                   money(Number(sale.sales_item_total || 0)),
@@ -589,7 +601,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                 ]
               : [
                   sale.invoice_no,
-                  sale.sales_date,
+                  pdfDate(sale.sales_date),
                   sale.customer_name || "-",
                   normalizeRep(sale.sales_rep),
                   money(Number(sale.sales_item_total || 0)),
@@ -620,12 +632,21 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                 ],
           ],
           theme: "grid",
-          styles: { fontSize: 6, cellPadding: 1.7, overflow: "linebreak" },
-          headStyles: { fillColor: purple, textColor: 255, fontSize: 6 },
+          styles: { fontSize: 7, cellPadding: 2, overflow: "linebreak" },
+          headStyles: { fillColor: purple, textColor: 255, fontSize: 6.8 },
+          bodyStyles: {
+            textColor:
+              group.title === "Credit Notes"
+                ? [180, 38, 38]
+                : [45, 50, 60],
+          },
           alternateRowStyles: { fillColor: alternate },
           footStyles: {
             fillColor: palePurple,
-            textColor: 30,
+            textColor:
+              group.title === "Credit Notes"
+                ? [180, 38, 38]
+                : [30, 30, 30],
             fontStyle: "bold",
           },
           columnStyles: group.noteType
@@ -648,9 +669,9 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
                 5: { cellWidth: 19, halign: "right" },
                 6: { cellWidth: 24, halign: "right", fontStyle: "bold" },
               },
-          willDrawPage: drawPageBrand,
+          didDrawPage: drawPageBrand,
         });
-        firstDetailSection = false;
+        nextY = ((doc as any).lastAutoTable?.finalY ?? nextY) + 5;
       });
     }
 
