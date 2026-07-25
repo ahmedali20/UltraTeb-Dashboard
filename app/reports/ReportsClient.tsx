@@ -326,9 +326,10 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
             })
         )
         .catch(() => "");
-    const [logo, headerLogo] = await Promise.all([
+    const [logo, headerLogo, footerImage] = await Promise.all([
       loadBrandImage("/brand/ultra-teb-logo.png"),
       loadBrandImage("/brand/ultra-teb-header.png"),
+      loadBrandImage("/brand/ultra-teb-footer.png"),
     ]);
 
     const period =
@@ -383,36 +384,18 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
       doc.setLineWidth(0.7);
       doc.line(15, 35, pageWidth - 15, 35);
 
-      doc.setDrawColor(205, 210, 218);
-      doc.line(15, pageHeight - 27, pageWidth - 15, pageHeight - 27);
-      if (logo) {
+      if (footerImage) {
         doc.addImage(
-          logo,
+          footerImage,
           "PNG",
-          pageWidth / 2 - 10,
-          pageHeight - 25,
           10,
-          14,
+          pageHeight - 49,
+          190,
+          46.4,
           undefined,
           "FAST"
         );
       }
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
-      doc.setTextColor(...purple);
-      doc.text("ULTRATEB", pageWidth / 2 + 5, pageHeight - 19, {
-        align: "left",
-      });
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      doc.setTextColor(...purple);
-      doc.text("19 Sayed Zakaria St., Sq. 1166, Sheraton", 15, pageHeight - 10);
-      doc.text("www.ultrateb.com", pageWidth / 2, pageHeight - 10, {
-        align: "center",
-      });
-      doc.text("Info@ultrateb.com", pageWidth - 15, pageHeight - 10, {
-        align: "right",
-      });
     }
 
     function sectionTitle(title: string, y: number) {
@@ -441,7 +424,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
       nextY = sectionTitle("Customer Sales Summary", nextY);
       autoTable(doc, {
         startY: nextY,
-        margin: { left: 10, right: 10, top: 48, bottom: 32 },
+        margin: { left: 10, right: 10, top: 48, bottom: 52 },
         tableWidth: 190,
         head: [[
           "Customer",
@@ -496,7 +479,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         nextY = sectionTitle("Sales Rep Summary", nextY);
         autoTable(doc, {
           startY: nextY,
-          margin: { left: 10, right: 10, top: 48, bottom: 32 },
+          margin: { left: 10, right: 10, top: 48, bottom: 52 },
           tableWidth: 190,
           head: [["Sales Rep", "Invoices", "CR Notes", "DR Notes", "Total Sales"]],
           body: salesRepSummary.map((item) => [
@@ -554,7 +537,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
       detailGroups.forEach((group) => {
         if (!group.rows.length) return;
         if (reportType === "details" && nextY < 78) nextY = 78;
-        if (nextY > 242) {
+        if (nextY > 220) {
           doc.addPage();
           drawPageBrand();
           nextY = 55;
@@ -571,7 +554,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
 
         autoTable(doc, {
           startY: nextY + 5,
-          margin: { left: 10, right: 10, top: 48, bottom: 32 },
+          margin: { left: 10, right: 10, top: 48, bottom: 52 },
           tableWidth: 190,
           head: [
             group.noteType
