@@ -32,6 +32,29 @@ export async function POST(request: Request) {
     );
   }
 
+  const { data: existingReps, error: existingRepsError } = await supabaseServer
+    .from("sales_reps")
+    .select("id, name");
+
+  if (existingRepsError) {
+    return NextResponse.json(
+      { error: existingRepsError.message },
+      { status: 400 }
+    );
+  }
+
+  const normalizedName = name.toLocaleLowerCase();
+  if (
+    (existingReps ?? []).some(
+      (rep) => String(rep.name ?? "").trim().toLocaleLowerCase() === normalizedName
+    )
+  ) {
+    return NextResponse.json(
+      { error: "This sales representative already exists." },
+      { status: 409 }
+    );
+  }
+
   const { data, error } = await supabaseServer
     .from("sales_reps")
     .insert({ name })
