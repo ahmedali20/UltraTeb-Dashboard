@@ -155,7 +155,14 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
   const customerSummary = useMemo(() => {
     const summary = new Map<
       string,
-      { invoices: number; creditNotes: number; debitNotes: number; total: number }
+      {
+        invoices: number;
+        creditNotes: number;
+        debitNotes: number;
+        item: number;
+        tax: number;
+        total: number;
+      }
     >();
     filtered.forEach((sale) => {
       const name = sale.customer_name || "Unassigned Customer";
@@ -163,11 +170,15 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
         invoices: 0,
         creditNotes: 0,
         debitNotes: 0,
+        item: 0,
+        tax: 0,
         total: 0,
       };
       if (sale.document_type === "CR_NOTE") current.creditNotes += 1;
       else if (sale.document_type === "DR_NOTE") current.debitNotes += 1;
       else current.invoices += 1;
+      current.item += Number(sale.sales_item_total || 0);
+      current.tax += Number(sale.tax || 0);
       current.total += Number(sale.total_sales || 0);
       summary.set(name, current);
     });
@@ -331,34 +342,58 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       if (logo) {
-        doc.addImage(logo, "PNG", 15, 10, 27, 39, undefined, "FAST");
+        doc.addImage(logo, "PNG", 15, 8, 21, 30, undefined, "FAST");
         doc.saveGraphicsState();
         doc.setGState(new (doc as any).GState({ opacity: 0.035 }));
-        doc.addImage(logo, "PNG", 66, 94, 78, 112, undefined, "FAST");
+        doc.addImage(logo, "PNG", 69, 91, 72, 104, undefined, "FAST");
         doc.restoreGraphicsState();
       }
       doc.setTextColor(...purple);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text("ULTRA TEB", pageWidth - 15, 17, { align: "right" });
-      doc.setFontSize(7);
-      doc.setTextColor(90, 105, 120);
-      doc.text("Sales Intelligence Report", pageWidth - 15, 22, {
+      doc.setFontSize(21);
+      doc.text("ULTRA", 39, 23);
+      doc.text("TEB", 71, 23);
+      doc.setFontSize(7.5);
+      doc.setTextColor(...teal);
+      doc.text("FOR TRADE", 40, 29);
+      doc.setFontSize(8);
+      doc.setTextColor(70, 78, 92);
+      doc.text("Sales Report", pageWidth - 15, 16, { align: "right" });
+      doc.setFontSize(6.5);
+      doc.text(new Date().toLocaleDateString("en-GB"), pageWidth - 15, 21, {
         align: "right",
       });
       doc.setDrawColor(205, 210, 218);
-      doc.line(15, 52, pageWidth - 15, 52);
+      doc.line(15, 43, pageWidth - 15, 43);
 
-      doc.setDrawColor(...teal);
-      doc.line(15, pageHeight - 20, pageWidth - 15, pageHeight - 20);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
+      doc.setDrawColor(205, 210, 218);
+      doc.line(15, pageHeight - 27, pageWidth - 15, pageHeight - 27);
+      if (logo) {
+        doc.addImage(
+          logo,
+          "PNG",
+          pageWidth / 2 - 4,
+          pageHeight - 25,
+          8,
+          11,
+          undefined,
+          "FAST"
+        );
+      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.5);
       doc.setTextColor(...purple);
-      doc.text("19 Sayed Zakaria St., Sq. 1166, Sheraton", 15, pageHeight - 13);
-      doc.text("www.ultrateb.com", pageWidth / 2, pageHeight - 13, {
+      doc.text("ULTRATEB", pageWidth / 2 + 5, pageHeight - 19, {
+        align: "left",
+      });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.8);
+      doc.setTextColor(...purple);
+      doc.text("19 Sayed Zakaria St., Sq. 1166, Sheraton", 15, pageHeight - 10);
+      doc.text("www.ultrateb.com", pageWidth / 2, pageHeight - 10, {
         align: "center",
       });
-      doc.text("Info@ultrateb.com", pageWidth - 15, pageHeight - 13, {
+      doc.text("Info@ultrateb.com", pageWidth - 15, pageHeight - 10, {
         align: "right",
       });
     }
@@ -371,50 +406,41 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
       return y + 4;
     }
 
-    drawPageBrand();
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
+    doc.setFontSize(17);
     doc.setTextColor(25, 35, 50);
-    doc.text("Sales Report", 15, 64);
-    doc.setFontSize(9);
+    doc.text("Sales Report", 15, 55);
+    doc.setFontSize(9.5);
     doc.setTextColor(...purple);
-    doc.text(subject, 15, 71);
+    doc.text(subject, 15, 62);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(85, 95, 110);
-    doc.text(`Period: ${period}`, 15, 77);
+    doc.text(`Period: ${period}`, 15, 68);
 
-    autoTable(doc, {
-      startY: 83,
-      margin: { left: 15, right: 15, top: 58, bottom: 25 },
-      head: [["Invoices", "Credit Notes", "Debit Notes", "Item Total", "TAX", "Total Sales"]],
-      body: [[
-        documentTotals.invoices,
-        money(documentTotals.creditTotal),
-        money(documentTotals.debitTotal),
-        money(totals.item),
-        money(totals.tax),
-        money(totals.total),
-      ]],
-      theme: "grid",
-      styles: { halign: "center", fontSize: 7, cellPadding: 2.2 },
-      headStyles: { fillColor: purple, textColor: 255, fontStyle: "bold" },
-      bodyStyles: { fillColor: palePurple, fontStyle: "bold" },
-      didDrawPage: drawPageBrand,
-    });
-
-    let nextY = ((doc as any).lastAutoTable?.finalY ?? 100) + 10;
+    let nextY = 78;
 
     if (reportType === "summary" || reportType === "both") {
       nextY = sectionTitle("Customer Sales Summary", nextY);
       autoTable(doc, {
         startY: nextY,
-        margin: { left: 15, right: 15, top: 58, bottom: 25 },
-        head: [["Customer", "Invoices", "CR Notes", "DR Notes", "Total Sales"]],
+        margin: { left: 10, right: 10, top: 48, bottom: 32 },
+        tableWidth: 190,
+        head: [[
+          "Customer",
+          "Invoices",
+          "CR Notes",
+          "DR Notes",
+          "Item Total",
+          "TAX",
+          "Total Sales",
+        ]],
         body: customerSummary.map((item) => [
           item.name,
           item.invoices,
           item.creditNotes,
           item.debitNotes,
+          money(item.item),
+          money(item.tax),
           money(item.total),
         ]),
         foot: [[
@@ -422,98 +448,209 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
           documentTotals.invoices,
           documentTotals.creditNotes,
           documentTotals.debitNotes,
+          money(totals.item),
+          money(totals.tax),
           money(totals.total),
         ]],
         theme: "grid",
-        styles: { fontSize: 7, cellPadding: 2 },
+        styles: { fontSize: 6.6, cellPadding: 2, overflow: "linebreak" },
         headStyles: { fillColor: purple, textColor: 255 },
         alternateRowStyles: { fillColor: alternate },
         footStyles: { fillColor: palePurple, textColor: 30, fontStyle: "bold" },
-        columnStyles: { 0: { cellWidth: 70 }, 4: { halign: "right" } },
-        didDrawPage: drawPageBrand,
+        columnStyles: {
+          0: { cellWidth: 48 },
+          1: { cellWidth: 19, halign: "center" },
+          2: { cellWidth: 19, halign: "center" },
+          3: { cellWidth: 19, halign: "center" },
+          4: { cellWidth: 28, halign: "right" },
+          5: { cellWidth: 24, halign: "right" },
+          6: { cellWidth: 33, halign: "right", fontStyle: "bold" },
+        },
+        willDrawPage: drawPageBrand,
       });
 
       nextY = ((doc as any).lastAutoTable?.finalY ?? nextY) + 10;
-      if (nextY > 225) {
-        doc.addPage();
-        drawPageBrand();
-        nextY = 64;
+      if (customerSummary.length > 1) {
+        if (nextY > 225) {
+          doc.addPage();
+          nextY = 55;
+        }
+        nextY = sectionTitle("Sales Rep Summary", nextY);
+        autoTable(doc, {
+          startY: nextY,
+          margin: { left: 10, right: 10, top: 48, bottom: 32 },
+          tableWidth: 190,
+          head: [["Sales Rep", "Invoices", "CR Notes", "DR Notes", "Total Sales"]],
+          body: salesRepSummary.map((item) => [
+            item.name,
+            item.invoices,
+            item.creditNotes,
+            item.debitNotes,
+            money(item.total),
+          ]),
+          foot: [[
+            "Grand Total",
+            documentTotals.invoices,
+            documentTotals.creditNotes,
+            documentTotals.debitNotes,
+            money(totals.total),
+          ]],
+          theme: "grid",
+          styles: { fontSize: 7, cellPadding: 2 },
+          headStyles: { fillColor: purple, textColor: 255 },
+          alternateRowStyles: { fillColor: alternate },
+          footStyles: {
+            fillColor: palePurple,
+            textColor: 30,
+            fontStyle: "bold",
+          },
+          columnStyles: {
+            0: { cellWidth: 66 },
+            1: { cellWidth: 25, halign: "center" },
+            2: { cellWidth: 25, halign: "center" },
+            3: { cellWidth: 25, halign: "center" },
+            4: { cellWidth: 49, halign: "right", fontStyle: "bold" },
+          },
+          willDrawPage: drawPageBrand,
+        });
       }
-      nextY = sectionTitle("Sales Rep Summary", nextY);
-      autoTable(doc, {
-        startY: nextY,
-        margin: { left: 15, right: 15, top: 58, bottom: 25 },
-        head: [["Sales Rep", "Invoices", "CR Notes", "DR Notes", "Total Sales"]],
-        body: salesRepSummary.map((item) => [
-          item.name,
-          item.invoices,
-          item.creditNotes,
-          item.debitNotes,
-          money(item.total),
-        ]),
-        foot: [[
-          "Grand Total",
-          documentTotals.invoices,
-          documentTotals.creditNotes,
-          documentTotals.debitNotes,
-          money(totals.total),
-        ]],
-        theme: "grid",
-        styles: { fontSize: 7, cellPadding: 2 },
-        headStyles: { fillColor: purple, textColor: 255 },
-        alternateRowStyles: { fillColor: alternate },
-        footStyles: { fillColor: palePurple, textColor: 30, fontStyle: "bold" },
-        columnStyles: { 0: { cellWidth: 70 }, 4: { halign: "right" } },
-        didDrawPage: drawPageBrand,
-      });
     }
 
     if (reportType === "details" || reportType === "both") {
-      doc.addPage();
-      drawPageBrand();
-      sectionTitle("Detailed Records", 64);
-      autoTable(doc, {
-        startY: 69,
-        margin: { left: 10, right: 10, top: 58, bottom: 25 },
-        head: [[
-          "Document",
-          "No.",
-          "Date",
-          "Customer",
-          "Sales Rep",
-          "Item Total",
-          "TAX",
-          "Total",
-        ]],
-        body: filtered.map((sale) => [
-          sale.document_type === "CR_NOTE"
-            ? "CR Note"
-            : sale.document_type === "DR_NOTE"
-              ? "DR Note"
-              : "Invoice",
-          sale.invoice_no,
-          sale.sales_date,
-          sale.customer_name || "-",
-          normalizeRep(sale.sales_rep),
-          money(Number(sale.sales_item_total || 0)),
-          money(Number(sale.tax || 0)),
-          money(Number(sale.total_sales || 0)),
-        ]),
-        theme: "grid",
-        styles: { fontSize: 5.8, cellPadding: 1.55, overflow: "linebreak" },
-        headStyles: { fillColor: purple, textColor: 255, fontSize: 5.7 },
-        alternateRowStyles: { fillColor: alternate },
-        columnStyles: {
-          0: { cellWidth: 16 },
-          1: { cellWidth: 13 },
-          2: { cellWidth: 19 },
-          3: { cellWidth: 34 },
-          4: { cellWidth: 25 },
-          5: { cellWidth: 24, halign: "right" },
-          6: { cellWidth: 20, halign: "right" },
-          7: { cellWidth: 26, halign: "right", fontStyle: "bold" },
-        },
-        didDrawPage: drawPageBrand,
+      const invoiceRows = filtered.filter(
+        (sale) => (sale.document_type ?? "INVOICE") === "INVOICE"
+      );
+      const creditRows = filtered.filter(
+        (sale) => sale.document_type === "CR_NOTE"
+      );
+      const debitRows = filtered.filter(
+        (sale) => sale.document_type === "DR_NOTE"
+      );
+
+      const detailGroups = [
+        { title: "Sales Invoices", rows: invoiceRows, noteType: false },
+        { title: "Credit Notes", rows: creditRows, noteType: true },
+        { title: "Debit Notes", rows: debitRows, noteType: true },
+      ];
+      let firstDetailSection = true;
+
+      detailGroups.forEach((group) => {
+        if (!group.rows.length) return;
+        const useOpeningPage =
+          reportType === "details" && firstDetailSection;
+        if (!useOpeningPage) doc.addPage();
+        sectionTitle(group.title, useOpeningPage ? 78 : 55);
+        const groupTotals = group.rows.reduce(
+          (result, sale) => ({
+            item: result.item + Number(sale.sales_item_total || 0),
+            tax: result.tax + Number(sale.tax || 0),
+            total: result.total + Number(sale.total_sales || 0),
+          }),
+          { item: 0, tax: 0, total: 0 }
+        );
+
+        autoTable(doc, {
+          startY: useOpeningPage ? 84 : 61,
+          margin: { left: 10, right: 10, top: 48, bottom: 32 },
+          tableWidth: 190,
+          head: [
+            group.noteType
+              ? [
+                  "Note No.",
+                  "Invoice No.",
+                  "Date",
+                  "Customer",
+                  "Sales Rep",
+                  "Item Total",
+                  "TAX",
+                  "Total",
+                ]
+              : [
+                  "Invoice No.",
+                  "Date",
+                  "Customer",
+                  "Sales Rep",
+                  "Item Total",
+                  "TAX",
+                  "Total",
+                ],
+          ],
+          body: group.rows.map((sale) =>
+            group.noteType
+              ? [
+                  sale.invoice_no,
+                  sale.original_invoice_no || "-",
+                  sale.sales_date,
+                  sale.customer_name || "-",
+                  normalizeRep(sale.sales_rep),
+                  money(Number(sale.sales_item_total || 0)),
+                  money(Number(sale.tax || 0)),
+                  money(Number(sale.total_sales || 0)),
+                ]
+              : [
+                  sale.invoice_no,
+                  sale.sales_date,
+                  sale.customer_name || "-",
+                  normalizeRep(sale.sales_rep),
+                  money(Number(sale.sales_item_total || 0)),
+                  money(Number(sale.tax || 0)),
+                  money(Number(sale.total_sales || 0)),
+                ]
+          ),
+          foot: [
+            group.noteType
+              ? [
+                  "Total",
+                  "",
+                  "",
+                  "",
+                  "",
+                  money(groupTotals.item),
+                  money(groupTotals.tax),
+                  money(groupTotals.total),
+                ]
+              : [
+                  "Total",
+                  "",
+                  "",
+                  "",
+                  money(groupTotals.item),
+                  money(groupTotals.tax),
+                  money(groupTotals.total),
+                ],
+          ],
+          theme: "grid",
+          styles: { fontSize: 6, cellPadding: 1.7, overflow: "linebreak" },
+          headStyles: { fillColor: purple, textColor: 255, fontSize: 6 },
+          alternateRowStyles: { fillColor: alternate },
+          footStyles: {
+            fillColor: palePurple,
+            textColor: 30,
+            fontStyle: "bold",
+          },
+          columnStyles: group.noteType
+            ? {
+                0: { cellWidth: 16 },
+                1: { cellWidth: 18 },
+                2: { cellWidth: 19 },
+                3: { cellWidth: 38 },
+                4: { cellWidth: 27 },
+                5: { cellWidth: 23, halign: "right" },
+                6: { cellWidth: 18, halign: "right" },
+                7: { cellWidth: 31, halign: "right", fontStyle: "bold" },
+              }
+            : {
+                0: { cellWidth: 20 },
+                1: { cellWidth: 22 },
+                2: { cellWidth: 48 },
+                3: { cellWidth: 34 },
+                4: { cellWidth: 23, halign: "right" },
+                5: { cellWidth: 19, halign: "right" },
+                6: { cellWidth: 24, halign: "right", fontStyle: "bold" },
+              },
+          willDrawPage: drawPageBrand,
+        });
+        firstDetailSection = false;
       });
     }
 
@@ -526,7 +663,7 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
       doc.text(
         `${pageNumber} / ${pageCount}`,
         doc.internal.pageSize.getWidth() - 15,
-        doc.internal.pageSize.getHeight() - 7,
+        doc.internal.pageSize.getHeight() - 4,
         { align: "right" }
       );
     }
