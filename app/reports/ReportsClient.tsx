@@ -304,6 +304,14 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
             <p>ULTRA TEB</p>
             <h1>{t.title}</h1>
             <span>{t.subtitle}</span>
+            <div className="report-print-meta">
+              <strong>
+                {lang === "ar" ? "الفترة" : "Period"}:
+              </strong>{" "}
+              {startDate || (lang === "ar" ? "البداية" : "Beginning")}
+              {" — "}
+              {endDate || (lang === "ar" ? "الآن" : "Present")}
+            </div>
           </div>
           <div className="report-actions">
             <button type="button" onClick={exportCsv}>{t.export}</button>
