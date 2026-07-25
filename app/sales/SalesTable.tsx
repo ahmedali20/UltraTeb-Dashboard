@@ -158,9 +158,7 @@ export default function SalesTable({
   const [recordSortDirection, setRecordSortDirection] =
     useState<"asc" | "desc">("asc");
   const recordsPerPage = 25;
-  const [activeSalesView, setActiveSalesView] = useState<"add" | "records">(
-    "add"
-  );
+  const [activeSalesView] = useState<"add" | "records">("records");
   const salesRepOptions = Array.from(
     new Set(
       customerOptions
@@ -252,18 +250,6 @@ export default function SalesTable({
       setRecordSortDirection("asc");
     }
   }
-
-  useEffect(() => {
-    function updateViewFromHash() {
-      setActiveSalesView(
-        window.location.hash === "#all-records" ? "records" : "add"
-      );
-    }
-
-    updateViewFromHash();
-    window.addEventListener("hashchange", updateViewFromHash);
-    return () => window.removeEventListener("hashchange", updateViewFromHash);
-  }, []);
 
   function calculateTax(itemTotal: string, mode: "14" | "5" | "manual") {
     if (mode === "manual") return form.tax;
