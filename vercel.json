@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/google-sheets-sync",
-      "schedule": "59 8 * * *"
+      "schedule": "59 20 * * *"
     }
   ]
 }
