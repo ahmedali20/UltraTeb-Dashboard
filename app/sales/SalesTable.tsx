@@ -715,8 +715,8 @@ export default function SalesTable({
           </div>
           <span>
             {lang === "ar"
-              ? "مبيعات الفواتير · مزامنة تلقائية يومياً الساعة 11:59 صباحاً بتوقيت القاهرة"
-              : "Invoice Sales · Automatic daily sync at 11:59 AM Cairo"}
+              ? "مبيعات الفواتير · مزامنة تلقائية يومياً الساعة 11:59 مساءً بتوقيت القاهرة"
+              : "Invoice Sales · Automatic daily sync at 11:59 PM Cairo"}
           </span>
           {sheetSyncStatus && <p>{sheetSyncStatus}</p>}
         </div>
