@@ -30,7 +30,8 @@ export async function middleware(request: NextRequest) {
       (pathname === "/users" ||
         pathname === "/sales-teams" ||
         pathname.startsWith("/api/auth/users") ||
-        pathname.startsWith("/api/sales-teams")) &&
+        pathname.startsWith("/api/sales-teams") ||
+        pathname.startsWith("/api/sales-reps/bonus")) &&
       session.role !== "admin"
     ) {
       if (pathname.startsWith("/api/")) {
