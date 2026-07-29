@@ -1777,8 +1777,8 @@ input::placeholder {
   margin-top: 14px;
 }
 
-.team-card__members span,
-.unassigned-reps span {
+.team-card__members > span,
+.unassigned-reps > div:not(.team-bonus) > span {
   border-radius: 999px;
   background: var(--surface-muted);
   padding: 6px 9px;
@@ -1802,6 +1802,18 @@ input::placeholder {
 
 .unassigned-reps {
   padding: 17px;
+}
+
+.unassigned-reps > small {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.unassigned-reps > .team-bonus {
+  display: grid;
+  margin-top: 14px;
 }
 
 @media (max-width: 760px) {
