@@ -21,7 +21,9 @@ export default async function SalesTeamsPage() {
       .order("name"),
     supabase
       .from("sales_reps")
-      .select("id, name, team_id")
+      .select(
+        "id, name, team_id, bonus_type, bonus_percentage, fixed_monthly_bonus"
+      )
       .order("name"),
     supabase
       .from("sales_view")
@@ -48,4 +50,3 @@ export default async function SalesTeamsPage() {
     />
   );
 }
-
