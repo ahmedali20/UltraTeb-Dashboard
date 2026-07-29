@@ -1733,6 +1733,19 @@ input::placeholder {
   min-width: 0;
 }
 
+.team-bonus__method,
+.team-bonus__rule-note {
+  grid-column: 1 / -1;
+}
+
+.team-bonus__rule-note {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--brand-primary) 9%, transparent);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  padding: 9px 10px;
+}
+
 .team-bonus__row > div:first-child,
 .team-bonus__row label,
 .team-bonus__calculated {
