@@ -15,8 +15,13 @@ type SalesRep = {
   id: number;
   name: string;
   team_id: number | null;
-  bonus_type: "PERCENTAGE" | "FIXED_MONTHLY";
+  bonus_type:
+    | "PERCENTAGE"
+    | "FIXED_MONTHLY"
+    | "DUAL_PERCENTAGE"
+    | "TIERED_EXCESS";
   bonus_percentage: number;
+  secondary_bonus_percentage: number;
   fixed_monthly_bonus: number;
 };
 
@@ -29,8 +34,9 @@ type TeamSale = {
 };
 
 type BonusDraft = {
-  type: "PERCENTAGE" | "FIXED_MONTHLY";
+  type: SalesRep["bonus_type"];
   percentage: string;
+  secondary: string;
   fixed: string;
 };
 
@@ -73,6 +79,13 @@ const text = {
     method: "Method",
     percentage: "Percentage",
     fixed: "Fixed Monthly",
+    dualPercentage: "Own Sales + Mostafa Sales",
+    tieredExcess: "Tiered + Excess Percentage",
+    ownSalesPercentage: "Own Sales %",
+    mostafaSalesPercentage: "Mostafa Sales %",
+    excessPercentage: "Excess Above 300K %",
+    tieredNote:
+      "0 below 100K; 1,000 at 100K; +500 for every additional 50K up to 300K; then 3,000 plus the excess percentage.",
     value: "Value",
     calculated: "Calculated Bonus",
     save: "Save",
@@ -109,6 +122,13 @@ const text = {
     method: "الطريقة",
     percentage: "نسبة مئوية",
     fixed: "مبلغ شهري ثابت",
+    dualPercentage: "المبيعات الخاصة + مبيعات مصطفى",
+    tieredExcess: "شرائح + نسبة الزيادة",
+    ownSalesPercentage: "نسبة المبيعات الخاصة",
+    mostafaSalesPercentage: "نسبة مبيعات مصطفى",
+    excessPercentage: "نسبة الزيادة فوق 300 ألف",
+    tieredNote:
+      "صفر أقل من 100 ألف، و1000 عند 100 ألف، و500 لكل 50 ألف إضافية حتى 300 ألف، ثم 3000 + نسبة الزيادة.",
     value: "القيمة",
     calculated: "البونص المحسوب",
     save: "حفظ",
@@ -161,6 +181,7 @@ export default function SalesTeamsClient({
           {
             type: rep.bonus_type ?? "PERCENTAGE",
             percentage: String(rep.bonus_percentage ?? 0),
+            secondary: String(rep.secondary_bonus_percentage ?? 0),
             fixed: String(rep.fixed_monthly_bonus ?? 0),
           },
         ])
@@ -176,9 +197,24 @@ export default function SalesTeamsClient({
     [sales]
   );
 
-  const representativeResults = useMemo(
-    () =>
-      new Map<number, RepPerformance>(
+  const representativeResults = useMemo(() => {
+    const netForMonth = (repName: string, targetMonth: string) =>
+      sales
+        .filter(
+          (sale) =>
+            normalizedName(sale.sales_rep) === normalizedName(repName) &&
+            sale.month === targetMonth
+        )
+        .reduce((sum, sale) => {
+          const amount = Math.abs(Number(sale.total_sales || 0));
+          if (sale.document_type === "CR_NOTE") return sum - amount;
+          if (sale.document_type === "DR_NOTE") return sum + amount;
+          return sum + amount;
+        }, 0);
+
+    const bonusMonths = month === "All" ? months : [month];
+
+    return new Map<number, RepPerformance>(
         reps.map((rep) => {
           const repSales = sales.filter(
             (sale) =>
@@ -196,24 +232,53 @@ export default function SalesTeamsClient({
             { invoices: 0, credit: 0, debit: 0 }
           );
           const net = totals.invoices - totals.credit + totals.debit;
-          const activeMonths =
-            month === "All"
-              ? new Set(repSales.map((sale) => sale.month).filter(Boolean)).size
-              : 1;
-          const bonus =
-            rep.bonus_type === "FIXED_MONTHLY"
-              ? Number(rep.fixed_monthly_bonus || 0) *
-                (repSales.length ? activeMonths : 0)
-              : Math.max(net, 0) *
-                (Number(rep.bonus_percentage || 0) / 100);
+          const bonus = bonusMonths.reduce((sum, bonusMonth) => {
+            const ownNet = Math.max(netForMonth(rep.name, bonusMonth), 0);
+
+            if (rep.bonus_type === "FIXED_MONTHLY") {
+              return (
+                sum +
+                (ownNet > 0 ? Number(rep.fixed_monthly_bonus || 0) : 0)
+              );
+            }
+
+            if (rep.bonus_type === "DUAL_PERCENTAGE") {
+              const mostafaNet = Math.max(
+                netForMonth("Mostafa", bonusMonth),
+                0
+              );
+              return (
+                sum +
+                ownNet * (Number(rep.bonus_percentage || 0) / 100) +
+                mostafaNet *
+                  (Number(rep.secondary_bonus_percentage || 0) / 100)
+              );
+            }
+
+            if (rep.bonus_type === "TIERED_EXCESS") {
+              if (ownNet < 100000) return sum;
+              if (ownNet <= 300000) {
+                return sum + Math.floor(ownNet / 50000) * 500;
+              }
+              return (
+                sum +
+                3000 +
+                (ownNet - 300000) *
+                  (Number(rep.bonus_percentage || 0) / 100)
+              );
+            }
+
+            return (
+              sum + ownNet * (Number(rep.bonus_percentage || 0) / 100)
+            );
+          }, 0);
           return [rep.id, { ...rep, ...totals, net, bonus }] as [
             number,
             RepPerformance,
           ];
         })
-      ),
-    [reps, sales, month]
-  );
+      );
+  }, [reps, sales, month, months]);
 
   const teamResults = useMemo(
     () =>
@@ -329,6 +394,7 @@ export default function SalesTeamsClient({
       [repId]: {
         type: current[repId]?.type ?? "PERCENTAGE",
         percentage: current[repId]?.percentage ?? "0",
+        secondary: current[repId]?.secondary ?? "0",
         fixed: current[repId]?.fixed ?? "0",
         ...changes,
       },
@@ -346,6 +412,7 @@ export default function SalesTeamsClient({
         id: repId,
         bonusType: draft.type,
         bonusPercentage: Number(draft.percentage || 0),
+        secondaryBonusPercentage: Number(draft.secondary || 0),
         fixedMonthlyBonus: Number(draft.fixed || 0),
       }),
     });
@@ -362,6 +429,7 @@ export default function SalesTeamsClient({
     const draft = bonusDrafts[member.id] ?? {
       type: member.bonus_type,
       percentage: String(member.bonus_percentage ?? 0),
+      secondary: String(member.secondary_bonus_percentage ?? 0),
       fixed: String(member.fixed_monthly_bonus ?? 0),
     };
     return (
@@ -376,7 +444,7 @@ export default function SalesTeamsClient({
             <strong>{currency(member.bonus, lang)}</strong>
           </div>
         </div>
-        <label>
+        <label className="team-bonus__method">
           {t.method}
           <select
             value={draft.type}
@@ -388,33 +456,69 @@ export default function SalesTeamsClient({
           >
             <option value="PERCENTAGE">{t.percentage}</option>
             <option value="FIXED_MONTHLY">{t.fixed}</option>
+            <option value="DUAL_PERCENTAGE">{t.dualPercentage}</option>
+            <option value="TIERED_EXCESS">{t.tieredExcess}</option>
           </select>
         </label>
-        <label>
-          {t.value}
-          <div className="team-bonus__value">
-            <input
-              type="number"
-              min="0"
-              max={draft.type === "PERCENTAGE" ? 100 : undefined}
-              step={draft.type === "PERCENTAGE" ? "0.1" : "0.01"}
-              value={
-                draft.type === "PERCENTAGE"
-                  ? draft.percentage
-                  : draft.fixed
-              }
-              onChange={(event) =>
-                changeBonus(
-                  member.id,
-                  draft.type === "PERCENTAGE"
-                    ? { percentage: event.target.value }
-                    : { fixed: event.target.value }
-                )
-              }
-            />
-            <span>{draft.type === "PERCENTAGE" ? "%" : "EGP"}</span>
-          </div>
-        </label>
+        {draft.type === "FIXED_MONTHLY" ? (
+          <label>
+            {t.value}
+            <div className="team-bonus__value">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={draft.fixed}
+                onChange={(event) =>
+                  changeBonus(member.id, { fixed: event.target.value })
+                }
+              />
+              <span>EGP</span>
+            </div>
+          </label>
+        ) : (
+          <label>
+            {draft.type === "DUAL_PERCENTAGE"
+              ? t.ownSalesPercentage
+              : draft.type === "TIERED_EXCESS"
+                ? t.excessPercentage
+                : t.value}
+            <div className="team-bonus__value">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={draft.percentage}
+                onChange={(event) =>
+                  changeBonus(member.id, { percentage: event.target.value })
+                }
+              />
+              <span>%</span>
+            </div>
+          </label>
+        )}
+        {draft.type === "DUAL_PERCENTAGE" && (
+          <label>
+            {t.mostafaSalesPercentage}
+            <div className="team-bonus__value">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={draft.secondary}
+                onChange={(event) =>
+                  changeBonus(member.id, { secondary: event.target.value })
+                }
+              />
+              <span>%</span>
+            </div>
+          </label>
+        )}
+        {draft.type === "TIERED_EXCESS" && (
+          <small className="team-bonus__rule-note">{t.tieredNote}</small>
+        )}
         <div className="team-bonus__save-row">
           <button
             type="button"
