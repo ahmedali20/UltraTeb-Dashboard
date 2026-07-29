@@ -1611,7 +1611,7 @@ input::placeholder {
 
 .team-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 
@@ -1663,6 +1663,112 @@ input::placeholder {
   color: rgba(255,255,255,.78);
 }
 
+.team-card__metrics .team-card__bonus {
+  background: #e8f7ef;
+  color: #166534;
+}
+
+:root[data-theme="dark"] .team-card__metrics .team-card__bonus {
+  background: #173d2b;
+  color: #bbf7d0;
+}
+
+.team-card__bonus span {
+  color: currentColor;
+  opacity: .78;
+}
+
+.team-bonus {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.team-bonus__heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.team-bonus__heading small {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.team-bonus__row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.2fr) minmax(130px, .8fr) minmax(130px, .8fr) minmax(130px, .8fr) auto;
+  align-items: end;
+  gap: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  padding: 11px;
+}
+
+.team-bonus__row > div:first-child,
+.team-bonus__row label,
+.team-bonus__calculated {
+  display: grid;
+  gap: 5px;
+}
+
+.team-bonus__row small,
+.team-bonus__row label,
+.team-bonus__calculated span {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.team-bonus__row select,
+.team-bonus__row input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--input-border);
+  border-radius: 7px;
+  background: var(--input-bg);
+  color: var(--input-text);
+  padding: 6px 8px;
+}
+
+.team-bonus__value {
+  position: relative;
+}
+
+.team-bonus__value input {
+  padding-inline-end: 40px;
+}
+
+.team-bonus__value span {
+  position: absolute;
+  inset-inline-end: 9px;
+  top: 50%;
+  color: var(--text-secondary);
+  font-size: 10px;
+  transform: translateY(-50%);
+}
+
+.team-bonus__calculated strong {
+  font-size: 15px;
+}
+
+.team-bonus__row > button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--brand-primary);
+  color: #fff;
+  padding: 7px 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.team-bonus__row > button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
 .team-card__members,
 .unassigned-reps > div {
   display: flex;
@@ -1706,6 +1812,15 @@ input::placeholder {
 
   .records-heading {
     align-items: stretch;
+  }
+
+  .team-bonus__heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .team-bonus__row {
+    grid-template-columns: 1fr;
   }
 }
 
