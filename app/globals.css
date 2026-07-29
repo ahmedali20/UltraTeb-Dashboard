@@ -1698,13 +1698,22 @@ input::placeholder {
 
 .team-bonus__row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.2fr) minmax(130px, .8fr) minmax(130px, .8fr) minmax(130px, .8fr) auto;
+  grid-template-columns:
+    minmax(0, 1.25fr)
+    minmax(110px, .8fr)
+    minmax(130px, .9fr)
+    minmax(105px, .7fr)
+    max-content;
   align-items: end;
   gap: 10px;
   border: 1px solid var(--border-color);
   border-radius: 10px;
   background: var(--surface-muted);
   padding: 11px;
+}
+
+.team-bonus__row > * {
+  min-width: 0;
 }
 
 .team-bonus__row > div:first-child,
@@ -1751,6 +1760,7 @@ input::placeholder {
 
 .team-bonus__calculated strong {
   font-size: 15px;
+  white-space: nowrap;
 }
 
 .team-bonus__row > button {
@@ -1814,6 +1824,24 @@ input::placeholder {
 .unassigned-reps > .team-bonus {
   display: grid;
   margin-top: 14px;
+}
+
+@media (max-width: 1200px) {
+  .team-bonus__row {
+    grid-template-columns:
+      minmax(160px, 1fr)
+      minmax(140px, 1fr)
+      minmax(140px, 1fr);
+  }
+
+  .team-bonus__calculated {
+    align-self: center;
+  }
+
+  .team-bonus__row > button {
+    justify-self: start;
+    min-width: 96px;
+  }
 }
 
 @media (max-width: 760px) {
