@@ -1735,6 +1735,7 @@ input::placeholder {
 
 .team-bonus__row select,
 .team-bonus__row input {
+  box-sizing: border-box;
   width: 100%;
   min-height: 36px;
   border: 1px solid var(--input-border);
