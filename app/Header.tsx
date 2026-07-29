@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
-  active: "home" | "customers" | "sales" | "reps" | "reports" | "users";
+  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "users";
   lang: "en" | "ar";
   onToggleLang: () => void;
 };
@@ -15,6 +15,7 @@ const labels = {
     addRecord: "Add Record",
     sales: "All Records",
     reps: "Sales Reps",
+    teams: "Sales Teams",
     reports: "Reports",
     users: "Users",
     workspace: "Workspace",
@@ -30,6 +31,7 @@ const labels = {
     addRecord: "إضافة فاتورة",
     sales: "كل الفواتير",
     reps: "المندوبون",
+    teams: "فرق المبيعات",
     reports: "التقارير",
     users: "المستخدمون",
     workspace: "مساحة العمل",
@@ -237,6 +239,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
           {isAdmin && (
             <>
               <span className="app-sidebar__section app-sidebar__section--admin">{t.administration}</span>
+              <NavLink href="/sales-teams" page="teams" label={t.teams} icon="teams" className={linkClass("teams")} />
               <NavLink href="/users" page="users" label={t.users} icon="users" className={linkClass("users")} />
             </>
           )}
@@ -264,7 +267,7 @@ function NavLink({
   href: string;
   page: string;
   label: string;
-  icon: "home" | "customers" | "add" | "records" | "reps" | "reports" | "users";
+  icon: "home" | "customers" | "add" | "records" | "reps" | "teams" | "reports" | "users";
   className: string;
 }) {
   return (
@@ -278,7 +281,7 @@ function NavLink({
 function SidebarIcon({
   name,
 }: {
-  name: "home" | "customers" | "add" | "records" | "reps" | "reports" | "users";
+  name: "home" | "customers" | "add" | "records" | "reps" | "teams" | "reports" | "users";
 }) {
   const paths = {
     home: <><path d="m3 11 9-8 9 8" /><path d="M5 10v10h14V10" /><path d="M9 20v-6h6v6" /></>,
@@ -286,6 +289,7 @@ function SidebarIcon({
     add: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M12 12v6M9 15h6" /></>,
     records: <><path d="M6 3h12v18H6z" /><path d="M9 8h6M9 12h6M9 16h4" /></>,
     reps: <><circle cx="8" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M2.5 20a5.5 5.5 0 0 1 11 0M13 16a4.5 4.5 0 0 1 8.5 2" /></>,
+    teams: <><circle cx="7" cy="8" r="2.5" /><circle cx="17" cy="8" r="2.5" /><circle cx="12" cy="5" r="2.5" /><path d="M2.5 20a4.5 4.5 0 0 1 9 0M12.5 20a4.5 4.5 0 0 1 9 0M7.5 15a4.5 4.5 0 0 1 9 0" /></>,
     reports: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
     users: <><circle cx="12" cy="7" r="3" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /><path d="M19 5v4M17 7h4" /></>,
   };
