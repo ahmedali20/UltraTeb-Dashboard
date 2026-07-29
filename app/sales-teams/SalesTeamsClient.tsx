@@ -34,6 +34,14 @@ type BonusDraft = {
   fixed: string;
 };
 
+type RepPerformance = SalesRep & {
+  invoices: number;
+  credit: number;
+  debit: number;
+  net: number;
+  bonus: number;
+};
+
 const text = {
   en: {
     eyebrow: "SALES ORGANIZATION",
@@ -168,40 +176,52 @@ export default function SalesTeamsClient({
     [sales]
   );
 
+  const representativeResults = useMemo(
+    () =>
+      new Map<number, RepPerformance>(
+        reps.map((rep) => {
+          const repSales = sales.filter(
+            (sale) =>
+              normalizedName(sale.sales_rep) === normalizedName(rep.name) &&
+              (month === "All" || sale.month === month)
+          );
+          const totals = repSales.reduce(
+            (sum, sale) => {
+              const amount = Math.abs(Number(sale.total_sales || 0));
+              if (sale.document_type === "CR_NOTE") sum.credit += amount;
+              else if (sale.document_type === "DR_NOTE") sum.debit += amount;
+              else sum.invoices += amount;
+              return sum;
+            },
+            { invoices: 0, credit: 0, debit: 0 }
+          );
+          const net = totals.invoices - totals.credit + totals.debit;
+          const activeMonths =
+            month === "All"
+              ? new Set(repSales.map((sale) => sale.month).filter(Boolean)).size
+              : 1;
+          const bonus =
+            rep.bonus_type === "FIXED_MONTHLY"
+              ? Number(rep.fixed_monthly_bonus || 0) *
+                (repSales.length ? activeMonths : 0)
+              : Math.max(net, 0) *
+                (Number(rep.bonus_percentage || 0) / 100);
+          return [rep.id, { ...rep, ...totals, net, bonus }] as [
+            number,
+            RepPerformance,
+          ];
+        })
+      ),
+    [reps, sales, month]
+  );
+
   const teamResults = useMemo(
     () =>
       teams.map((team) => {
         const members = reps
           .filter((rep) => rep.team_id === team.id)
-          .map((rep) => {
-            const repSales = sales.filter(
-              (sale) =>
-                normalizedName(sale.sales_rep) === normalizedName(rep.name) &&
-                (month === "All" || sale.month === month)
-            );
-            const totals = repSales.reduce(
-              (sum, sale) => {
-                const amount = Math.abs(Number(sale.total_sales || 0));
-                if (sale.document_type === "CR_NOTE") sum.credit += amount;
-                else if (sale.document_type === "DR_NOTE") sum.debit += amount;
-                else sum.invoices += amount;
-                return sum;
-              },
-              { invoices: 0, credit: 0, debit: 0 }
-            );
-            const net = totals.invoices - totals.credit + totals.debit;
-            const activeMonths =
-              month === "All"
-                ? new Set(repSales.map((sale) => sale.month).filter(Boolean)).size
-                : 1;
-            const bonus =
-              rep.bonus_type === "FIXED_MONTHLY"
-                ? Number(rep.fixed_monthly_bonus || 0) *
-                  (repSales.length ? activeMonths : 0)
-                : Math.max(net, 0) *
-                  (Number(rep.bonus_percentage || 0) / 100);
-            return { ...rep, ...totals, net, bonus };
-          });
+          .map((rep) => representativeResults.get(rep.id)!)
+          .filter(Boolean);
 
         const totals = members.reduce(
           (sum, member) => ({
@@ -221,10 +241,13 @@ export default function SalesTeamsClient({
           ...totals,
         };
       }),
-    [teams, reps, sales, month]
+    [teams, reps, representativeResults]
   );
 
-  const unassigned = reps.filter((rep) => rep.team_id === null);
+  const unassigned = reps
+    .filter((rep) => rep.team_id === null)
+    .map((rep) => representativeResults.get(rep.id)!)
+    .filter(Boolean);
 
   function resetEditor() {
     setEditingId(null);
@@ -333,6 +356,74 @@ export default function SalesTeamsClient({
       return;
     }
     router.refresh();
+  }
+
+  function renderBonusRow(member: RepPerformance) {
+    const draft = bonusDrafts[member.id] ?? {
+      type: member.bonus_type,
+      percentage: String(member.bonus_percentage ?? 0),
+      fixed: String(member.fixed_monthly_bonus ?? 0),
+    };
+    return (
+      <div key={member.id} className="team-bonus__row">
+        <div>
+          <strong>{member.name}</strong>
+          <small>
+            {t.net}: {currency(member.net, lang)}
+          </small>
+        </div>
+        <label>
+          {t.method}
+          <select
+            value={draft.type}
+            onChange={(event) =>
+              changeBonus(member.id, {
+                type: event.target.value as BonusDraft["type"],
+              })
+            }
+          >
+            <option value="PERCENTAGE">{t.percentage}</option>
+            <option value="FIXED_MONTHLY">{t.fixed}</option>
+          </select>
+        </label>
+        <label>
+          {t.value}
+          <div className="team-bonus__value">
+            <input
+              type="number"
+              min="0"
+              max={draft.type === "PERCENTAGE" ? 100 : undefined}
+              step={draft.type === "PERCENTAGE" ? "0.1" : "0.01"}
+              value={
+                draft.type === "PERCENTAGE"
+                  ? draft.percentage
+                  : draft.fixed
+              }
+              onChange={(event) =>
+                changeBonus(
+                  member.id,
+                  draft.type === "PERCENTAGE"
+                    ? { percentage: event.target.value }
+                    : { fixed: event.target.value }
+                )
+              }
+            />
+            <span>{draft.type === "PERCENTAGE" ? "%" : "EGP"}</span>
+          </div>
+        </label>
+        <div className="team-bonus__calculated">
+          <span>{t.calculated}</span>
+          <strong>{currency(member.bonus, lang)}</strong>
+        </div>
+        <button
+          type="button"
+          disabled={savingBonusId === member.id}
+          onClick={() => saveBonus(member.id)}
+        >
+          {savingBonusId === member.id ? "..." : t.save}
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -486,79 +577,7 @@ export default function SalesTeamsClient({
                   <strong>{t.bonusSettings}</strong>
                   {month === "All" && <small>{t.allMonthsNote}</small>}
                 </div>
-                {team.members.map((member) => {
-                  const draft = bonusDrafts[member.id] ?? {
-                    type: member.bonus_type,
-                    percentage: String(member.bonus_percentage ?? 0),
-                    fixed: String(member.fixed_monthly_bonus ?? 0),
-                  };
-                  return (
-                    <div key={member.id} className="team-bonus__row">
-                      <div>
-                        <strong>{member.name}</strong>
-                        <small>
-                          {t.net}: {currency(member.net, lang)}
-                        </small>
-                      </div>
-                      <label>
-                        {t.method}
-                        <select
-                          value={draft.type}
-                          onChange={(event) =>
-                            changeBonus(member.id, {
-                              type: event.target.value as BonusDraft["type"],
-                            })
-                          }
-                        >
-                          <option value="PERCENTAGE">{t.percentage}</option>
-                          <option value="FIXED_MONTHLY">{t.fixed}</option>
-                        </select>
-                      </label>
-                      <label>
-                        {t.value}
-                        <div className="team-bonus__value">
-                          <input
-                            type="number"
-                            min="0"
-                            max={
-                              draft.type === "PERCENTAGE" ? 100 : undefined
-                            }
-                            step={
-                              draft.type === "PERCENTAGE" ? "0.1" : "0.01"
-                            }
-                            value={
-                              draft.type === "PERCENTAGE"
-                                ? draft.percentage
-                                : draft.fixed
-                            }
-                            onChange={(event) =>
-                              changeBonus(
-                                member.id,
-                                draft.type === "PERCENTAGE"
-                                  ? { percentage: event.target.value }
-                                  : { fixed: event.target.value }
-                              )
-                            }
-                          />
-                          <span>
-                            {draft.type === "PERCENTAGE" ? "%" : "EGP"}
-                          </span>
-                        </div>
-                      </label>
-                      <div className="team-bonus__calculated">
-                        <span>{t.calculated}</span>
-                        <strong>{currency(member.bonus, lang)}</strong>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={savingBonusId === member.id}
-                        onClick={() => saveBonus(member.id)}
-                      >
-                        {savingBonusId === member.id ? "..." : t.save}
-                      </button>
-                    </div>
-                  );
-                })}
+                {team.members.map(renderBonusRow)}
               </div>
 
               <div className="team-card__actions">
@@ -578,10 +597,9 @@ export default function SalesTeamsClient({
 
         <section className="unassigned-reps">
           <strong>{t.unassigned}</strong>
-          <div>
-            {unassigned.map((rep) => (
-              <span key={rep.id}>{rep.name}</span>
-            ))}
+          {month === "All" && <small>{t.allMonthsNote}</small>}
+          <div className="team-bonus">
+            {unassigned.map(renderBonusRow)}
             {!unassigned.length && <span>-</span>}
           </div>
         </section>
