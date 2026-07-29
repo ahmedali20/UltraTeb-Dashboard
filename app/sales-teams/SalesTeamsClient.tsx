@@ -371,6 +371,10 @@ export default function SalesTeamsClient({
           <small>
             {t.net}: {currency(member.net, lang)}
           </small>
+          <div className="team-bonus__inline-calculated">
+            <span>{t.calculated}</span>
+            <strong>{currency(member.bonus, lang)}</strong>
+          </div>
         </div>
         <label>
           {t.method}
@@ -411,10 +415,6 @@ export default function SalesTeamsClient({
             <span>{draft.type === "PERCENTAGE" ? "%" : "EGP"}</span>
           </div>
         </label>
-        <div className="team-bonus__calculated">
-          <span>{t.calculated}</span>
-          <strong>{currency(member.bonus, lang)}</strong>
-        </div>
         <button
           type="button"
           disabled={savingBonusId === member.id}
