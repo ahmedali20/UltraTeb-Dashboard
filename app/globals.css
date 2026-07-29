@@ -1826,7 +1826,7 @@ input::placeholder {
   margin-top: 14px;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1500px) {
   .team-bonus__row {
     grid-template-columns:
       minmax(160px, 1fr)
