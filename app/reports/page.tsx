@@ -10,21 +10,33 @@ const supabase = createClient(
 export const revalidate = 0;
 
 export default async function ReportsPage() {
-  const { data, error } = await supabase
-    .from("sales_view")
-    .select(
-      "id, invoice_no, sales_date, month, customer_name, sales_rep, sales_item_total, tax, total_sales, document_type, original_invoice_no, note_reason"
-    )
-    .order("sales_date", { ascending: true });
+  const [
+    { data, error },
+    { data: bonusReps, error: bonusRepsError },
+  ] = await Promise.all([
+    supabase
+      .from("sales_view")
+      .select(
+        "id, invoice_no, sales_date, month, customer_name, sales_rep, sales_item_total, tax, total_sales, document_type, original_invoice_no, note_reason"
+      )
+      .order("sales_date", { ascending: true }),
+    supabase
+      .from("sales_reps")
+      .select(
+        "id, name, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus"
+      ),
+  ]);
 
-  if (error) {
+  if (error || bonusRepsError) {
     return (
       <main style={{ padding: 32 }}>
         <h1>Report Error</h1>
-        <p style={{ color: "#dc2626" }}>{error.message}</p>
+        <p style={{ color: "#dc2626" }}>
+          {(error || bonusRepsError)?.message}
+        </p>
       </main>
     );
   }
 
-  return <ReportsClient sales={data ?? []} />;
+  return <ReportsClient sales={data ?? []} bonusReps={bonusReps ?? []} />;
 }
