@@ -220,6 +220,25 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
   }
 
   function exportCsv() {
+    const overviewRows = [
+      ["Report Overview"],
+      ["Metric", "Value", "Records"],
+      ["Invoices", documentTotals.invoices, documentTotals.invoices],
+      [
+        "Credit Notes",
+        documentTotals.creditTotal,
+        documentTotals.creditNotes,
+      ],
+      [
+        "Debit Notes",
+        documentTotals.debitTotal,
+        documentTotals.debitNotes,
+      ],
+      ["Item Total", totals.item, ""],
+      ["Total TAX", totals.tax, ""],
+      ["Total Sales", totals.total, filtered.length],
+      [],
+    ];
     const detailRows = [
       [
         "Invoice No",
@@ -285,10 +304,16 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
     ];
     const rows =
       reportType === "summary"
-        ? summaryRows
+        ? [...overviewRows, ...summaryRows]
         : reportType === "details"
-          ? detailRows
-          : [...summaryRows, [], ["Detailed Invoice Records"], ...detailRows];
+          ? [...overviewRows, ...detailRows]
+          : [
+              ...overviewRows,
+              ...summaryRows,
+              [],
+              ["Detailed Invoice Records"],
+              ...detailRows,
+            ];
     const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
     const url = URL.createObjectURL(
       new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" })
@@ -406,6 +431,84 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
       return y + 4;
     }
 
+    function drawReportOverview(y: number) {
+      const cards = [
+        {
+          label: "Invoices",
+          value: String(documentTotals.invoices),
+          detail: `${documentTotals.invoices} records`,
+          primary: false,
+        },
+        {
+          label: "Credit Notes",
+          value: money(documentTotals.creditTotal),
+          detail: `${documentTotals.creditNotes} records`,
+          primary: false,
+        },
+        {
+          label: "Debit Notes",
+          value: money(documentTotals.debitTotal),
+          detail: `${documentTotals.debitNotes} records`,
+          primary: false,
+        },
+        {
+          label: "Item Total",
+          value: money(totals.item),
+          detail: "",
+          primary: false,
+        },
+        {
+          label: "Total TAX",
+          value: money(totals.tax),
+          detail: "",
+          primary: false,
+        },
+        {
+          label: "Total Sales",
+          value: money(totals.total),
+          detail: `${filtered.length} records`,
+          primary: true,
+        },
+      ];
+      const cardWidth = 58;
+      const cardHeight = 18;
+      const gap = 3;
+
+      cards.forEach((card, index) => {
+        const column = index % 3;
+        const row = Math.floor(index / 3);
+        const x = 15 + column * (cardWidth + gap);
+        const cardY = y + row * (cardHeight + gap);
+        if (card.primary) {
+          doc.setFillColor(...purple);
+          doc.setDrawColor(...purple);
+        } else {
+          doc.setFillColor(245, 242, 250);
+          doc.setDrawColor(...palePurple);
+        }
+        doc.roundedRect(x, cardY, cardWidth, cardHeight, 2, 2, "FD");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        if (card.primary) doc.setTextColor(235, 228, 248);
+        else doc.setTextColor(85, 72, 105);
+        doc.text(card.label, x + 3, cardY + 4.5);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        if (card.primary) doc.setTextColor(255, 255, 255);
+        else doc.setTextColor(35, 28, 50);
+        doc.text(card.value, x + 3, cardY + 10.5);
+        if (card.detail) {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(5.5);
+          if (card.primary) doc.setTextColor(230, 220, 245);
+          else doc.setTextColor(105, 94, 120);
+          doc.text(card.detail, x + 3, cardY + 15);
+        }
+      });
+
+      return y + cardHeight * 2 + gap + 7;
+    }
+
     drawPageBrand();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(17);
@@ -418,7 +521,8 @@ export default function ReportsClient({ sales }: { sales: ReportSale[] }) {
     doc.setTextColor(85, 95, 110);
     doc.text(`Period: ${period}`, 15, 68);
 
-    let nextY = 78;
+    let nextY = sectionTitle("Report Overview", 78);
+    nextY = drawReportOverview(nextY);
 
     if (reportType === "summary" || reportType === "both") {
       nextY = sectionTitle("Customer Sales Summary", nextY);
