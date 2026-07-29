@@ -1699,10 +1699,9 @@ input::placeholder {
 .team-bonus__row {
   display: grid;
   grid-template-columns:
-    minmax(0, 1.25fr)
-    minmax(110px, .8fr)
-    minmax(130px, .9fr)
-    minmax(105px, .7fr)
+    minmax(180px, 1.25fr)
+    minmax(140px, .8fr)
+    minmax(150px, .9fr)
     max-content;
   align-items: end;
   gap: 10px;
@@ -1759,6 +1758,25 @@ input::placeholder {
 }
 
 .team-bonus__calculated strong {
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.team-bonus__inline-calculated {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 2px;
+}
+
+.team-bonus__inline-calculated span {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.team-bonus__inline-calculated strong {
+  color: var(--brand-primary);
   font-size: 15px;
   white-space: nowrap;
 }
@@ -1829,13 +1847,10 @@ input::placeholder {
 @media (max-width: 1500px) {
   .team-bonus__row {
     grid-template-columns:
-      minmax(160px, 1fr)
-      minmax(140px, 1fr)
-      minmax(140px, 1fr);
-  }
-
-  .team-bonus__calculated {
-    align-self: center;
+      minmax(190px, 1fr)
+      minmax(150px, 1fr)
+      minmax(150px, 1fr)
+      max-content;
   }
 
   .team-bonus__row > button {
