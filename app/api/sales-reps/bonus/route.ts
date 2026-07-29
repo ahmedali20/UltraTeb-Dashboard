@@ -18,9 +18,19 @@ export async function PATCH(request: NextRequest) {
 
   const body = await request.json();
   const id = Number(body.id);
-  const bonusType =
-    body.bonusType === "FIXED_MONTHLY" ? "FIXED_MONTHLY" : "PERCENTAGE";
+  const allowedBonusTypes = [
+    "PERCENTAGE",
+    "FIXED_MONTHLY",
+    "DUAL_PERCENTAGE",
+    "TIERED_EXCESS",
+  ];
+  const bonusType = allowedBonusTypes.includes(body.bonusType)
+    ? body.bonusType
+    : "PERCENTAGE";
   const bonusPercentage = Number(body.bonusPercentage ?? 0);
+  const secondaryBonusPercentage = Number(
+    body.secondaryBonusPercentage ?? 0
+  );
   const fixedMonthlyBonus = Number(body.fixedMonthlyBonus ?? 0);
 
   if (!Number.isSafeInteger(id) || id <= 0) {
@@ -39,6 +49,16 @@ export async function PATCH(request: NextRequest) {
       { status: 400 }
     );
   }
+  if (
+    !Number.isFinite(secondaryBonusPercentage) ||
+    secondaryBonusPercentage < 0 ||
+    secondaryBonusPercentage > 100
+  ) {
+    return NextResponse.json(
+      { error: "Secondary bonus percentage must be between 0 and 100." },
+      { status: 400 }
+    );
+  }
   if (!Number.isFinite(fixedMonthlyBonus) || fixedMonthlyBonus < 0) {
     return NextResponse.json(
       { error: "Fixed monthly bonus cannot be negative." },
@@ -51,11 +71,12 @@ export async function PATCH(request: NextRequest) {
     .update({
       bonus_type: bonusType,
       bonus_percentage: bonusPercentage,
+      secondary_bonus_percentage: secondaryBonusPercentage,
       fixed_monthly_bonus: fixedMonthlyBonus,
     })
     .eq("id", id)
     .select(
-      "id, name, bonus_type, bonus_percentage, fixed_monthly_bonus"
+      "id, name, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus"
     )
     .single();
 
@@ -63,4 +84,3 @@ export async function PATCH(request: NextRequest) {
     ? NextResponse.json({ error: error.message }, { status: 400 })
     : NextResponse.json({ data });
 }
-
