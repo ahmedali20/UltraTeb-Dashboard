@@ -415,13 +415,15 @@ export default function SalesTeamsClient({
             <span>{draft.type === "PERCENTAGE" ? "%" : "EGP"}</span>
           </div>
         </label>
-        <button
-          type="button"
-          disabled={savingBonusId === member.id}
-          onClick={() => saveBonus(member.id)}
-        >
-          {savingBonusId === member.id ? "..." : t.save}
-        </button>
+        <div className="team-bonus__save-row">
+          <button
+            type="button"
+            disabled={savingBonusId === member.id}
+            onClick={() => saveBonus(member.id)}
+          >
+            {savingBonusId === member.id ? "..." : t.save}
+          </button>
+        </div>
       </div>
     );
   }
