@@ -1697,12 +1697,8 @@ input::placeholder {
 }
 
 .team-bonus__row {
-  display: grid;
-  grid-template-columns:
-    minmax(180px, 1fr)
-    180px
-    180px
-    max-content;
+  display: flex;
+  flex-wrap: wrap;
   align-items: end;
   gap: 10px;
   border: 1px solid var(--border-color);
@@ -1713,6 +1709,14 @@ input::placeholder {
 
 .team-bonus__row > * {
   min-width: 0;
+}
+
+.team-bonus__row > div:first-child {
+  flex: 1 1 240px;
+}
+
+.team-bonus__row > label {
+  flex: 0 1 160px;
 }
 
 .team-bonus__row > div:first-child,
@@ -1782,6 +1786,7 @@ input::placeholder {
 }
 
 .team-bonus__row > button {
+  flex: 0 0 auto;
   min-height: 36px;
   border: 0;
   border-radius: 7px;
@@ -1845,31 +1850,7 @@ input::placeholder {
 }
 
 @media (max-width: 1500px) {
-  .team-bonus__row {
-    grid-template-columns:
-      minmax(190px, 1fr)
-      170px
-      170px;
-    grid-template-areas:
-      "representative method value"
-      "representative . save";
-  }
-
-  .team-bonus__row > div:first-child {
-    grid-area: representative;
-    align-self: center;
-  }
-
-  .team-bonus__row > label:nth-of-type(1) {
-    grid-area: method;
-  }
-
-  .team-bonus__row > label:nth-of-type(2) {
-    grid-area: value;
-  }
-
   .team-bonus__row > button {
-    grid-area: save;
     justify-self: start;
     min-width: 96px;
   }
@@ -1891,15 +1872,16 @@ input::placeholder {
   }
 
   .team-bonus__row {
-    grid-template-columns: 1fr;
-    grid-template-areas: none;
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .team-bonus__row > div:first-child,
   .team-bonus__row > label:nth-of-type(1),
   .team-bonus__row > label:nth-of-type(2),
   .team-bonus__row > button {
-    grid-area: auto;
+    flex: 0 0 auto;
+    width: 100%;
   }
 }
 
