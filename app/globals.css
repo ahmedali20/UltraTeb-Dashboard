@@ -1699,9 +1699,9 @@ input::placeholder {
 .team-bonus__row {
   display: grid;
   grid-template-columns:
-    minmax(180px, 1.25fr)
-    minmax(140px, .8fr)
-    minmax(150px, .9fr)
+    minmax(180px, 1fr)
+    180px
+    180px
     max-content;
   align-items: end;
   gap: 10px;
@@ -1848,8 +1848,8 @@ input::placeholder {
   .team-bonus__row {
     grid-template-columns:
       minmax(190px, 1fr)
-      minmax(150px, 1fr)
-      minmax(150px, 1fr)
+      170px
+      170px
       max-content;
   }
 
