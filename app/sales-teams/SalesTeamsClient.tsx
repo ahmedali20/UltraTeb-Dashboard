@@ -547,9 +547,19 @@ export default function SalesTeamsClient({
                   <p>{team.name}</p>
                   <span>{team.leader?.name || "-"}</span>
                 </div>
-                <strong>
-                  {team.members.length} {t.memberCount}
-                </strong>
+                <div className="team-card__heading-actions">
+                  <strong>
+                    {team.members.length} {t.memberCount}
+                  </strong>
+                  <div className="team-card__actions">
+                    <button type="button" onClick={() => startEdit(team)}>
+                      {t.edit}
+                    </button>
+                    <button type="button" onClick={() => deleteTeam(team)}>
+                      {t.delete}
+                    </button>
+                  </div>
+                </div>
               </div>
               <div className="team-card__metrics">
                 <div>
@@ -582,14 +592,6 @@ export default function SalesTeamsClient({
                 {team.members.map(renderBonusRow)}
               </div>
 
-              <div className="team-card__actions">
-                <button type="button" onClick={() => startEdit(team)}>
-                  {t.edit}
-                </button>
-                <button type="button" onClick={() => deleteTeam(team)}>
-                  {t.delete}
-                </button>
-              </div>
             </article>
           ))}
           {!teamResults.length && (
