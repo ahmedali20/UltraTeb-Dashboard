@@ -22,7 +22,7 @@ export default async function SalesTeamsPage() {
     supabase
       .from("sales_reps")
       .select(
-        "id, name, team_id, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus"
+        "id, name, team_id, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus, monthly_salary"
       )
       .order("name"),
     supabase
