@@ -30,6 +30,38 @@ function displayValue(value: unknown): string {
   return String(value);
 }
 
+function changedFields(metadata: Record<string, unknown> | null) {
+  const result: Array<{ field: string; from: unknown; to: unknown }> = [];
+  if (!metadata) return result;
+
+  const explicit = metadata.changes;
+  if (explicit && typeof explicit === "object" && !Array.isArray(explicit)) {
+    for (const [field, value] of Object.entries(explicit)) {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        const change = value as { from?: unknown; to?: unknown };
+        result.push({ field, from: change.from, to: change.to });
+      }
+    }
+    return result;
+  }
+
+  const before = metadata.before;
+  const after = metadata.after;
+  if (
+    before && typeof before === "object" && !Array.isArray(before) &&
+    after && typeof after === "object" && !Array.isArray(after)
+  ) {
+    const oldValues = before as Record<string, unknown>;
+    const newValues = after as Record<string, unknown>;
+    for (const field of Object.keys(oldValues)) {
+      if (field in newValues && JSON.stringify(oldValues[field]) !== JSON.stringify(newValues[field])) {
+        result.push({ field, from: oldValues[field], to: newValues[field] });
+      }
+    }
+  }
+  return result;
+}
+
 export default function ActivityLogClient({ logs }: { logs: AuditLog[] }) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [query, setQuery] = useState("");
@@ -105,9 +137,12 @@ export default function ActivityLogClient({ logs }: { logs: AuditLog[] }) {
                           </div>
                           <div className="audit-changes">
                             <h3>{isArabic ? "القيم والتغييرات" : "Values & Changes"}</h3>
-                            {Object.entries(log.metadata ?? {}).length ? Object.entries(log.metadata ?? {}).map(([key, value]) => (
-                              <div className="audit-change-row" key={key}><span>{displayKey(key)}</span><pre>{displayValue(value)}</pre></div>
-                            )) : <p>{isArabic ? "لا توجد قيم إضافية مسجلة لهذه العملية." : "No additional field values were recorded for this event."}</p>}
+                            {changedFields(log.metadata).length ? changedFields(log.metadata).map((change) => (
+                              <div className="audit-change-row" key={change.field}>
+                                <span>{displayKey(change.field)}</span>
+                                <pre><b>{displayValue(change.from)}</b>  →  <b>{displayValue(change.to)}</b></pre>
+                              </div>
+                            )) : <p>{isArabic ? "لم يتم تسجيل تغيير في قيم الحقول." : "No field-value change was recorded for this event."}</p>}
                           </div>
                         </div>
                       </td>
