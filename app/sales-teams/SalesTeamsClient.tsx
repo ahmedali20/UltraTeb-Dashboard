@@ -23,6 +23,7 @@ type SalesRep = {
   bonus_percentage: number;
   secondary_bonus_percentage: number;
   fixed_monthly_bonus: number;
+  monthly_salary: number;
 };
 
 type TeamSale = {
@@ -38,6 +39,7 @@ type BonusDraft = {
   percentage: string;
   secondary: string;
   fixed: string;
+  salary: string;
 };
 
 type RepPerformance = SalesRep & {
@@ -88,6 +90,7 @@ const text = {
       "0 below 100K; 1,000 at 100K; +500 for every additional 50K up to 300K; then 3,000 plus the excess percentage.",
     value: "Value",
     calculated: "Calculated Bonus",
+    salary: "Monthly Salary",
     save: "Save",
     allMonthsNote:
       "For All Months, fixed bonus is counted once per month containing sales.",
@@ -131,6 +134,7 @@ const text = {
       "صفر أقل من 100 ألف، و1000 عند 100 ألف، و500 لكل 50 ألف إضافية حتى 300 ألف، ثم 3000 + نسبة الزيادة.",
     value: "القيمة",
     calculated: "البونص المحسوب",
+    salary: "الراتب الشهري",
     save: "حفظ",
     allMonthsNote:
       "عند اختيار كل الشهور، يحتسب المبلغ الثابت مرة لكل شهر به مبيعات.",
@@ -183,6 +187,7 @@ export default function SalesTeamsClient({
             percentage: String(rep.bonus_percentage ?? 0),
             secondary: String(rep.secondary_bonus_percentage ?? 0),
             fixed: String(rep.fixed_monthly_bonus ?? 0),
+            salary: String(rep.monthly_salary ?? 0),
           },
         ])
       )
@@ -396,6 +401,7 @@ export default function SalesTeamsClient({
         percentage: current[repId]?.percentage ?? "0",
         secondary: current[repId]?.secondary ?? "0",
         fixed: current[repId]?.fixed ?? "0",
+        salary: current[repId]?.salary ?? "0",
         ...changes,
       },
     }));
@@ -414,6 +420,7 @@ export default function SalesTeamsClient({
         bonusPercentage: Number(draft.percentage || 0),
         secondaryBonusPercentage: Number(draft.secondary || 0),
         fixedMonthlyBonus: Number(draft.fixed || 0),
+        monthlySalary: Number(draft.salary || 0),
       }),
     });
     const result = await response.json();
@@ -431,6 +438,7 @@ export default function SalesTeamsClient({
       percentage: String(member.bonus_percentage ?? 0),
       secondary: String(member.secondary_bonus_percentage ?? 0),
       fixed: String(member.fixed_monthly_bonus ?? 0),
+      salary: String(member.monthly_salary ?? 0),
     };
     return (
       <div key={member.id} className="team-bonus__row">
@@ -519,6 +527,21 @@ export default function SalesTeamsClient({
         {draft.type === "TIERED_EXCESS" && (
           <small className="team-bonus__rule-note">{t.tieredNote}</small>
         )}
+        <label>
+          {t.salary}
+          <div className="team-bonus__value">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={draft.salary}
+              onChange={(event) =>
+                changeBonus(member.id, { salary: event.target.value })
+              }
+            />
+            <span>EGP</span>
+          </div>
+        </label>
         <div className="team-bonus__save-row">
           <button
             type="button"
