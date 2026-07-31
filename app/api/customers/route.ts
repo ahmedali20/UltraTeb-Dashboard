@@ -77,6 +77,14 @@ export async function POST(request: Request) {
     entityType: "CUSTOMER",
     entityId: data.id,
     description: `Created customer ${data.customer_name}.`,
+    metadata: {
+      customer_name: data.customer_name,
+      customer_official_name: data.customer_official_name,
+      payment_terms_days: data.payment_terms_days,
+      customer_trn: data.customer_trn,
+      sales_rep_name: data.sales_rep_name,
+      credit_limit: data.credit_limit,
+    },
   });
   return NextResponse.json({ data });
 }
