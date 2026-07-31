@@ -39,7 +39,7 @@ export async function PATCH(
 
   const { data: before } = await supabaseServer
     .from("sales")
-    .select("invoice_no, sales_date, sales_item_total, tax, document_type, original_invoice_no, note_reason")
+    .select("invoice_no, sales_date, due_date, sales_item_total, tax, document_type, original_invoice_no, note_reason")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -66,6 +66,7 @@ export async function PATCH(
     .update({
       invoice_no: body.invoice_no,
       sales_date: body.sales_date,
+      due_date: body.due_date || null,
       customer_code: body.customer_code,
       sales_item_total:
         sign * Math.abs(Number(body.sales_item_total) || 0),
@@ -89,6 +90,7 @@ export async function PATCH(
   const after = {
     invoice_no: data.invoice_no,
     sales_date: data.sales_date,
+    due_date: data.due_date,
     sales_item_total: data.sales_item_total,
     tax: data.tax,
     document_type: data.document_type,
@@ -129,7 +131,7 @@ export async function DELETE(
 ) {
   const { data: deletedRecord } = await supabaseServer
     .from("sales")
-    .select("invoice_no, sales_date, sales_item_total, tax, document_type, original_invoice_no, note_reason")
+    .select("invoice_no, sales_date, due_date, sales_item_total, tax, document_type, original_invoice_no, note_reason")
     .eq("id", params.id)
     .maybeSingle();
   const { error } = await supabaseServer
