@@ -1,129 +1,107 @@
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
-import { writeAuditLog } from "../../../lib/audit-log";
+import { readDashboardSession } from "../../../../lib/dashboard-auth";
+import { writeAuditLog } from "../../../../lib/audit-log";
 
-const supabaseServer = createClient(
+const supabase = createClient(
   process.env.SUPABASE_URL as string,
   process.env.SUPABASE_SERVICE_ROLE_KEY as string,
   { auth: { persistSession: false } }
 );
 
-function isAmountLike(value: string) {
-  const raw = value.trim();
-  const normalized = raw
-    .replace(/[\s,\u00a0]/g, "")
-    .replace(/^\((.*)\)$/, "-$1");
-  return /[.,()]/.test(raw) && /^-?\d+(?:\.\d+)?$/.test(normalized);
-}
+export async function PATCH(request: NextRequest) {
+  const session = await readDashboardSession(
+    request.cookies.get("ultra_teb_session")?.value
+  );
+  if (session?.role !== "admin") {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
 
-export async function POST(request: Request) {
   const body = await request.json();
-  const name = String(body.name ?? "").trim();
+  const id = Number(body.id);
+  const allowedBonusTypes = [
+    "PERCENTAGE",
+    "FIXED_MONTHLY",
+    "DUAL_PERCENTAGE",
+    "TIERED_EXCESS",
+  ];
+  const bonusType = allowedBonusTypes.includes(body.bonusType)
+    ? body.bonusType
+    : "PERCENTAGE";
+  const bonusPercentage = Number(body.bonusPercentage ?? 0);
+  const secondaryBonusPercentage = Number(
+    body.secondaryBonusPercentage ?? 0
+  );
+  const fixedMonthlyBonus = Number(body.fixedMonthlyBonus ?? 0);
 
-  if (!name) {
+  if (!Number.isSafeInteger(id) || id <= 0) {
     return NextResponse.json(
-      { error: "Sales representative name is required." },
+      { error: "A valid sales representative is required." },
       { status: 400 }
     );
   }
-  if (isAmountLike(name)) {
-    return NextResponse.json(
-      { error: "A sales representative name cannot be a numeric amount." },
-      { status: 400 }
-    );
-  }
-
-  const { data: existingReps, error: existingRepsError } = await supabaseServer
-    .from("sales_reps")
-    .select("id, name");
-
-  if (existingRepsError) {
-    return NextResponse.json(
-      { error: existingRepsError.message },
-      { status: 400 }
-    );
-  }
-
-  const normalizedName = name.toLocaleLowerCase();
   if (
-    (existingReps ?? []).some(
-      (rep) => String(rep.name ?? "").trim().toLocaleLowerCase() === normalizedName
-    )
+    !Number.isFinite(bonusPercentage) ||
+    bonusPercentage < 0 ||
+    bonusPercentage > 100
   ) {
     return NextResponse.json(
-      { error: "This sales representative already exists." },
-      { status: 409 }
+      { error: "Bonus percentage must be between 0 and 100." },
+      { status: 400 }
+    );
+  }
+  if (
+    !Number.isFinite(secondaryBonusPercentage) ||
+    secondaryBonusPercentage < 0 ||
+    secondaryBonusPercentage > 100
+  ) {
+    return NextResponse.json(
+      { error: "Secondary bonus percentage must be between 0 and 100." },
+      { status: 400 }
+    );
+  }
+  if (!Number.isFinite(fixedMonthlyBonus) || fixedMonthlyBonus < 0) {
+    return NextResponse.json(
+      { error: "Fixed monthly bonus cannot be negative." },
+      { status: 400 }
     );
   }
 
-  const { data, error } = await supabaseServer
+  const { data: before } = await supabase
     .from("sales_reps")
-    .insert({ name })
-    .select("id, name")
+    .select("bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus")
+    .eq("id", id)
+    .maybeSingle();
+
+  const { data, error } = await supabase
+    .from("sales_reps")
+    .update({
+      bonus_type: bonusType,
+      bonus_percentage: bonusPercentage,
+      secondary_bonus_percentage: secondaryBonusPercentage,
+      fixed_monthly_bonus: fixedMonthlyBonus,
+    })
+    .eq("id", id)
+    .select(
+      "id, name, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus"
+    )
     .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
-
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   await writeAuditLog(request, {
-    action: "CREATE_SALES_REP",
+    action: "UPDATE_BONUS",
     entityType: "SALES_REP",
     entityId: data.id,
-    description: `Created sales representative ${data.name}.`,
+    description: `Updated bonus structure for ${data.name}.`,
+    metadata: {
+      before,
+      after: {
+        bonus_type: data.bonus_type,
+        bonus_percentage: data.bonus_percentage,
+        secondary_bonus_percentage: data.secondary_bonus_percentage,
+        fixed_monthly_bonus: data.fixed_monthly_bonus,
+      },
+    },
   });
   return NextResponse.json({ data });
-}
-
-export async function DELETE(request: Request) {
-  const id = new URL(request.url).searchParams.get("id");
-
-  if (!id) {
-    return NextResponse.json({ error: "Missing representative ID." }, { status: 400 });
-  }
-
-  const { data: rep, error: repError } = await supabaseServer
-    .from("sales_reps")
-    .select("name")
-    .eq("id", id)
-    .single();
-
-  if (repError) {
-    return NextResponse.json({ error: repError.message }, { status: 400 });
-  }
-
-  const { count, error: countError } = await supabaseServer
-    .from("customers")
-    .select("*", { count: "exact", head: true })
-    .ilike("sales_rep_name", rep.name.trim());
-
-  if (countError) {
-    return NextResponse.json({ error: countError.message }, { status: 400 });
-  }
-
-  if ((count ?? 0) > 0) {
-    return NextResponse.json(
-      {
-        error: `This representative is assigned to ${count} customer(s). Reassign them before deleting.`,
-      },
-      { status: 409 }
-    );
-  }
-
-  const { error } = await supabaseServer
-    .from("sales_reps")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
-
-  await writeAuditLog(request, {
-    action: "DELETE_SALES_REP",
-    entityType: "SALES_REP",
-    entityId: id,
-    description: `Deleted sales representative ${rep.name}.`,
-  });
-  return NextResponse.json({ success: true });
 }
