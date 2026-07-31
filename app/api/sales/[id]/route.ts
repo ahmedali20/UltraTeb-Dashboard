@@ -37,6 +37,12 @@ export async function PATCH(
 
   const sign = documentType === "CR_NOTE" ? -1 : 1;
 
+  const { data: before } = await supabaseServer
+    .from("sales")
+    .select("invoice_no, sales_date, sales_item_total, tax, document_type, original_invoice_no, note_reason")
+    .eq("id", params.id)
+    .maybeSingle();
+
   const { error: customerError } = await supabaseServer
     .from("customers")
     .update({ sales_rep_name: body.sales_rep_name })
@@ -79,6 +85,19 @@ export async function PATCH(
     entityType: documentType,
     entityId: params.id,
     description: `Updated ${documentType.toLowerCase().replace("_", " ")} ${data.invoice_no}.`,
+    metadata: {
+      before,
+      after: {
+        invoice_no: data.invoice_no,
+        sales_date: data.sales_date,
+        sales_item_total: data.sales_item_total,
+        tax: data.tax,
+        total_sales: Number(data.sales_item_total || 0) + Number(data.tax || 0),
+        document_type: data.document_type,
+        original_invoice_no: data.original_invoice_no,
+        note_reason: data.note_reason,
+      },
+    },
   });
   return NextResponse.json({ data });
 }
@@ -87,6 +106,11 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const { data: deletedRecord } = await supabaseServer
+    .from("sales")
+    .select("invoice_no, sales_date, sales_item_total, tax, document_type, original_invoice_no, note_reason")
+    .eq("id", params.id)
+    .maybeSingle();
   const { error } = await supabaseServer
     .from("sales")
     .delete()
@@ -100,7 +124,8 @@ export async function DELETE(
     action: "DELETE_SALES_RECORD",
     entityType: "SALES",
     entityId: params.id,
-    description: `Deleted sales record ${params.id}.`,
+    description: `Deleted sales record ${deletedRecord?.invoice_no ?? params.id}.`,
+    metadata: { deletedRecord },
   });
   return NextResponse.json({ success: true });
 }
