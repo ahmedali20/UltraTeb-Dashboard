@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { writeAuditLog } from "../../../lib/audit-log";
 
 const supabaseServer = createClient(
   process.env.SUPABASE_URL as string,
@@ -71,5 +72,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+  await writeAuditLog(request, {
+    action: "CREATE_CUSTOMER",
+    entityType: "CUSTOMER",
+    entityId: data.id,
+    description: `Created customer ${data.customer_name}.`,
+  });
   return NextResponse.json({ data });
 }
