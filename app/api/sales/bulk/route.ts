@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { writeAuditLog } from "../../../../lib/audit-log";
 
 const supabaseServer = createClient(
   process.env.SUPABASE_URL as string,
@@ -35,5 +36,11 @@ export async function POST(request: Request) {
     }
   }
 
+  await writeAuditLog(request, {
+    action: "BULK_UPLOAD_SALES",
+    entityType: "SALES",
+    description: `Bulk upload completed: ${inserted} inserted, ${failed.length} failed.`,
+    metadata: { inserted, failed: failed.length },
+  });
   return NextResponse.json({ inserted, failed });
 }
