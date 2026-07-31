@@ -10,6 +10,7 @@ type SaleRow = {
   id: string;
   invoice_no: string;
   sales_date: string;
+  due_date: string | null;
   month: string;
   customer_code: string;
   customer_name: string;
@@ -100,6 +101,7 @@ const emptyForm = {
   original_invoice_no: "",
   note_reason: "",
   sales_date: "",
+  due_date: "",
   customer_code: "",
   sales_item_total: "",
   tax: "",
@@ -651,6 +653,7 @@ export default function SalesTable({
       original_invoice_no: sale.original_invoice_no ?? "",
       note_reason: sale.note_reason ?? "",
       sales_date: sale.sales_date,
+      due_date: sale.due_date ?? "",
       customer_code: sale.customer_code,
       sales_item_total: String(Math.abs(sale.sales_item_total)),
       tax: String(Math.abs(sale.tax)),
@@ -1409,15 +1412,29 @@ export default function SalesTable({
                 </Td>
                 <Td align={align}>
                   {isEditing ? (
-                    <input
-                      style={inputStyle}
-                      type="date"
-                      value={editForm.sales_date}
-                      onChange={(event) =>
-                        setEditForm({ ...editForm, sales_date: event.target.value })
-                      }
-                    />
-                  ) : s.sales_date}
+                    <div style={{ display: "grid", gap: 5, minWidth: 135 }}>
+                      <small>{lang === "ar" ? "تاريخ البيع" : "Sales Date"}</small>
+                      <input
+                        style={inputStyle}
+                        type="date"
+                        value={editForm.sales_date}
+                        onChange={(event) =>
+                          setEditForm({ ...editForm, sales_date: event.target.value })
+                        }
+                      />
+                      <small>{lang === "ar" ? "تاريخ الاستحقاق" : "Due Date"}</small>
+                      <input
+                        style={inputStyle}
+                        type="date"
+                        value={editForm.due_date}
+                        onChange={(event) =>
+                          setEditForm({ ...editForm, due_date: event.target.value })
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <div>{s.sales_date}{s.due_date && <small style={{ display: "block", marginTop: 4, color: "var(--text-secondary)" }}>{lang === "ar" ? "استحقاق" : "Due"}: {s.due_date}</small>}</div>
+                  )}
                 </Td>
                 <Td align={align}>{s.month}</Td>
                 <Td align={align}>
