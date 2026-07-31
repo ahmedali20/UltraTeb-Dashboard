@@ -30,6 +30,7 @@
     bonus_percentage: number;
     secondary_bonus_percentage: number;
     fixed_monthly_bonus: number;
+    monthly_salary: number;
   };
   
   function normalizeRep(value: string | null) {
@@ -72,7 +73,7 @@
       from: "من", to: "إلى", month: "الشهر", allMonths: "كل الشهور",
       customer: "العميل", allCustomers: "كل العملاء", salesRep: "مندوب المبيعات",
       allReps: "كل المندوبين", clear: "مسح الفلاتر", invoices: "الفواتير",
-      itemTotal: "إجمالي البنود", totalTax: "إجمالي الضريبة", totalSales: "إجمالي المبيعات", bonus: "البونص",
+      itemTotal: "إجمالي البنود", totalTax: "إجمالي الضريبة", totalSales: "إجمالي المبيعات", bonus: "البونص", salary: "الراتب", salaryBonus: "الراتب + البونص",
       selectedPeriod: "الفترة المحددة", customerSummary: "ملخص مبيعات العملاء",
       customers: "عملاء", customerName: "اسم العميل", grandTotal: "الإجمالي العام",
       repSummary: "ملخص مندوبي المبيعات", reps: "مندوبون", detailed: "السجلات التفصيلية",
@@ -86,7 +87,7 @@
       from: "From", to: "To", month: "Month", allMonths: "All Months",
       customer: "Customer", allCustomers: "All Customers", salesRep: "Sales Rep",
       allReps: "All Sales Reps", clear: "Clear Filters", invoices: "Invoices",
-      itemTotal: "Item Total", totalTax: "Total TAX", totalSales: "Total Sales", bonus: "Bonus",
+      itemTotal: "Item Total", totalTax: "Total TAX", totalSales: "Total Sales", bonus: "Bonus", salary: "Salary", salaryBonus: "Salary + Bonus",
       selectedPeriod: "SELECTED PERIOD", customerSummary: "Customer Sales Summary",
       customers: "customers", customerName: "Customer Name", grandTotal: "Grand Total",
       repSummary: "Sales Rep Summary", reps: "reps", detailed: "DETAILED RECORDS",
@@ -240,6 +241,21 @@
     customer,
   ]);
 
+  const selectedRepSalary = useMemo(() => {
+    if (salesRep === "All") return null;
+    const config = bonusReps.find(
+      (rep) => normalizeRep(rep.name).toLowerCase() === salesRep.toLowerCase()
+    );
+    if (!config) return 0;
+    const activeMonths = new Set(
+      filtered
+        .filter((sale) => normalizeRep(sale.sales_rep).toLowerCase() === salesRep.toLowerCase())
+        .map((sale) => sale.month)
+        .filter(Boolean)
+    );
+    return Number(config.monthly_salary || 0) * activeMonths.size;
+  }, [salesRep, bonusReps, filtered]);
+
   const customerSummary = useMemo(() => {
       const summary = new Map<
         string,
@@ -327,6 +343,12 @@
       ["Total Sales", totals.total, filtered.length],
       ...(selectedRepBonus !== null
         ? [["Bonus", selectedRepBonus, salesRep]]
+        : []),
+      ...(selectedRepSalary !== null
+        ? [["Salary", selectedRepSalary, salesRep]]
+        : []),
+      ...(selectedRepSalary !== null && selectedRepBonus !== null
+        ? [["Salary + Bonus", selectedRepSalary + selectedRepBonus, salesRep]]
         : []),
       [],
       ];
@@ -565,6 +587,26 @@
               {
                 label: `${salesRep} Bonus`,
                 value: money(selectedRepBonus),
+                detail: "Selected period",
+                primary: true,
+              },
+            ]
+          : []),
+        ...(selectedRepSalary !== null
+          ? [
+              {
+                label: `${salesRep} Salary`,
+                value: money(selectedRepSalary),
+                detail: "Selected period",
+                primary: false,
+              },
+            ]
+          : []),
+        ...(selectedRepSalary !== null && selectedRepBonus !== null
+          ? [
+              {
+                label: `${salesRep} Salary + Bonus`,
+                value: money(selectedRepSalary + selectedRepBonus),
                 detail: "Selected period",
                 primary: true,
               },
@@ -1012,6 +1054,20 @@
             <article className="report-kpi-bonus">
               <span>{salesRep} {t.bonus}</span>
               <strong>{money(selectedRepBonus)}</strong>
+              <small>{t.selectedPeriod}</small>
+            </article>
+          )}
+          {selectedRepSalary !== null && (
+            <article className="report-kpi-bonus">
+              <span>{salesRep} {t.salary}</span>
+              <strong>{money(selectedRepSalary)}</strong>
+              <small>{t.selectedPeriod}</small>
+            </article>
+          )}
+          {selectedRepSalary !== null && selectedRepBonus !== null && (
+            <article className="report-kpi-primary">
+              <span>{salesRep} {t.salaryBonus}</span>
+              <strong>{money(selectedRepSalary + selectedRepBonus)}</strong>
               <small>{t.selectedPeriod}</small>
             </article>
           )}
