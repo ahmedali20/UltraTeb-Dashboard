@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { readDashboardSession } from "../../../lib/dashboard-auth";
+import { writeAuditLog } from "../../../lib/audit-log";
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -75,6 +76,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: assignmentError.message }, { status: 400 });
   }
 
+  await writeAuditLog(request, {
+    action: "CREATE_SALES_TEAM",
+    entityType: "SALES_TEAM",
+    entityId: team.id,
+    description: `Created sales team ${team.name}.`,
+    metadata: { leaderRepId, memberIds },
+  });
   return NextResponse.json({ data: team });
 }
 
@@ -115,6 +123,13 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: assignmentError.message }, { status: 400 });
   }
 
+  await writeAuditLog(request, {
+    action: "UPDATE_SALES_TEAM",
+    entityType: "SALES_TEAM",
+    entityId: id,
+    description: `Updated sales team ${name}.`,
+    metadata: { leaderRepId, memberIds },
+  });
   return NextResponse.json({ success: true });
 }
 
@@ -129,8 +144,12 @@ export async function DELETE(request: NextRequest) {
   }
 
   const { error } = await supabase.from("sales_teams").delete().eq("id", id);
-  return error
-    ? NextResponse.json({ error: error.message }, { status: 400 })
-    : NextResponse.json({ success: true });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await writeAuditLog(request, {
+    action: "DELETE_SALES_TEAM",
+    entityType: "SALES_TEAM",
+    entityId: id,
+    description: `Deleted sales team ${id}.`,
+  });
+  return NextResponse.json({ success: true });
 }
-
