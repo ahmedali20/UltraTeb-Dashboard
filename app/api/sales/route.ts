@@ -51,6 +51,7 @@ export async function POST(request: Request) {
     .insert({
       invoice_no: body.invoice_no,
       sales_date: body.sales_date,
+      due_date: body.due_date || null,
       customer_code: body.customer_code,
       sales_item_total:
         sign * Math.abs(Number(body.sales_item_total) || 0),
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
     metadata: {
       invoice_no: data.invoice_no,
       sales_date: data.sales_date,
+      due_date: data.due_date,
       sales_item_total: data.sales_item_total,
       tax: data.tax,
       total_sales: Number(data.sales_item_total || 0) + Number(data.tax || 0),
