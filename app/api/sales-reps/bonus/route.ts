@@ -33,6 +33,7 @@ export async function PATCH(request: NextRequest) {
     body.secondaryBonusPercentage ?? 0
   );
   const fixedMonthlyBonus = Number(body.fixedMonthlyBonus ?? 0);
+  const monthlySalary = Number(body.monthlySalary ?? 0);
 
   if (!Number.isSafeInteger(id) || id <= 0) {
     return NextResponse.json(
@@ -66,6 +67,18 @@ export async function PATCH(request: NextRequest) {
       { status: 400 }
     );
   }
+  if (!Number.isFinite(monthlySalary) || monthlySalary < 0) {
+    return NextResponse.json(
+      { error: "Monthly salary cannot be negative." },
+      { status: 400 }
+    );
+  }
+
+  const { data: before } = await supabase
+    .from("sales_reps")
+    .select("bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus, monthly_salary")
+    .eq("id", id)
+    .maybeSingle();
 
   const { data, error } = await supabase
     .from("sales_reps")
@@ -74,10 +87,11 @@ export async function PATCH(request: NextRequest) {
       bonus_percentage: bonusPercentage,
       secondary_bonus_percentage: secondaryBonusPercentage,
       fixed_monthly_bonus: fixedMonthlyBonus,
+      monthly_salary: monthlySalary,
     })
     .eq("id", id)
     .select(
-      "id, name, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus"
+      "id, name, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus, monthly_salary"
     )
     .single();
 
@@ -88,10 +102,14 @@ export async function PATCH(request: NextRequest) {
     entityId: data.id,
     description: `Updated bonus structure for ${data.name}.`,
     metadata: {
-      bonusType: data.bonus_type,
-      bonusPercentage: data.bonus_percentage,
-      secondaryBonusPercentage: data.secondary_bonus_percentage,
-      fixedMonthlyBonus: data.fixed_monthly_bonus,
+      before,
+      after: {
+        bonus_type: data.bonus_type,
+        bonus_percentage: data.bonus_percentage,
+        secondary_bonus_percentage: data.secondary_bonus_percentage,
+        fixed_monthly_bonus: data.fixed_monthly_bonus,
+        monthly_salary: data.monthly_salary,
+      },
     },
   });
   return NextResponse.json({ data });
