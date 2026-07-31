@@ -75,6 +75,17 @@ export async function POST(request: Request) {
     entityType: documentType,
     entityId: data.id,
     description: `Created ${documentType.toLowerCase().replace("_", " ")} ${data.invoice_no}.`,
+    metadata: {
+      invoice_no: data.invoice_no,
+      sales_date: data.sales_date,
+      sales_item_total: data.sales_item_total,
+      tax: data.tax,
+      total_sales: Number(data.sales_item_total || 0) + Number(data.tax || 0),
+      document_type: data.document_type,
+      original_invoice_no: data.original_invoice_no,
+      note_reason: data.note_reason,
+      sales_rep_name: body.sales_rep_name,
+    },
   });
   return NextResponse.json({ data });
 }
