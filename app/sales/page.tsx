@@ -22,7 +22,7 @@ export default async function SalesPage() {
       .order("sales_date", { ascending: false }),
     supabaseServer
       .from("customers")
-      .select("customer_code, customer_name, sales_rep_name")
+      .select("customer_code, customer_name, sales_rep_name, payment_terms_days")
       .order("customer_code", { ascending: true }),
     supabaseServer
       .from("sales_reps")
