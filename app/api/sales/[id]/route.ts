@@ -43,6 +43,12 @@ export async function PATCH(
     .eq("id", params.id)
     .maybeSingle();
 
+  const { data: customerBefore } = await supabaseServer
+    .from("customers")
+    .select("sales_rep_name")
+    .eq("customer_code", body.customer_code)
+    .maybeSingle();
+
   const { error: customerError } = await supabaseServer
     .from("customers")
     .update({ sales_rep_name: body.sales_rep_name })
@@ -80,24 +86,39 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+  const after = {
+    invoice_no: data.invoice_no,
+    sales_date: data.sales_date,
+    sales_item_total: data.sales_item_total,
+    tax: data.tax,
+    document_type: data.document_type,
+    original_invoice_no: data.original_invoice_no,
+    note_reason: data.note_reason,
+  };
+  const changes: Record<string, { from: unknown; to: unknown }> = {};
+  const oldValues = (before ?? {}) as Record<string, unknown>;
+  for (const [field, newValue] of Object.entries(after)) {
+    const oldValue = oldValues[field];
+    if (String(oldValue ?? "") !== String(newValue ?? "")) {
+      changes[field] = { from: oldValue ?? null, to: newValue ?? null };
+    }
+  }
+  if (
+    String(customerBefore?.sales_rep_name ?? "") !==
+    String(body.sales_rep_name ?? "")
+  ) {
+    changes.sales_rep_name = {
+      from: customerBefore?.sales_rep_name ?? null,
+      to: body.sales_rep_name,
+    };
+  }
+
   await writeAuditLog(request, {
     action: "UPDATE_SALES_RECORD",
     entityType: documentType,
     entityId: params.id,
     description: `Updated ${documentType.toLowerCase().replace("_", " ")} ${data.invoice_no}.`,
-    metadata: {
-      before,
-      after: {
-        invoice_no: data.invoice_no,
-        sales_date: data.sales_date,
-        sales_item_total: data.sales_item_total,
-        tax: data.tax,
-        total_sales: Number(data.sales_item_total || 0) + Number(data.tax || 0),
-        document_type: data.document_type,
-        original_invoice_no: data.original_invoice_no,
-        note_reason: data.note_reason,
-      },
-    },
+    metadata: { changes },
   });
   return NextResponse.json({ data });
 }
