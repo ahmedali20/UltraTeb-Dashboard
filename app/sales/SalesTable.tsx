@@ -102,6 +102,7 @@ const emptyForm = {
   note_reason: "",
   sales_date: "",
   due_date: "",
+  due_days: "",
   customer_code: "",
   sales_item_total: "",
   tax: "",
@@ -109,6 +110,23 @@ const emptyForm = {
 };
 
 type InvoiceForm = typeof emptyForm;
+
+function addDaysToDate(date: string, days: string) {
+  if (!date || days === "") return "";
+  const value = Number(days);
+  if (!Number.isFinite(value) || value < 0) return "";
+  const result = new Date(`${date}T00:00:00Z`);
+  result.setUTCDate(result.getUTCDate() + Math.floor(value));
+  return result.toISOString().slice(0, 10);
+}
+
+function daysBetweenDates(start: string, end: string | null) {
+  if (!start || !end) return "";
+  const startTime = Date.parse(`${start}T00:00:00Z`);
+  const endTime = Date.parse(`${end}T00:00:00Z`);
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return "";
+  return String(Math.max(0, Math.round((endTime - startTime) / 86400000)));
+}
 
 function normalizeSalesRep(value: string | null) {
   const trimmed = value?.trim();
@@ -654,6 +672,7 @@ export default function SalesTable({
       note_reason: sale.note_reason ?? "",
       sales_date: sale.sales_date,
       due_date: sale.due_date ?? "",
+      due_days: daysBetweenDates(sale.sales_date, sale.due_date),
       customer_code: sale.customer_code,
       sales_item_total: String(Math.abs(sale.sales_item_total)),
       tax: String(Math.abs(sale.tax)),
@@ -1418,19 +1437,33 @@ export default function SalesTable({
                         style={inputStyle}
                         type="date"
                         value={editForm.sales_date}
-                        onChange={(event) =>
-                          setEditForm({ ...editForm, sales_date: event.target.value })
-                        }
+                        onChange={(event) => {
+                          const salesDate = event.target.value;
+                          setEditForm({
+                            ...editForm,
+                            sales_date: salesDate,
+                            due_date: addDaysToDate(salesDate, editForm.due_days),
+                          });
+                        }}
                       />
-                      <small>{lang === "ar" ? "تاريخ الاستحقاق" : "Due Date"}</small>
+                      <small>{lang === "ar" ? "عدد أيام الاستحقاق" : "Due After (Days)"}</small>
                       <input
                         style={inputStyle}
-                        type="date"
-                        value={editForm.due_date}
-                        onChange={(event) =>
-                          setEditForm({ ...editForm, due_date: event.target.value })
-                        }
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="30"
+                        value={editForm.due_days}
+                        onChange={(event) => {
+                          const dueDays = event.target.value;
+                          setEditForm({
+                            ...editForm,
+                            due_days: dueDays,
+                            due_date: addDaysToDate(editForm.sales_date, dueDays),
+                          });
+                        }}
                       />
+                      {editForm.due_date && <small>{lang === "ar" ? "تاريخ الاستحقاق" : "Due Date"}: {editForm.due_date}</small>}
                     </div>
                   ) : (
                     <div>{s.sales_date}{s.due_date && <small style={{ display: "block", marginTop: 4, color: "var(--text-secondary)" }}>{lang === "ar" ? "استحقاق" : "Due"}: {s.due_date}</small>}</div>
