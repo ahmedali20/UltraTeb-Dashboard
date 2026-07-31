@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { writeAuditLog } from "../../../../lib/audit-log";
 
 const supabaseServer = createClient(
   process.env.SUPABASE_URL as string,
@@ -53,6 +54,12 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+  await writeAuditLog(request, {
+    action: "UPDATE_CUSTOMER",
+    entityType: "CUSTOMER",
+    entityId: params.id,
+    description: `Updated customer ${data.customer_name}.`,
+  });
   return NextResponse.json({ data });
 }
 
@@ -69,5 +76,11 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+  await writeAuditLog(request, {
+    action: "DELETE_CUSTOMER",
+    entityType: "CUSTOMER",
+    entityId: params.id,
+    description: `Deleted customer record ${params.id}.`,
+  });
   return NextResponse.json({ success: true });
 }
