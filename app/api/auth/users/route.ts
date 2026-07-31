@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
     entityType: "USER",
     entityId: data.id,
     description: `Created user ${data.username} with role ${data.role}.`,
+    metadata: { username: data.username, role: data.role, active: data.active },
   });
   return NextResponse.json({ data });
 }
@@ -81,7 +82,7 @@ export async function PATCH(request: NextRequest) {
 
   const { data: target, error: targetError } = await supabase
     .from("dashboard_users")
-    .select("username")
+    .select("username, role, active")
     .eq("id", id)
     .single();
   if (targetError) {
@@ -130,8 +131,8 @@ export async function PATCH(request: NextRequest) {
     entityId: data.id,
     description: `Updated user ${data.username}.`,
     metadata: {
-      role: data.role,
-      active: data.active,
+      before: { username: target.username, role: target.role, active: target.active },
+      after: { username: data.username, role: data.role, active: data.active },
       passwordChanged: Boolean(body.password),
     },
   });
@@ -148,7 +149,7 @@ export async function DELETE(request: NextRequest) {
 
   const { data: target } = await supabase
     .from("dashboard_users")
-    .select("username")
+    .select("username, role, active")
     .eq("id", id)
     .single();
   if (target?.username?.toLowerCase() === session.username.toLowerCase()) {
@@ -165,6 +166,7 @@ export async function DELETE(request: NextRequest) {
     entityType: "USER",
     entityId: id,
     description: `Deleted user ${target?.username ?? id}.`,
+    metadata: { deletedRecord: target },
   });
   return NextResponse.json({ success: true });
 }
