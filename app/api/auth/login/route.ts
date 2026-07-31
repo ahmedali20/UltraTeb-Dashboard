@@ -5,6 +5,7 @@ import {
   createPasswordSalt,
   hashDashboardPassword,
 } from "../../../../lib/dashboard-auth";
+import { writeAuditLog } from "../../../../lib/audit-log";
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -51,6 +52,14 @@ export async function POST(request: Request) {
   }
 
   if (!authenticatedRole) {
+    await writeAuditLog(request, {
+      username: normalizedUsername || "Unknown",
+      role: null,
+      action: "LOGIN_FAILED",
+      entityType: "AUTH",
+      description: `Failed sign-in attempt for ${normalizedUsername || "unknown user"}.`,
+      success: false,
+    });
     return NextResponse.json(
       { error: "Incorrect username or password." },
       { status: 401 }
@@ -62,6 +71,13 @@ export async function POST(request: Request) {
     authenticatedRole
   );
   const response = NextResponse.json({ success: true });
+  await writeAuditLog(request, {
+    username: normalizedUsername,
+    role: authenticatedRole,
+    action: "LOGIN",
+    entityType: "AUTH",
+    description: `${normalizedUsername} signed in.`,
+  });
   response.cookies.set("ultra_teb_session", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
