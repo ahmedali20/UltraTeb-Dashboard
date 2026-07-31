@@ -3154,6 +3154,7 @@
   .audit-inline-detail .audit-detail-grid { padding-inline: 0; }
   .audit-inline-detail .audit-changes { padding: 0; }
   .audit-modal-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(5, 12, 24, .72); backdrop-filter: blur(4px); }
+  .audit-modal-backdrop { display: none; }
   .audit-modal { width: min(760px, 100%); max-height: calc(100vh - 40px); overflow: auto; border: 1px solid var(--border-color); border-radius: 16px; background: var(--surface-bg); color: var(--text-primary); box-shadow: 0 24px 70px rgba(0,0,0,.35); }
   .audit-modal__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 20px 22px; border-bottom: 1px solid var(--border-color); }
   .audit-modal__header p, .audit-modal__header h2 { margin: 0; }
