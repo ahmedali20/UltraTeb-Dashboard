@@ -34,6 +34,12 @@ export async function PATCH(
     );
   }
 
+  const { data: before } = await supabaseServer
+    .from("customers")
+    .select("customer_name, customer_official_name, payment_terms_days, customer_trn, sales_rep_name, credit_limit")
+    .eq("id", params.id)
+    .maybeSingle();
+
   const { data, error } = await supabaseServer
     .from("customers")
     .update({
@@ -59,6 +65,17 @@ export async function PATCH(
     entityType: "CUSTOMER",
     entityId: params.id,
     description: `Updated customer ${data.customer_name}.`,
+    metadata: {
+      before,
+      after: {
+        customer_name: data.customer_name,
+        customer_official_name: data.customer_official_name,
+        payment_terms_days: data.payment_terms_days,
+        customer_trn: data.customer_trn,
+        sales_rep_name: data.sales_rep_name,
+        credit_limit: data.credit_limit,
+      },
+    },
   });
   return NextResponse.json({ data });
 }
@@ -67,6 +84,11 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const { data: deletedRecord } = await supabaseServer
+    .from("customers")
+    .select("customer_name, customer_official_name, payment_terms_days, customer_trn, sales_rep_name, credit_limit")
+    .eq("id", params.id)
+    .maybeSingle();
   const { error } = await supabaseServer
     .from("customers")
     .delete()
@@ -80,7 +102,8 @@ export async function DELETE(
     action: "DELETE_CUSTOMER",
     entityType: "CUSTOMER",
     entityId: params.id,
-    description: `Deleted customer record ${params.id}.`,
+    description: `Deleted customer ${deletedRecord?.customer_name ?? params.id}.`,
+    metadata: { deletedRecord },
   });
   return NextResponse.json({ success: true });
 }
