@@ -573,6 +573,7 @@ export default function SalesTable({
       customer_code: json.data.customer_code,
       customer_name: json.data.customer_name,
       sales_rep_name: json.data.sales_rep_name ?? null,
+      payment_terms_days: json.data.payment_terms_days ?? null,
     };
 
     setCustomerOptions((current) =>
