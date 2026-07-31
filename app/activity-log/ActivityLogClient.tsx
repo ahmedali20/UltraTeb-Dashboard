@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Header from "../Header";
 import Footer from "../Footer";
 
@@ -79,15 +79,41 @@ export default function ActivityLogClient({ logs }: { logs: AuditLog[] }) {
               <thead><tr><th>{isArabic ? "الوقت" : "Date & Time"}</th><th>{isArabic ? "المستخدم" : "User"}</th><th>{isArabic ? "الإجراء" : "Action"}</th><th>{isArabic ? "القسم" : "Area"}</th><th>{isArabic ? "التفاصيل" : "Summary"}</th><th>{isArabic ? "الحالة" : "Status"}</th><th /></tr></thead>
               <tbody>
                 {filtered.map((log) => (
-                  <tr key={log.id}>
+                  <Fragment key={log.id}>
+                  <tr className={selectedLog?.id === log.id ? "audit-row audit-row--open" : "audit-row"}>
                     <td>{new Date(log.created_at).toLocaleString(isArabic ? "ar-EG" : "en-GB")}</td>
                     <td><strong>{log.username}</strong><small>{log.user_role ?? "-"}</small></td>
                     <td><span className="audit-action">{displayKey(log.action)}</span></td>
                     <td>{log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ""}</td>
                     <td>{log.description}</td>
                     <td><span className={log.success ? "audit-status audit-status--success" : "audit-status audit-status--failed"}>{log.success ? (isArabic ? "ناجح" : "Success") : (isArabic ? "فشل" : "Failed")}</span></td>
-                    <td><button className="audit-view-button" type="button" onClick={() => setSelectedLog(log)}>{isArabic ? "عرض التفاصيل" : "View Details"}</button></td>
+                    <td><button className="audit-view-button" type="button" aria-expanded={selectedLog?.id === log.id} onClick={() => setSelectedLog(selectedLog?.id === log.id ? null : log)}>{selectedLog?.id === log.id ? (isArabic ? "إخفاء التفاصيل" : "Hide Details") : (isArabic ? "عرض التفاصيل" : "View Details")}</button></td>
                   </tr>
+                  {selectedLog?.id === log.id && (
+                    <tr className="audit-inline-row">
+                      <td colSpan={7}>
+                        <div className="audit-inline-detail">
+                          <div className="audit-inline-detail__header">
+                            <div><span>{isArabic ? "تفاصيل العملية" : "ACTIVITY DETAILS"}</span><strong>{displayKey(log.action)}</strong></div>
+                            <small>#{log.id}</small>
+                          </div>
+                          <div className="audit-detail-grid">
+                            <div><span>{isArabic ? "المستخدم" : "User"}</span><strong>{log.username}</strong></div>
+                            <div><span>{isArabic ? "الدور" : "Role"}</span><strong>{log.user_role ?? "—"}</strong></div>
+                            <div><span>{isArabic ? "السجل" : "Record"}</span><strong>{displayKey(log.entity_type)} {log.entity_id ? `#${log.entity_id}` : ""}</strong></div>
+                            <div><span>IP</span><strong>{log.ip_address ?? "—"}</strong></div>
+                          </div>
+                          <div className="audit-changes">
+                            <h3>{isArabic ? "القيم والتغييرات" : "Values & Changes"}</h3>
+                            {Object.entries(log.metadata ?? {}).length ? Object.entries(log.metadata ?? {}).map(([key, value]) => (
+                              <div className="audit-change-row" key={key}><span>{displayKey(key)}</span><pre>{displayValue(value)}</pre></div>
+                            )) : <p>{isArabic ? "لا توجد قيم إضافية مسجلة لهذه العملية." : "No additional field values were recorded for this event."}</p>}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
                 {!filtered.length && <tr><td colSpan={7} className="audit-empty">{isArabic ? "لا توجد عمليات مطابقة." : "No matching activity found."}</td></tr>}
               </tbody>
