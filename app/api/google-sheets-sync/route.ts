@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { createSign } from "crypto";
 import { NextResponse } from "next/server";
+import { writeAuditLog } from "../../../lib/audit-log";
 
 const SPREADSHEET_ID = "13L05U9X3f4cerrzSQu6qQxSTrqY-b8jo4SVYZ9Vrcc4";
 const SHEETS = [
@@ -827,10 +828,27 @@ async function syncInvoices() {
   };
 }
 
-async function runSync() {
+async function runSync(request: Request, system = false) {
   try {
-    return NextResponse.json(await syncInvoices());
+    const result = await syncInvoices();
+    await writeAuditLog(request, {
+      username: system ? "System Cron" : undefined,
+      role: system ? "admin" : undefined,
+      action: "GOOGLE_SHEET_SYNC",
+      entityType: "SYNC",
+      description: `Google Sheet sync completed: ${result.inserted} added, ${result.updated} updated, ${result.failed} failed.`,
+      metadata: result,
+    });
+    return NextResponse.json(result);
   } catch (error) {
+    await writeAuditLog(request, {
+      username: system ? "System Cron" : undefined,
+      role: system ? "admin" : undefined,
+      action: "GOOGLE_SHEET_SYNC_FAILED",
+      entityType: "SYNC",
+      description: error instanceof Error ? error.message : "Synchronization failed.",
+      success: false,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Synchronization failed." },
       { status: 500 }
@@ -838,8 +856,8 @@ async function runSync() {
   }
 }
 
-export async function POST() {
-  return runSync();
+export async function POST(request: Request) {
+  return runSync(request);
 }
 
 export async function GET(request: Request) {
@@ -850,5 +868,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return runSync();
+  return runSync(request, true);
 }
