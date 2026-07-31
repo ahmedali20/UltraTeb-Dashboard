@@ -27,6 +27,7 @@ type CustomerOption = {
   customer_code: string;
   customer_name: string;
   sales_rep_name: string | null;
+  payment_terms_days: number | null;
 };
 
 type BulkInvoiceRow = {
@@ -664,6 +665,9 @@ export default function SalesTable({
   }
 
   function startEdit(sale: SaleRow) {
+    const customer = customerOptions.find(
+      (item) => item.customer_code === sale.customer_code
+    );
     setEditingId(sale.id);
     setEditForm({
       document_type: sale.document_type ?? "INVOICE",
@@ -672,7 +676,9 @@ export default function SalesTable({
       note_reason: sale.note_reason ?? "",
       sales_date: sale.sales_date,
       due_date: sale.due_date ?? "",
-      due_days: daysBetweenDates(sale.sales_date, sale.due_date),
+      due_days: customer
+        ? String(customer.payment_terms_days ?? 0)
+        : daysBetweenDates(sale.sales_date, sale.due_date),
       customer_code: sale.customer_code,
       sales_item_total: String(Math.abs(sale.sales_item_total)),
       tax: String(Math.abs(sale.tax)),
@@ -1458,14 +1464,7 @@ export default function SalesTable({
                         step="1"
                         placeholder="30"
                         value={editForm.due_days}
-                        onChange={(event) => {
-                          const dueDays = event.target.value;
-                          setEditForm({
-                            ...editForm,
-                            due_days: dueDays,
-                            due_date: addDaysToDate(editForm.sales_date, dueDays),
-                          });
-                        }}
+                        readOnly
                       />
                       {editForm.due_date && <small>{lang === "ar" ? "تاريخ الاستحقاق" : "Due Date"}: {editForm.due_date}</small>}
                     </div>
@@ -1487,6 +1486,11 @@ export default function SalesTable({
                           sales_rep_name:
                             customer?.sales_rep_name?.trim() ??
                             editForm.sales_rep_name,
+                          due_days: String(customer?.payment_terms_days ?? 0),
+                          due_date: addDaysToDate(
+                            editForm.sales_date,
+                            String(customer?.payment_terms_days ?? 0)
+                          ),
                         });
                       }}
                     >
