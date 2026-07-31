@@ -5,6 +5,7 @@ import {
   hashDashboardPassword,
   readDashboardSession,
 } from "../../../../lib/dashboard-auth";
+import { writeAuditLog } from "../../../../lib/audit-log";
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -59,9 +60,14 @@ export async function POST(request: NextRequest) {
     })
     .select("id, username, role, active, created_at")
     .single();
-  return error
-    ? NextResponse.json({ error: error.message }, { status: 400 })
-    : NextResponse.json({ data });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await writeAuditLog(request, {
+    action: "CREATE_USER",
+    entityType: "USER",
+    entityId: data.id,
+    description: `Created user ${data.username} with role ${data.role}.`,
+  });
+  return NextResponse.json({ data });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -117,9 +123,19 @@ export async function PATCH(request: NextRequest) {
     .eq("id", id)
     .select("id, username, role, active, created_at")
     .single();
-  return error
-    ? NextResponse.json({ error: error.message }, { status: 400 })
-    : NextResponse.json({ data });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await writeAuditLog(request, {
+    action: "UPDATE_USER",
+    entityType: "USER",
+    entityId: data.id,
+    description: `Updated user ${data.username}.`,
+    metadata: {
+      role: data.role,
+      active: data.active,
+      passwordChanged: Boolean(body.password),
+    },
+  });
+  return NextResponse.json({ data });
 }
 
 export async function DELETE(request: NextRequest) {
@@ -143,7 +159,12 @@ export async function DELETE(request: NextRequest) {
   }
 
   const { error } = await supabase.from("dashboard_users").delete().eq("id", id);
-  return error
-    ? NextResponse.json({ error: error.message }, { status: 400 })
-    : NextResponse.json({ success: true });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await writeAuditLog(request, {
+    action: "DELETE_USER",
+    entityType: "USER",
+    entityId: id,
+    description: `Deleted user ${target?.username ?? id}.`,
+  });
+  return NextResponse.json({ success: true });
 }
