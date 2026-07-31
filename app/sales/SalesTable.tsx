@@ -1363,6 +1363,7 @@ export default function SalesTable({
               <Th align={align}>
                 <SortButton active={recordSort === "date"} direction={recordSortDirection} onClick={() => toggleRecordSort("date")}>{t.date}</SortButton>
               </Th>
+              <Th align={align}>{lang === "ar" ? "تاريخ الاستحقاق" : "Due Date"}</Th>
               <Th align={align}>{t.month}</Th>
               <Th align={align}>
                 <SortButton active={recordSort === "customer"} direction={recordSortDirection} onClick={() => toggleRecordSort("customer")}>{t.customer}</SortButton>
@@ -1431,21 +1432,24 @@ export default function SalesTable({
                 </Td>
                 <Td align={align}>
                   {isEditing ? (
-                    <div style={{ display: "grid", gap: 5, minWidth: 135 }}>
-                      <small>{lang === "ar" ? "تاريخ البيع" : "Sales Date"}</small>
-                      <input
-                        style={inputStyle}
-                        type="date"
-                        value={editForm.sales_date}
-                        onChange={(event) => {
-                          const salesDate = event.target.value;
-                          setEditForm({
-                            ...editForm,
-                            sales_date: salesDate,
-                            due_date: addDaysToDate(salesDate, editForm.due_days),
-                          });
-                        }}
-                      />
+                    <input
+                      style={inputStyle}
+                      type="date"
+                      value={editForm.sales_date}
+                      onChange={(event) => {
+                        const salesDate = event.target.value;
+                        setEditForm({
+                          ...editForm,
+                          sales_date: salesDate,
+                          due_date: addDaysToDate(salesDate, editForm.due_days),
+                        });
+                      }}
+                    />
+                  ) : s.sales_date}
+                </Td>
+                <Td align={align}>
+                  {isEditing ? (
+                    <div style={{ display: "grid", gap: 5, minWidth: 125 }}>
                       <small>{lang === "ar" ? "عدد أيام الاستحقاق" : "Due After (Days)"}</small>
                       <input
                         style={inputStyle}
@@ -1465,9 +1469,7 @@ export default function SalesTable({
                       />
                       {editForm.due_date && <small>{lang === "ar" ? "تاريخ الاستحقاق" : "Due Date"}: {editForm.due_date}</small>}
                     </div>
-                  ) : (
-                    <div>{s.sales_date}{s.due_date && <small style={{ display: "block", marginTop: 4, color: "var(--text-secondary)" }}>{lang === "ar" ? "استحقاق" : "Due"}: {s.due_date}</small>}</div>
-                  )}
+                  ) : s.due_date || "-"}
                 </Td>
                 <Td align={align}>{s.month}</Td>
                 <Td align={align}>
