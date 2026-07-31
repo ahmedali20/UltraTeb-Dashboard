@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
-  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "users";
+  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "users" | "activity";
   lang: "en" | "ar";
   onToggleLang: () => void;
 };
@@ -18,6 +18,7 @@ const labels = {
     teams: "Sales Teams",
     reports: "Reports",
     users: "Users",
+    activity: "Activity Log",
     workspace: "Workspace",
     administration: "Administration",
     admin: "Admin",
@@ -34,6 +35,7 @@ const labels = {
     teams: "فرق المبيعات",
     reports: "التقارير",
     users: "المستخدمون",
+    activity: "سجل النشاط",
     workspace: "مساحة العمل",
     administration: "الإدارة",
     admin: "مسؤول",
@@ -241,6 +243,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
               <span className="app-sidebar__section app-sidebar__section--admin">{t.administration}</span>
               <NavLink href="/sales-teams" page="teams" label={t.teams} icon="teams" className={linkClass("teams")} />
               <NavLink href="/users" page="users" label={t.users} icon="users" className={linkClass("users")} />
+              <NavLink href="/activity-log" page="activity" label={t.activity} icon="activity" className={linkClass("activity")} />
             </>
           )}
         </nav>
@@ -267,7 +270,7 @@ function NavLink({
   href: string;
   page: string;
   label: string;
-  icon: "home" | "customers" | "add" | "records" | "reps" | "teams" | "reports" | "users";
+  icon: "home" | "customers" | "add" | "records" | "reps" | "teams" | "reports" | "users" | "activity";
   className: string;
 }) {
   return (
@@ -281,7 +284,7 @@ function NavLink({
 function SidebarIcon({
   name,
 }: {
-  name: "home" | "customers" | "add" | "records" | "reps" | "teams" | "reports" | "users";
+  name: "home" | "customers" | "add" | "records" | "reps" | "teams" | "reports" | "users" | "activity";
 }) {
   const paths = {
     home: <><path d="m3 11 9-8 9 8" /><path d="M5 10v10h14V10" /><path d="M9 20v-6h6v6" /></>,
@@ -292,6 +295,7 @@ function SidebarIcon({
     teams: <><circle cx="7" cy="8" r="2.5" /><circle cx="17" cy="8" r="2.5" /><circle cx="12" cy="5" r="2.5" /><path d="M2.5 20a4.5 4.5 0 0 1 9 0M12.5 20a4.5 4.5 0 0 1 9 0M7.5 15a4.5 4.5 0 0 1 9 0" /></>,
     reports: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
     users: <><circle cx="12" cy="7" r="3" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /><path d="M19 5v4M17 7h4" /></>,
+    activity: <><path d="M4 4h16v16H4z" /><path d="M8 9h8M8 13h8M8 17h5" /><path d="M8 4V2M16 4V2" /></>,
   };
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
