@@ -17,13 +17,13 @@ export default async function ReportsPage() {
     supabase
       .from("sales_view")
       .select(
-        "id, invoice_no, sales_date, month, customer_name, sales_rep, sales_item_total, tax, total_sales, document_type, original_invoice_no, note_reason"
+        "id, invoice_no, sales_date, month, customer_name, sales_rep, sales_item_total, tax, total_sales, document_type, original_invoice_no, note_reason, due_date"
       )
       .order("sales_date", { ascending: true }),
     supabase
       .from("sales_reps")
       .select(
-        "id, name, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus"
+        "id, name, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus, monthly_salary"
       ),
   ]);
 
