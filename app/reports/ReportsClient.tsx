@@ -259,13 +259,15 @@
     );
     if (!config) return 0;
     const activeMonths = new Set(
-      filtered
-        .filter((sale) => normalizeRep(sale.sales_rep).toLowerCase() === salesRep.toLowerCase())
-        .map((sale) => sale.month)
-        .filter(Boolean)
+      month !== "All"
+        ? [month]
+        : filtered
+            .filter((sale) => normalizeRep(sale.sales_rep).toLowerCase() === salesRep.toLowerCase())
+            .map((sale) => sale.month)
+            .filter(Boolean)
     );
     return Number(config.monthly_salary || 0) * activeMonths.size;
-  }, [salesRep, bonusReps, filtered]);
+  }, [salesRep, bonusReps, filtered, month]);
 
   const selectedRepDeduction = useMemo(() => {
     if (salesRep === "All") return null;
@@ -274,15 +276,17 @@
     );
     if (!config) return 0;
     const activeMonths = new Set(
-      filtered
-        .filter((sale) => normalizeRep(sale.sales_rep).toLowerCase() === salesRep.toLowerCase())
-        .map((sale) => sale.month)
-        .filter(Boolean)
+      month !== "All"
+        ? [month]
+        : filtered
+            .filter((sale) => normalizeRep(sale.sales_rep).toLowerCase() === salesRep.toLowerCase())
+            .map((sale) => sale.month)
+            .filter(Boolean)
     );
     return salaryDeductions
       .filter((item) => item.sales_rep_id === config.id && activeMonths.has(item.month))
       .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  }, [salesRep, bonusReps, filtered, salaryDeductions]);
+  }, [salesRep, bonusReps, filtered, salaryDeductions, month]);
 
   const selectedRepDeductionReason = useMemo(() => {
     if (salesRep === "All") return "";
@@ -290,7 +294,11 @@
       (rep) => normalizeRep(rep.name).toLowerCase() === salesRep.toLowerCase()
     );
     if (!config) return "";
-    const activeMonths = new Set(filtered.map((sale) => sale.month).filter(Boolean));
+    const activeMonths = new Set(
+      month !== "All"
+        ? [month]
+        : filtered.map((sale) => sale.month).filter(Boolean)
+    );
     return Array.from(
       new Set(
         salaryDeductions
@@ -299,7 +307,7 @@
           .filter((reason): reason is string => Boolean(reason))
       )
     ).join("; ");
-  }, [salesRep, bonusReps, filtered, salaryDeductions]);
+  }, [salesRep, bonusReps, filtered, salaryDeductions, month]);
 
   const customerSummary = useMemo(() => {
       const summary = new Map<
