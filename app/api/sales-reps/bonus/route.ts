@@ -34,6 +34,8 @@ export async function PATCH(request: NextRequest) {
   );
   const fixedMonthlyBonus = Number(body.fixedMonthlyBonus ?? 0);
   const monthlySalary = Number(body.monthlySalary ?? 0);
+  const deductionMonth = String(body.deductionMonth ?? "").trim();
+  const salaryDeduction = Number(body.salaryDeduction ?? 0);
 
   if (!Number.isSafeInteger(id) || id <= 0) {
     return NextResponse.json(
@@ -73,6 +75,12 @@ export async function PATCH(request: NextRequest) {
       { status: 400 }
     );
   }
+  if (!Number.isFinite(salaryDeduction) || salaryDeduction < 0) {
+    return NextResponse.json(
+      { error: "Salary deduction cannot be negative." },
+      { status: 400 }
+    );
+  }
 
   const { data: before } = await supabase
     .from("sales_reps")
@@ -96,6 +104,22 @@ export async function PATCH(request: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (deductionMonth && deductionMonth !== "All") {
+    const { error: deductionError } = await supabase
+      .from("sales_rep_salary_deductions")
+      .upsert(
+        {
+          sales_rep_id: id,
+          month: deductionMonth,
+          amount: salaryDeduction,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "sales_rep_id,month" }
+      );
+    if (deductionError) {
+      return NextResponse.json({ error: deductionError.message }, { status: 400 });
+    }
+  }
   await writeAuditLog(request, {
     action: "UPDATE_BONUS",
     entityType: "SALES_REP",
@@ -109,6 +133,8 @@ export async function PATCH(request: NextRequest) {
         secondary_bonus_percentage: data.secondary_bonus_percentage,
         fixed_monthly_bonus: data.fixed_monthly_bonus,
         monthly_salary: data.monthly_salary,
+        salary_deduction_month: deductionMonth || null,
+        salary_deduction: deductionMonth && deductionMonth !== "All" ? salaryDeduction : null,
       },
     },
   });
