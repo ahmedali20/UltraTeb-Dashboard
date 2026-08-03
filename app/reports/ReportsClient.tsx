@@ -37,6 +37,7 @@
     sales_rep_id: number;
     month: string;
     amount: number;
+    reason: string | null;
   };
   
   function normalizeRep(value: string | null) {
@@ -281,6 +282,23 @@
       .reduce((sum, item) => sum + Number(item.amount || 0), 0);
   }, [salesRep, bonusReps, filtered, salaryDeductions]);
 
+  const selectedRepDeductionReason = useMemo(() => {
+    if (salesRep === "All") return "";
+    const config = bonusReps.find(
+      (rep) => normalizeRep(rep.name).toLowerCase() === salesRep.toLowerCase()
+    );
+    if (!config) return "";
+    const activeMonths = new Set(filtered.map((sale) => sale.month).filter(Boolean));
+    return Array.from(
+      new Set(
+        salaryDeductions
+          .filter((item) => item.sales_rep_id === config.id && activeMonths.has(item.month) && Number(item.amount || 0) > 0)
+          .map((item) => item.reason?.trim())
+          .filter((reason): reason is string => Boolean(reason))
+      )
+    ).join("; ");
+  }, [salesRep, bonusReps, filtered, salaryDeductions]);
+
   const customerSummary = useMemo(() => {
       const summary = new Map<
         string,
@@ -374,6 +392,9 @@
         : []),
       ...(selectedRepDeduction !== null && selectedRepDeduction > 0
         ? [["Salary Deduction", selectedRepDeduction, salesRep]]
+        : []),
+      ...(selectedRepDeduction !== null && selectedRepDeduction > 0 && selectedRepDeductionReason
+        ? [["Deduction Reason", selectedRepDeductionReason, salesRep]]
         : []),
       ...(selectedRepSalary !== null && selectedRepBonus !== null
         ? [["Net Salary + Bonus", selectedRepSalary - (selectedRepDeduction ?? 0) + selectedRepBonus, salesRep]]
@@ -631,7 +652,7 @@
             ]
           : []),
         ...(selectedRepDeduction !== null && selectedRepDeduction > 0
-          ? [{ label: `${salesRep} Salary Deduction`, value: money(selectedRepDeduction), detail: "Selected period", primary: false }]
+          ? [{ label: `${salesRep} Salary Deduction`, value: money(selectedRepDeduction), detail: selectedRepDeductionReason || "Selected period", primary: false }]
           : []),
         ...(selectedRepSalary !== null && selectedRepBonus !== null
           ? [
@@ -1106,7 +1127,7 @@
             <article>
               <span>{salesRep} {t.deduction}</span>
               <strong>{money(selectedRepDeduction)}</strong>
-              <small>{t.selectedPeriod}</small>
+              <small>{selectedRepDeductionReason || t.selectedPeriod}</small>
             </article>
           )}
         </section>
