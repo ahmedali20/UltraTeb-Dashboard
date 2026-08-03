@@ -84,7 +84,7 @@
       from: "من", to: "إلى", month: "الشهر", allMonths: "كل الشهور",
       customer: "العميل", allCustomers: "كل العملاء", salesRep: "مندوب المبيعات",
       allReps: "كل المندوبين", clear: "مسح الفلاتر", invoices: "الفواتير",
-      itemTotal: "إجمالي البنود", totalTax: "إجمالي الضريبة", totalSales: "إجمالي المبيعات", bonus: "البونص", salary: "الراتب", deduction: "خصم الراتب", salaryBonus: "صافي الراتب + البونص",
+      itemTotal: "إجمالي البنود", totalTax: "إجمالي الضريبة", totalSales: "إجمالي المبيعات", bonus: "البونص", salary: "الراتب", deduction: "خصم الراتب", netSalary: "صافي الراتب بعد الخصم", salaryBonus: "صافي الراتب + البونص",
       selectedPeriod: "الفترة المحددة", customerSummary: "ملخص مبيعات العملاء",
       customers: "عملاء", customerName: "اسم العميل", grandTotal: "الإجمالي العام",
       repSummary: "ملخص مندوبي المبيعات", reps: "مندوبون", detailed: "السجلات التفصيلية",
@@ -98,7 +98,7 @@
       from: "From", to: "To", month: "Month", allMonths: "All Months",
       customer: "Customer", allCustomers: "All Customers", salesRep: "Sales Rep",
       allReps: "All Sales Reps", clear: "Clear Filters", invoices: "Invoices",
-      itemTotal: "Item Total", totalTax: "Total TAX", totalSales: "Total Sales", bonus: "Bonus", salary: "Salary", deduction: "Salary Deduction", salaryBonus: "Net Salary + Bonus",
+      itemTotal: "Item Total", totalTax: "Total TAX", totalSales: "Total Sales", bonus: "Bonus", salary: "Salary", deduction: "Salary Deduction", netSalary: "Net Salary After Deduction", salaryBonus: "Net Salary + Bonus",
       selectedPeriod: "SELECTED PERIOD", customerSummary: "Customer Sales Summary",
       customers: "customers", customerName: "Customer Name", grandTotal: "Grand Total",
       repSummary: "Sales Rep Summary", reps: "reps", detailed: "DETAILED RECORDS",
@@ -406,6 +406,9 @@
       ...(selectedRepDeduction !== null && selectedRepDeduction > 0 && selectedRepDeductionReason
         ? [["Deduction Reason", selectedRepDeductionReason, salesRep]]
         : []),
+      ...(selectedRepSalary !== null
+        ? [["Net Salary After Deduction", selectedRepSalary - (selectedRepDeduction ?? 0), salesRep]]
+        : []),
       ...(selectedRepSalary !== null && selectedRepBonus !== null
         ? [["Net Salary + Bonus", selectedRepSalary - (selectedRepDeduction ?? 0) + selectedRepBonus, salesRep]]
         : []),
@@ -663,6 +666,16 @@
           : []),
         ...(selectedRepDeduction !== null && selectedRepDeduction > 0
           ? [{ label: `${salesRep} Salary Deduction`, value: money(selectedRepDeduction), detail: selectedRepDeductionReason || "Selected period", primary: false }]
+          : []),
+        ...(selectedRepSalary !== null
+          ? [
+              {
+                label: `${salesRep} Net Salary After Deduction`,
+                value: money(selectedRepSalary - (selectedRepDeduction ?? 0)),
+                detail: "Selected period",
+                primary: false,
+              },
+            ]
           : []),
         ...(selectedRepSalary !== null && selectedRepBonus !== null
           ? [
@@ -1123,6 +1136,13 @@
             <article className="report-kpi-bonus">
               <span>{salesRep} {t.salary}</span>
               <strong>{money(selectedRepSalary)}</strong>
+              <small>{t.selectedPeriod}</small>
+            </article>
+          )}
+          {selectedRepSalary !== null && (
+            <article>
+              <span>{salesRep} {t.netSalary}</span>
+              <strong>{money(selectedRepSalary - (selectedRepDeduction ?? 0))}</strong>
               <small>{t.selectedPeriod}</small>
             </article>
           )}
