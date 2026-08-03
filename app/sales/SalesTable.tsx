@@ -129,6 +129,17 @@ function daysBetweenDates(start: string, end: string | null) {
   return String(Math.max(0, Math.round((endTime - startTime) / 86400000)));
 }
 
+function formatShortDate(value: string | null | undefined) {
+  if (!value) return "-";
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return value;
+  const months = [
+    "jan", "feb", "mar", "apr", "may", "jun",
+    "jul", "aug", "sep", "oct", "nov", "dec",
+  ];
+  return `${match[3]}-${months[Number(match[2]) - 1]}-${match[1].slice(-2)}`;
+}
+
 function normalizeSalesRep(value: string | null) {
   const trimmed = value?.trim();
   if (!trimmed) return "Unassigned";
@@ -1452,7 +1463,7 @@ export default function SalesTable({
                         });
                       }}
                     />
-                  ) : s.sales_date}
+                  ) : formatShortDate(s.sales_date)}
                 </Td>
                 <Td align={align}>
                   {isEditing ? (
@@ -1467,9 +1478,9 @@ export default function SalesTable({
                         value={editForm.due_days}
                         readOnly
                       />
-                      {editForm.due_date && <small>{lang === "ar" ? "تاريخ الاستحقاق" : "Due Date"}: {editForm.due_date}</small>}
+                      {editForm.due_date && <small>{lang === "ar" ? "تاريخ الاستحقاق" : "Due Date"}: {formatShortDate(editForm.due_date)}</small>}
                     </div>
-                  ) : s.due_date || "-"}
+                  ) : formatShortDate(s.due_date)}
                 </Td>
                 <Td align={align}>{s.month}</Td>
                 <Td align={align}>
