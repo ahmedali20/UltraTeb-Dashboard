@@ -28,7 +28,7 @@ export default async function ReportsPage() {
       ),
     supabase
       .from("sales_rep_salary_deductions")
-      .select("sales_rep_id, month, amount"),
+      .select("sales_rep_id, month, amount, reason"),
   ]);
 
   if (error || bonusRepsError || salaryDeductionsError) {
