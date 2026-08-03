@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Header from "../Header";
 import Footer from "../Footer";
 
+const currentTeamMonth = `${new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Cairo", month: "short" }).format(new Date())}.${new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Cairo", year: "numeric" }).format(new Date())}`;
+
 type Team = {
   id: number;
   name: string;
@@ -185,7 +187,7 @@ export default function SalesTeamsClient({
 }) {
   const router = useRouter();
   const [lang, setLang] = useState<"en" | "ar">("en");
-  const [month, setMonth] = useState("All");
+  const [month, setMonth] = useState(currentTeamMonth);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [teamName, setTeamName] = useState("");
   const [leaderId, setLeaderId] = useState("");
@@ -217,7 +219,7 @@ export default function SalesTeamsClient({
 
   const months = useMemo(
     () =>
-      Array.from(new Set(sales.map((sale) => sale.month).filter(Boolean))).sort(
+      Array.from(new Set([currentTeamMonth, ...sales.map((sale) => sale.month).filter(Boolean)])).sort(
         (a, b) => monthSortValue(b) - monthSortValue(a)
       ),
     [sales]
