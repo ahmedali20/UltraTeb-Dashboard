@@ -4,6 +4,11 @@ import { useMemo, useState } from "react";
 import Header from "./Header";
 import Footer from "./Footer";
 
+const currentMonthParts = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Africa/Cairo", year: "numeric", month: "2-digit",
+}).formatToParts(new Date());
+const currentMonthKey = `${currentMonthParts.find((part) => part.type === "year")?.value}-${currentMonthParts.find((part) => part.type === "month")?.value}`;
+
 type DashboardSale = {
   id: string;
   invoice_no: string;
@@ -106,7 +111,7 @@ function normalizeSalesRep(value: string | null, fallback: string) {
 export default function HomeClient({ sales, customerCount }: HomeClientProps) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [selectedRep, setSelectedRep] = useState("All");
-  const [selectedMonth, setSelectedMonth] = useState("All");
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const t = text[lang];
   const dir = lang === "ar" ? "rtl" : "ltr";
 
@@ -123,9 +128,9 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     () =>
       Array.from(
         new Set(
-          sales
+          [currentMonthKey, ...sales
             .map((sale) => sale.sales_date?.slice(0, 7))
-            .filter((month): month is string => Boolean(month))
+            .filter((month): month is string => Boolean(month))]
         )
       ).sort((a, b) => b.localeCompare(a)),
     [sales]
