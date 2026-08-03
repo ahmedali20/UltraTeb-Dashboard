@@ -183,6 +183,7 @@ export default function SalesTable({
   >({});
   const [recordRepFilter, setRecordRepFilter] = useState("All");
   const [recordMonthFilter, setRecordMonthFilter] = useState("All");
+  const [recordCustomerFilter, setRecordCustomerFilter] = useState("All");
   const [recordPage, setRecordPage] = useState(1);
   const [recordSort, setRecordSort] = useState<
     "invoice" | "date" | "customer" | "total"
@@ -247,11 +248,16 @@ export default function SalesTable({
   const recordMonths = Array.from(
     new Set(sales.map((sale) => sale.month).filter(Boolean))
   ).sort((a, b) => b.localeCompare(a));
+  const recordCustomers = Array.from(
+    new Set(sales.map((sale) => sale.customer_name).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
   const displayedSales = sortedSales.filter(
     (sale) =>
       (recordRepFilter === "All" ||
         normalizeSalesRep(sale.sales_rep) === recordRepFilter) &&
-      (recordMonthFilter === "All" || sale.month === recordMonthFilter)
+      (recordMonthFilter === "All" || sale.month === recordMonthFilter) &&
+      (recordCustomerFilter === "All" ||
+        sale.customer_name === recordCustomerFilter)
   );
   const displayedSalesTotal = displayedSales.reduce(
     (total, sale) => total + Number(sale.total_sales || 0),
@@ -275,6 +281,7 @@ export default function SalesTable({
   }, [
     recordRepFilter,
     recordMonthFilter,
+    recordCustomerFilter,
     recordSort,
     recordSortDirection,
   ]);
@@ -1313,7 +1320,7 @@ export default function SalesTable({
         style={{ display: activeSalesView === "records" ? undefined : "none" }}
       >
         <div>
-          <strong>{lang === "ar" ? "كل الفواتير" : "All Records"}</strong>
+          <strong>{lang === "ar" ? "الفواتير" : "Invoices"}</strong>
           <span>
             {lang === "ar" ? "إجمالي الفواتير" : "Total Invoices"}:{" "}
             {displayedSales.length}
@@ -1354,6 +1361,18 @@ export default function SalesTable({
             <option value="All">{lang === "ar" ? "كل المندوبين" : "All Reps"}</option>
             {recordReps.map((rep) => (
               <option key={rep} value={rep}>{rep}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {lang === "ar" ? "اسم العميل" : "Customer Name"}
+          <select
+            value={recordCustomerFilter}
+            onChange={(event) => setRecordCustomerFilter(event.target.value)}
+          >
+            <option value="All">{lang === "ar" ? "كل العملاء" : "All Customers"}</option>
+            {recordCustomers.map((customerName) => (
+              <option key={customerName} value={customerName}>{customerName}</option>
             ))}
           </select>
         </label>
