@@ -31,7 +31,7 @@ export default async function SalesTeamsPage() {
       .select("id, month, sales_rep, total_sales, document_type"),
     supabase
       .from("sales_rep_salary_deductions")
-      .select("sales_rep_id, month, amount"),
+      .select("sales_rep_id, month, amount, reason"),
   ]);
 
   const error = teamsError || repsError || salesError || deductionsError;
