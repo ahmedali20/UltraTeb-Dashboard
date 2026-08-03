@@ -14,6 +14,7 @@ export default async function SalesTeamsPage() {
     { data: teams, error: teamsError },
     { data: reps, error: repsError },
     { data: sales, error: salesError },
+    { data: deductions, error: deductionsError },
   ] = await Promise.all([
     supabase
       .from("sales_teams")
@@ -28,9 +29,12 @@ export default async function SalesTeamsPage() {
     supabase
       .from("sales_view")
       .select("id, month, sales_rep, total_sales, document_type"),
+    supabase
+      .from("sales_rep_salary_deductions")
+      .select("sales_rep_id, month, amount"),
   ]);
 
-  const error = teamsError || repsError || salesError;
+  const error = teamsError || repsError || salesError || deductionsError;
   if (error) {
     return (
       <main style={{ padding: 32, color: "red" }}>
@@ -47,6 +51,7 @@ export default async function SalesTeamsPage() {
       teams={teams ?? []}
       reps={reps ?? []}
       sales={sales ?? []}
+      deductions={deductions ?? []}
     />
   );
 }
