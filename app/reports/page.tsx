@@ -13,6 +13,7 @@ export default async function ReportsPage() {
   const [
     { data, error },
     { data: bonusReps, error: bonusRepsError },
+    { data: salaryDeductions, error: salaryDeductionsError },
   ] = await Promise.all([
     supabase
       .from("sales_view")
@@ -25,18 +26,21 @@ export default async function ReportsPage() {
       .select(
         "id, name, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus, monthly_salary"
       ),
+    supabase
+      .from("sales_rep_salary_deductions")
+      .select("sales_rep_id, month, amount"),
   ]);
 
-  if (error || bonusRepsError) {
+  if (error || bonusRepsError || salaryDeductionsError) {
     return (
       <main style={{ padding: 32 }}>
         <h1>Report Error</h1>
         <p style={{ color: "#dc2626" }}>
-          {(error || bonusRepsError)?.message}
+          {(error || bonusRepsError || salaryDeductionsError)?.message}
         </p>
       </main>
     );
   }
 
-  return <ReportsClient sales={data ?? []} bonusReps={bonusReps ?? []} />;
+  return <ReportsClient sales={data ?? []} bonusReps={bonusReps ?? []} salaryDeductions={salaryDeductions ?? []} />;
 }
