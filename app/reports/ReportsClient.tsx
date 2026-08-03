@@ -3,6 +3,8 @@
   import { useMemo, useState } from "react";
   import Header from "../Header";
   import Footer from "../Footer";
+
+  const currentReportMonth = `${new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Cairo", month: "short" }).format(new Date())}.${new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Cairo", year: "numeric" }).format(new Date())}`;
   
   type ReportSale = {
     id: string;
@@ -67,7 +69,7 @@
     const [lang, setLang] = useState<"en" | "ar">("en");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
-    const [month, setMonth] = useState("All");
+    const [month, setMonth] = useState(currentReportMonth);
     const [customer, setCustomer] = useState("All");
     const [salesRep, setSalesRep] = useState("All");
     const [reportType, setReportType] = useState<
@@ -106,7 +108,7 @@
   
     const months = useMemo(
       () =>
-        Array.from(new Set(sales.map((sale) => sale.month).filter(Boolean))).sort(
+        Array.from(new Set([currentReportMonth, ...sales.map((sale) => sale.month).filter(Boolean)])).sort(
           (a, b) => b.localeCompare(a)
         ),
       [sales]
