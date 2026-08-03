@@ -32,6 +32,12 @@
     fixed_monthly_bonus: number;
     monthly_salary: number;
   };
+
+  type SalaryDeduction = {
+    sales_rep_id: number;
+    month: string;
+    amount: number;
+  };
   
   function normalizeRep(value: string | null) {
     return value?.trim() || "Unassigned";
@@ -51,9 +57,11 @@
   export default function ReportsClient({
     sales,
     bonusReps,
+    salaryDeductions,
   }: {
     sales: ReportSale[];
     bonusReps: BonusRep[];
+    salaryDeductions: SalaryDeduction[];
   }) {
     const [lang, setLang] = useState<"en" | "ar">("en");
     const [startDate, setStartDate] = useState("");
@@ -73,7 +81,7 @@
       from: "من", to: "إلى", month: "الشهر", allMonths: "كل الشهور",
       customer: "العميل", allCustomers: "كل العملاء", salesRep: "مندوب المبيعات",
       allReps: "كل المندوبين", clear: "مسح الفلاتر", invoices: "الفواتير",
-      itemTotal: "إجمالي البنود", totalTax: "إجمالي الضريبة", totalSales: "إجمالي المبيعات", bonus: "البونص", salary: "الراتب", salaryBonus: "الراتب + البونص",
+      itemTotal: "إجمالي البنود", totalTax: "إجمالي الضريبة", totalSales: "إجمالي المبيعات", bonus: "البونص", salary: "الراتب", deduction: "خصم الراتب", salaryBonus: "صافي الراتب + البونص",
       selectedPeriod: "الفترة المحددة", customerSummary: "ملخص مبيعات العملاء",
       customers: "عملاء", customerName: "اسم العميل", grandTotal: "الإجمالي العام",
       repSummary: "ملخص مندوبي المبيعات", reps: "مندوبون", detailed: "السجلات التفصيلية",
@@ -87,7 +95,7 @@
       from: "From", to: "To", month: "Month", allMonths: "All Months",
       customer: "Customer", allCustomers: "All Customers", salesRep: "Sales Rep",
       allReps: "All Sales Reps", clear: "Clear Filters", invoices: "Invoices",
-      itemTotal: "Item Total", totalTax: "Total TAX", totalSales: "Total Sales", bonus: "Bonus", salary: "Salary", salaryBonus: "Salary + Bonus",
+      itemTotal: "Item Total", totalTax: "Total TAX", totalSales: "Total Sales", bonus: "Bonus", salary: "Salary", deduction: "Salary Deduction", salaryBonus: "Net Salary + Bonus",
       selectedPeriod: "SELECTED PERIOD", customerSummary: "Customer Sales Summary",
       customers: "customers", customerName: "Customer Name", grandTotal: "Grand Total",
       repSummary: "Sales Rep Summary", reps: "reps", detailed: "DETAILED RECORDS",
@@ -256,6 +264,23 @@
     return Number(config.monthly_salary || 0) * activeMonths.size;
   }, [salesRep, bonusReps, filtered]);
 
+  const selectedRepDeduction = useMemo(() => {
+    if (salesRep === "All") return null;
+    const config = bonusReps.find(
+      (rep) => normalizeRep(rep.name).toLowerCase() === salesRep.toLowerCase()
+    );
+    if (!config) return 0;
+    const activeMonths = new Set(
+      filtered
+        .filter((sale) => normalizeRep(sale.sales_rep).toLowerCase() === salesRep.toLowerCase())
+        .map((sale) => sale.month)
+        .filter(Boolean)
+    );
+    return salaryDeductions
+      .filter((item) => item.sales_rep_id === config.id && activeMonths.has(item.month))
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  }, [salesRep, bonusReps, filtered, salaryDeductions]);
+
   const customerSummary = useMemo(() => {
       const summary = new Map<
         string,
@@ -347,8 +372,11 @@
       ...(selectedRepSalary !== null
         ? [["Salary", selectedRepSalary, salesRep]]
         : []),
+      ...(selectedRepDeduction !== null
+        ? [["Salary Deduction", selectedRepDeduction, salesRep]]
+        : []),
       ...(selectedRepSalary !== null && selectedRepBonus !== null
-        ? [["Salary + Bonus", selectedRepSalary + selectedRepBonus, salesRep]]
+        ? [["Net Salary + Bonus", selectedRepSalary - (selectedRepDeduction ?? 0) + selectedRepBonus, salesRep]]
         : []),
       [],
       ];
@@ -602,11 +630,14 @@
               },
             ]
           : []),
+        ...(selectedRepDeduction !== null
+          ? [{ label: `${salesRep} Salary Deduction`, value: money(selectedRepDeduction), detail: "Selected period", primary: false }]
+          : []),
         ...(selectedRepSalary !== null && selectedRepBonus !== null
           ? [
               {
-                label: `${salesRep} Salary + Bonus`,
-                value: money(selectedRepSalary + selectedRepBonus),
+                label: `${salesRep} Net Salary + Bonus`,
+                value: money(selectedRepSalary - (selectedRepDeduction ?? 0) + selectedRepBonus),
                 detail: "Selected period",
                 primary: true,
               },
@@ -1067,7 +1098,14 @@
           {selectedRepSalary !== null && selectedRepBonus !== null && (
             <article className="report-kpi-primary">
               <span>{salesRep} {t.salaryBonus}</span>
-              <strong>{money(selectedRepSalary + selectedRepBonus)}</strong>
+              <strong>{money(selectedRepSalary - (selectedRepDeduction ?? 0) + selectedRepBonus)}</strong>
+              <small>{t.selectedPeriod}</small>
+            </article>
+          )}
+          {selectedRepDeduction !== null && (
+            <article>
+              <span>{salesRep} {t.deduction}</span>
+              <strong>{money(selectedRepDeduction)}</strong>
               <small>{t.selectedPeriod}</small>
             </article>
           )}
