@@ -372,7 +372,7 @@
       ...(selectedRepSalary !== null
         ? [["Salary", selectedRepSalary, salesRep]]
         : []),
-      ...(selectedRepDeduction !== null
+      ...(selectedRepDeduction !== null && selectedRepDeduction > 0
         ? [["Salary Deduction", selectedRepDeduction, salesRep]]
         : []),
       ...(selectedRepSalary !== null && selectedRepBonus !== null
@@ -630,7 +630,7 @@
               },
             ]
           : []),
-        ...(selectedRepDeduction !== null
+        ...(selectedRepDeduction !== null && selectedRepDeduction > 0
           ? [{ label: `${salesRep} Salary Deduction`, value: money(selectedRepDeduction), detail: "Selected period", primary: false }]
           : []),
         ...(selectedRepSalary !== null && selectedRepBonus !== null
@@ -1102,7 +1102,7 @@
               <small>{t.selectedPeriod}</small>
             </article>
           )}
-          {selectedRepDeduction !== null && (
+          {selectedRepDeduction !== null && selectedRepDeduction > 0 && (
             <article>
               <span>{salesRep} {t.deduction}</span>
               <strong>{money(selectedRepDeduction)}</strong>
