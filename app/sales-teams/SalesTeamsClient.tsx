@@ -434,28 +434,34 @@ export default function SalesTeamsClient({
     const draft = bonusDrafts[repId];
     if (!draft) return;
     setSavingBonusId(repId);
-    const response = await fetch("/api/sales-reps/bonus", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: repId,
-        bonusType: draft.type,
-        bonusPercentage: Number(draft.percentage || 0),
-        secondaryBonusPercentage: Number(draft.secondary || 0),
-        fixedMonthlyBonus: Number(draft.fixed || 0),
-        monthlySalary: Number(draft.salary || 0),
-        deductionMonth: month,
-        salaryDeduction: Number(deductionDrafts[`${repId}:${month}`] || 0),
-        deductionReason: deductionReasonDrafts[`${repId}:${month}`] ?? "",
-      }),
-    });
-    const result = await response.json();
-    setSavingBonusId(null);
-    if (!response.ok) {
-      alert(result.error || "Unable to save bonus.");
-      return;
+    try {
+      const response = await fetch("/api/sales-reps/bonus", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: repId,
+          bonusType: draft.type,
+          bonusPercentage: Number(draft.percentage || 0),
+          secondaryBonusPercentage: Number(draft.secondary || 0),
+          fixedMonthlyBonus: Number(draft.fixed || 0),
+          monthlySalary: Number(draft.salary || 0),
+          deductionMonth: month,
+          salaryDeduction: Number(deductionDrafts[`${repId}:${month}`] || 0),
+          deductionReason: deductionReasonDrafts[`${repId}:${month}`] ?? "",
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        alert(result.error || "Unable to save salary, bonus, or deduction.");
+        return;
+      }
+      alert("Salary, bonus, and deduction saved successfully.");
+      router.refresh();
+    } catch {
+      alert("Unable to save salary, bonus, or deduction.");
+    } finally {
+      setSavingBonusId(null);
     }
-    router.refresh();
   }
 
   function renderBonusRow(member: RepPerformance) {
@@ -477,6 +483,18 @@ export default function SalesTeamsClient({
             <span>{t.calculated}</span>
             <strong>{currency(member.bonus, lang)}</strong>
           </div>
+          {month !== "All" && (
+            <div className="team-bonus__inline-calculated">
+              <span>{lang === "ar" ? "صافي الراتب + البونص" : "Net Salary + Bonus"}</span>
+              <strong>
+                {currency(
+                  Number(draft.salary || 0) + member.bonus -
+                    Number(deductionDrafts[`${member.id}:${month}`] || 0),
+                  lang
+                )}
+              </strong>
+            </div>
+          )}
         </div>
         <label className="team-bonus__method">
           {t.method}
