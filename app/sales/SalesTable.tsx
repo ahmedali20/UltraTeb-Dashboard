@@ -6,6 +6,8 @@ import Papa from "papaparse";
 import Header from "../Header";
 import Footer from "../Footer";
 
+const currentRecordsMonth = `${new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Cairo", month: "short" }).format(new Date())}.${new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Cairo", year: "numeric" }).format(new Date())}`;
+
 type SaleRow = {
   id: string;
   invoice_no: string;
@@ -182,7 +184,7 @@ export default function SalesTable({
     Record<number, string>
   >({});
   const [recordRepFilter, setRecordRepFilter] = useState("All");
-  const [recordMonthFilter, setRecordMonthFilter] = useState("All");
+  const [recordMonthFilter, setRecordMonthFilter] = useState(currentRecordsMonth);
   const [recordCustomerFilter, setRecordCustomerFilter] = useState("All");
   const [recordPage, setRecordPage] = useState(1);
   const [recordSort, setRecordSort] = useState<
@@ -246,7 +248,7 @@ export default function SalesTable({
     new Set(sales.map((sale) => normalizeSalesRep(sale.sales_rep)))
   ).sort();
   const recordMonths = Array.from(
-    new Set(sales.map((sale) => sale.month).filter(Boolean))
+    new Set([currentRecordsMonth, ...sales.map((sale) => sale.month).filter(Boolean)])
   ).sort((a, b) => b.localeCompare(a));
   const recordCustomers = Array.from(
     new Set(sales.map((sale) => sale.customer_name).filter(Boolean))
