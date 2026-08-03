@@ -36,6 +36,7 @@ export async function PATCH(request: NextRequest) {
   const monthlySalary = Number(body.monthlySalary ?? 0);
   const deductionMonth = String(body.deductionMonth ?? "").trim();
   const salaryDeduction = Number(body.salaryDeduction ?? 0);
+  const deductionReason = String(body.deductionReason ?? "").trim();
 
   if (!Number.isSafeInteger(id) || id <= 0) {
     return NextResponse.json(
@@ -112,6 +113,7 @@ export async function PATCH(request: NextRequest) {
           sales_rep_id: id,
           month: deductionMonth,
           amount: salaryDeduction,
+          reason: deductionReason || null,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "sales_rep_id,month" }
@@ -135,6 +137,7 @@ export async function PATCH(request: NextRequest) {
         monthly_salary: data.monthly_salary,
         salary_deduction_month: deductionMonth || null,
         salary_deduction: deductionMonth && deductionMonth !== "All" ? salaryDeduction : null,
+        salary_deduction_reason: deductionMonth && deductionMonth !== "All" ? deductionReason || null : null,
       },
     },
   });
