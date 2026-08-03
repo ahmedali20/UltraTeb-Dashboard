@@ -34,6 +34,12 @@ type TeamSale = {
   document_type: "INVOICE" | "CR_NOTE" | "DR_NOTE" | null;
 };
 
+type SalaryDeduction = {
+  sales_rep_id: number;
+  month: string;
+  amount: number;
+};
+
 type BonusDraft = {
   type: SalesRep["bonus_type"];
   percentage: string;
@@ -91,6 +97,8 @@ const text = {
     value: "Value",
     calculated: "Calculated Bonus",
     salary: "Monthly Salary",
+    deduction: "Salary Deduction",
+    selectMonthDeduction: "Select a specific month to enter its salary deduction.",
     save: "Save",
     allMonthsNote:
       "For All Months, fixed bonus is counted once per month containing sales.",
@@ -135,6 +143,8 @@ const text = {
     value: "القيمة",
     calculated: "البونص المحسوب",
     salary: "الراتب الشهري",
+    deduction: "خصم الراتب",
+    selectMonthDeduction: "اختر شهراً محدداً لإدخال خصم الراتب.",
     save: "حفظ",
     allMonthsNote:
       "عند اختيار كل الشهور، يحتسب المبلغ الثابت مرة لكل شهر به مبيعات.",
@@ -163,10 +173,12 @@ export default function SalesTeamsClient({
   teams,
   reps,
   sales,
+  deductions,
 }: {
   teams: Team[];
   reps: SalesRep[];
   sales: TeamSale[];
+  deductions: SalaryDeduction[];
 }) {
   const router = useRouter();
   const [lang, setLang] = useState<"en" | "ar">("en");
@@ -177,6 +189,9 @@ export default function SalesTeamsClient({
   const [memberIds, setMemberIds] = useState<number[]>([]);
   const [savingTeam, setSavingTeam] = useState(false);
   const [savingBonusId, setSavingBonusId] = useState<number | null>(null);
+  const [deductionDrafts, setDeductionDrafts] = useState<Record<string, string>>(
+    () => Object.fromEntries(deductions.map((item) => [`${item.sales_rep_id}:${item.month}`, String(item.amount ?? 0)]))
+  );
   const [bonusDrafts, setBonusDrafts] = useState<Record<number, BonusDraft>>(
     () =>
       Object.fromEntries(
@@ -421,6 +436,8 @@ export default function SalesTeamsClient({
         secondaryBonusPercentage: Number(draft.secondary || 0),
         fixedMonthlyBonus: Number(draft.fixed || 0),
         monthlySalary: Number(draft.salary || 0),
+        deductionMonth: month,
+        salaryDeduction: Number(deductionDrafts[`${repId}:${month}`] || 0),
       }),
     });
     const result = await response.json();
@@ -526,6 +543,28 @@ export default function SalesTeamsClient({
         )}
         {draft.type === "TIERED_EXCESS" && (
           <small className="team-bonus__rule-note">{t.tieredNote}</small>
+        )}
+        {month !== "All" ? (
+          <label>
+            {t.deduction} ({month})
+            <div className="team-bonus__value">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={deductionDrafts[`${member.id}:${month}`] ?? "0"}
+                onChange={(event) =>
+                  setDeductionDrafts((current) => ({
+                    ...current,
+                    [`${member.id}:${month}`]: event.target.value,
+                  }))
+                }
+              />
+              <span>EGP</span>
+            </div>
+          </label>
+        ) : (
+          <small className="team-bonus__rule-note">{t.selectMonthDeduction}</small>
         )}
         <label>
           {t.salary}
