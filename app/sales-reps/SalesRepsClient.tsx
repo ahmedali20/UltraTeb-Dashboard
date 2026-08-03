@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Header from "../Header";
 import Footer from "../Footer";
 
+const currentRepMonth = `${new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Cairo", month: "short" }).format(new Date())}.${new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Cairo", year: "numeric" }).format(new Date())}`;
+
 type RepSale = {
   id: string;
   invoice_no: string;
@@ -39,7 +41,7 @@ export default function SalesRepsClient({
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [selectedRep, setSelectedRep] = useState<string | null>(null);
   const [hospitalFilter, setHospitalFilter] = useState("All");
-  const [monthFilter, setMonthFilter] = useState("All");
+  const [monthFilter, setMonthFilter] = useState(currentRepMonth);
   const [newRepName, setNewRepName] = useState("");
   const [savingRep, setSavingRep] = useState(false);
   const dir = lang === "ar" ? "rtl" : "ltr";
@@ -110,7 +112,7 @@ export default function SalesRepsClient({
     new Set(repSales.map((sale) => sale.customer_name).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b));
   const months = Array.from(
-    new Set(repSales.map((sale) => sale.month).filter(Boolean))
+    new Set([currentRepMonth, ...repSales.map((sale) => sale.month).filter(Boolean)])
   ).sort((a, b) => b.localeCompare(a));
   const visibleSales = repSales
     .filter(
@@ -135,7 +137,7 @@ export default function SalesRepsClient({
   function chooseRep(name: string) {
     setSelectedRep(name);
     setHospitalFilter("All");
-    setMonthFilter("All");
+    setMonthFilter(currentRepMonth);
     requestAnimationFrame(() =>
       document
         .getElementById("rep-sales-details")
