@@ -37,6 +37,7 @@ type TeamSale = {
 };
 
 type SalaryDeduction = {
+  id: number;
   sales_rep_id: number;
   month: string;
   amount: number;
@@ -194,12 +195,10 @@ export default function SalesTeamsClient({
   const [memberIds, setMemberIds] = useState<number[]>([]);
   const [savingTeam, setSavingTeam] = useState(false);
   const [savingBonusId, setSavingBonusId] = useState<number | null>(null);
-  const [deductionDrafts, setDeductionDrafts] = useState<Record<string, string>>(
-    () => Object.fromEntries(deductions.map((item) => [`${item.sales_rep_id}:${item.month}`, String(item.amount ?? 0)]))
-  );
-  const [deductionReasonDrafts, setDeductionReasonDrafts] = useState<Record<string, string>>(
-    () => Object.fromEntries(deductions.map((item) => [`${item.sales_rep_id}:${item.month}`, item.reason ?? ""]))
-  );
+  const [savedDeductions, setSavedDeductions] = useState(deductions);
+  const [deductionDrafts, setDeductionDrafts] = useState<Record<string, string>>({});
+  const [deductionReasonDrafts, setDeductionReasonDrafts] = useState<Record<string, string>>({});
+  const [savingDeductionId, setSavingDeductionId] = useState<number | null>(null);
   const [bonusDrafts, setBonusDrafts] = useState<Record<number, BonusDraft>>(
     () =>
       Object.fromEntries(
@@ -445,9 +444,6 @@ export default function SalesTeamsClient({
           secondaryBonusPercentage: Number(draft.secondary || 0),
           fixedMonthlyBonus: Number(draft.fixed || 0),
           monthlySalary: Number(draft.salary || 0),
-          deductionMonth: month,
-          salaryDeduction: Number(deductionDrafts[`${repId}:${month}`] || 0),
-          deductionReason: deductionReasonDrafts[`${repId}:${month}`] ?? "",
         }),
       });
       const result = await response.json().catch(() => ({}));
@@ -464,6 +460,49 @@ export default function SalesTeamsClient({
     }
   }
 
+  async function addDeduction(repId: number) {
+    const key = `${repId}:${month}`;
+    setSavingDeductionId(repId);
+    try {
+      const response = await fetch("/api/sales-reps/deductions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salesRepId: repId,
+          month,
+          amount: Number(deductionDrafts[key] || 0),
+          reason: deductionReasonDrafts[key] ?? "",
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        alert(result.error || "Unable to add deduction.");
+        return;
+      }
+      setSavedDeductions((current) => [...current, result.data]);
+      setDeductionDrafts((current) => ({ ...current, [key]: "" }));
+      setDeductionReasonDrafts((current) => ({ ...current, [key]: "" }));
+      alert("Deduction added successfully.");
+      router.refresh();
+    } catch {
+      alert("Unable to add deduction.");
+    } finally {
+      setSavingDeductionId(null);
+    }
+  }
+
+  async function deleteDeduction(id: number) {
+    if (!confirm("Delete this deduction?")) return;
+    const response = await fetch(`/api/sales-reps/deductions?id=${id}`, { method: "DELETE" });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(result.error || "Unable to delete deduction.");
+      return;
+    }
+    setSavedDeductions((current) => current.filter((item) => item.id !== id));
+    router.refresh();
+  }
+
   function renderBonusRow(member: RepPerformance) {
     const draft = bonusDrafts[member.id] ?? {
       type: member.bonus_type,
@@ -472,6 +511,13 @@ export default function SalesTeamsClient({
       fixed: String(member.fixed_monthly_bonus ?? 0),
       salary: String(member.monthly_salary ?? 0),
     };
+    const memberDeductions = savedDeductions.filter(
+      (item) => item.sales_rep_id === member.id && item.month === month
+    );
+    const deductionTotal = memberDeductions.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0
+    );
     return (
       <div key={member.id} className="team-bonus__row">
         <div>
@@ -488,8 +534,7 @@ export default function SalesTeamsClient({
               <span>{lang === "ar" ? "صافي الراتب + البونص" : "Net Salary + Bonus"}</span>
               <strong>
                 {currency(
-                  Number(draft.salary || 0) + member.bonus -
-                    Number(deductionDrafts[`${member.id}:${month}`] || 0),
+                  Number(draft.salary || 0) + member.bonus - deductionTotal,
                   lang
                 )}
               </strong>
@@ -573,13 +618,13 @@ export default function SalesTeamsClient({
         )}
         {month !== "All" ? (<>
           <label>
-            {t.deduction} ({month})
+            {lang === "ar" ? "خصم جديد" : "New Deduction"} ({month})
             <div className="team-bonus__value">
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                value={deductionDrafts[`${member.id}:${month}`] ?? "0"}
+                value={deductionDrafts[`${member.id}:${month}`] ?? ""}
                 onChange={(event) =>
                   setDeductionDrafts((current) => ({
                     ...current,
@@ -604,6 +649,32 @@ export default function SalesTeamsClient({
               placeholder={t.deductionReason}
             />
           </label>
+          <div className="team-deduction__actions">
+            <button
+              type="button"
+              disabled={savingDeductionId === member.id}
+              onClick={() => addDeduction(member.id)}
+            >
+              {savingDeductionId === member.id
+                ? "..."
+                : lang === "ar" ? "إضافة الخصم" : "Add Deduction"}
+            </button>
+          </div>
+          {memberDeductions.length > 0 && (
+            <div className="team-deduction__list">
+              <strong>{lang === "ar" ? "الخصومات المحفوظة" : "Saved Deductions"}</strong>
+              {memberDeductions.map((item) => (
+                <div key={item.id} className="team-deduction__item">
+                  <span>{currency(Number(item.amount || 0), lang)} EGP</span>
+                  <span>{item.reason || "-"}</span>
+                  <button type="button" onClick={() => deleteDeduction(item.id)}>
+                    {t.delete}
+                  </button>
+                </div>
+              ))}
+              <strong>{lang === "ar" ? "الإجمالي" : "Total"}: {currency(deductionTotal, lang)} EGP</strong>
+            </div>
+          )}
         </>) : (
           <small className="team-bonus__rule-note">{t.selectMonthDeduction}</small>
         )}
