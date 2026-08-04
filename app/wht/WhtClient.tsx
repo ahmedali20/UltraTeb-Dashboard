@@ -166,7 +166,7 @@ export default function WhtClient({ customers, initialRecords, invoices }: { cus
           <div className="table-scroll"><table><thead><tr><th>Customer</th><th>Invoice No.</th><th>Date</th><th>Subtotal</th><th>TAX</th><th>Total</th><th>WHT</th><th>Collected</th><th>Remaining</th><th>Collection Date</th><th>Actions</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}><td>{item.customer_name}</td><td>{item.invoice_no}</td><td>{displayDate(item.invoice_date)}</td><td>{money(item.subtotal)}</td><td>{money(item.tax)}</td><td>{money(item.total)}</td><td>{money(item.wht_amount)}</td><td>{money(item.collected_amount)}</td><td>{money(item.wht_amount - item.collected_amount)}</td><td>{displayDate(item.collection_date)}</td><td><div className="wht-row-actions"><button onClick={() => edit(item)}>Edit</button><button className="danger" onClick={() => remove(item.id)}>Delete</button></div></td></tr>)}</tbody></table>{filtered.length === 0 && <p className="empty-state">No WHT records found.</p>}</div>
         </section>
       </main>
-      <Footer />
+      <Footer lang={lang} />
     </div>
   );
 }
