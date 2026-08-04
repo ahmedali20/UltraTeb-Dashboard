@@ -2506,7 +2506,7 @@
     }
     .users-add-card { padding: 18px; }
     .users-add-card h2 { margin: 0 0 14px; font-size: 17px; }
-    .users-add-card form { display: grid; grid-template-columns: 1fr 1fr 150px auto; gap: 10px; align-items: end; }
+    .users-add-card form { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(190px, 1fr) minmax(150px, 1fr) 150px auto; gap: 10px; align-items: end; }
     .users-add-card label { display: grid; gap: 5px; color: var(--text-secondary); font-size: 11px; }
     .users-add-card input, .users-add-card select, .users-table-card select {
       padding: 9px 10px; border: 1px solid var(--input-border); border-radius: 7px;
