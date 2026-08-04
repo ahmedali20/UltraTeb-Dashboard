@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Header from "../Header";
 import Footer from "../Footer";
 
@@ -26,6 +26,35 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
   const [authorizationDate, setAuthorizationDate] = useState(cairoDate());
   const [showStamp, setShowStamp] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let previousLeft = "";
+    let previousRight = "";
+    let previousLeftPriority = "";
+    let previousRightPriority = "";
+
+    const preparePrint = () => {
+      previousLeft = document.body.style.getPropertyValue("padding-left");
+      previousRight = document.body.style.getPropertyValue("padding-right");
+      previousLeftPriority = document.body.style.getPropertyPriority("padding-left");
+      previousRightPriority = document.body.style.getPropertyPriority("padding-right");
+      document.body.style.setProperty("padding-left", "0", "important");
+      document.body.style.setProperty("padding-right", "0", "important");
+    };
+    const restoreAfterPrint = () => {
+      if (previousLeft) document.body.style.setProperty("padding-left", previousLeft, previousLeftPriority);
+      else document.body.style.removeProperty("padding-left");
+      if (previousRight) document.body.style.setProperty("padding-right", previousRight, previousRightPriority);
+      else document.body.style.removeProperty("padding-right");
+    };
+
+    window.addEventListener("beforeprint", preparePrint);
+    window.addEventListener("afterprint", restoreAfterPrint);
+    return () => {
+      window.removeEventListener("beforeprint", preparePrint);
+      window.removeEventListener("afterprint", restoreAfterPrint);
+    };
+  }, []);
 
   function chooseEmployee(id: string) {
     setEmployeeId(id);
