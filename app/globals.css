@@ -3264,7 +3264,9 @@
   .authorization-greeting { margin-bottom: 6mm !important; }
   .authorization-signature { display: flex; align-items: flex-end; justify-content: space-between; gap: 12mm; margin-top: 4mm; }
   .authorization-signature > div { display: grid; gap: 1mm; text-align: center; }
-  .authorization-paper__stamp { position: absolute; z-index: 2; right: 66mm; bottom: 38mm; width: 32mm; max-height: 56mm; object-fit: contain; }
+  .authorization-respect-row { display: flex; align-items: center; justify-content: space-between; gap: 8mm; min-height: 31mm; }
+  .authorization-respect-row p { flex: 1; }
+  .authorization-paper__stamp { position: relative; z-index: 2; flex: 0 0 auto; width: 27mm; max-height: 46mm; object-fit: contain; }
   .authorization-stamp-toggle { display: flex !important; grid-auto-flow: column; grid-template-columns: auto 1fr; align-items: center; align-self: end; min-height: 40px; }
   .authorization-stamp-toggle input { width: 18px; min-height: 18px; }
   .authorization-paper__footer { position: absolute; z-index: 2; right: 5mm; bottom: 0; left: 5mm; width: 200mm; height: auto; }
