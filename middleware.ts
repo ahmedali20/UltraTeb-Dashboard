@@ -45,6 +45,18 @@
         }
         return NextResponse.redirect(new URL("/", request.url));
       }
+      if (
+        session.salesRepId &&
+        request.method !== "GET" &&
+        (pathname.startsWith("/api/sales") ||
+          pathname.startsWith("/api/customers") ||
+          pathname.startsWith("/api/google-sheets-sync"))
+      ) {
+        return NextResponse.json(
+          { error: "Sales representative accounts have read-only access." },
+          { status: 403 }
+        );
+      }
       return NextResponse.next();
     }
   
