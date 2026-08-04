@@ -134,10 +134,12 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
             <p>بطاقة رقم قومي: <strong dir="ltr">{nationalId || "00000000000000"}</strong></p>
             <p>لاستلام المستحقات المالية (نقداً أو شيكات) وإشعارات الخصم والإضافة الخاصة بنا طرفكم.</p>
             <p>وهذا تفويض منا بذلك.</p>
-            <p><strong>وتفضلوا بقبول وافر الاحترام،</strong></p>
+            <div className="authorization-respect-row">
+              <p><strong>وتفضلوا بقبول وافر الاحترام،</strong></p>
+              {showStamp && <img className="authorization-paper__stamp" src="/brand/ultra-teb-stamp.png" alt="Official Ultra Teb stamp" />}
+            </div>
             <div className="authorization-signature"><div><strong>مقدمه لسيادتكم</strong><span>الإدارة المالية (ألترا طب للتجارة)</span></div><strong dir="ltr">{printedDate(authorizationDate)}</strong></div>
           </div>
-          {showStamp && <img className="authorization-paper__stamp" src="/brand/ultra-teb-stamp.png" alt="Official Ultra Teb stamp" />}
           <img className="authorization-paper__footer" src="/brand/ultra-teb-footer.png" alt="" />
         </section>
       </main>
