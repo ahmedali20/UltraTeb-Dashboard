@@ -30,11 +30,13 @@
         (pathname === "/users" ||
           pathname === "/sales-teams" ||
           pathname === "/wht" ||
+          pathname === "/authorization" ||
           pathname === "/activity-log" ||
           pathname.startsWith("/api/auth/users") ||
           pathname.startsWith("/api/activity-log") ||
           pathname.startsWith("/api/sales-teams") ||
           pathname.startsWith("/api/wht") ||
+          pathname.startsWith("/api/authorized-employees") ||
           pathname.startsWith("/api/sales-reps/bonus")) &&
         session.role !== "admin"
       ) {
