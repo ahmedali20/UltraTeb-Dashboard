@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import CustomersTable from "../CustomersTable";
+import { getCurrentDashboardUser } from "../../lib/current-dashboard-user";
 
 const supabaseServer = createClient(
   process.env.SUPABASE_URL as string,
@@ -10,18 +11,20 @@ const supabaseServer = createClient(
 export const revalidate = 0;
 
 export default async function CustomersPage() {
+  const session = await getCurrentDashboardUser();
+  const repName = session?.salesRepName ?? null;
+  let customersQuery = supabaseServer.from("customers").select("*").order("customer_code", { ascending: true });
+  let repsQuery = supabaseServer.from("sales_reps").select("name").order("name", { ascending: true });
+  if (repName) {
+    customersQuery = customersQuery.eq("sales_rep_name", repName);
+    repsQuery = repsQuery.eq("name", repName);
+  }
   const [
     { data: customers, error },
     { data: salesReps, error: repsError },
   ] = await Promise.all([
-    supabaseServer
-      .from("customers")
-      .select("*")
-      .order("customer_code", { ascending: true }),
-    supabaseServer
-      .from("sales_reps")
-      .select("name")
-      .order("name", { ascending: true }),
+    customersQuery,
+    repsQuery,
   ]);
 
   if (error || repsError) {
