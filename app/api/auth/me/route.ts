@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     username: session.username,
     role: session.role,
+    salesRepId: session.salesRepId,
+    salesRepName: session.salesRepName,
   });
 }
-
