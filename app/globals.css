@@ -2579,7 +2579,9 @@
     .app-sidebar {
       box-sizing: border-box;
       position: fixed; z-index: 50; inset: 0 auto 0 0; width: 236px;
-      padding: 0 14px 24px; background: #0b3038;
+      display: flex; flex-direction: column; height: 100dvh;
+      padding: 0 8px 10px; background: #0b3038;
+      overflow: hidden;
       border-right: 1px solid rgba(255,255,255,.1);
       box-shadow: 6px 0 22px rgba(5,25,30,.12);
       transform: translateX(-105%);
@@ -2591,7 +2593,18 @@
       color: #fff; font-size: 19px; font-weight: 800; letter-spacing: .02em;
       border-bottom: 1px solid rgba(255,255,255,.1);
     }
-    .app-sidebar__nav { display: grid; gap: 7px; padding-top: 20px; }
+    .app-sidebar__nav {
+      display: grid; align-content: start; gap: 7px;
+      min-height: 0; padding: 20px 6px 18px;
+      overflow-x: hidden; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.24) transparent;
+      overscroll-behavior: contain;
+    }
+    .app-sidebar__nav::-webkit-scrollbar { width: 6px; }
+    .app-sidebar__nav::-webkit-scrollbar-track { background: transparent; }
+    .app-sidebar__nav::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,.22); border-radius: 999px;
+    }
     .app-sidebar__link {
       padding: 11px 14px; border-radius: 8px; color: #cbd5d9;
       font-size: 14px; font-weight: 500; text-decoration: none;
@@ -2712,7 +2725,8 @@
         #092f37;
     }
     .app-sidebar__brand {
-      height: 72px;
+      flex: 0 0 64px;
+      height: 64px;
       gap: 10px;
       padding: 0 8px;
     }
@@ -2747,11 +2761,11 @@
       letter-spacing: .04em;
     }
     .app-sidebar__nav {
-      gap: 5px;
-      padding-top: 13px;
+      gap: 3px;
+      padding-top: 10px;
     }
     .app-sidebar__section {
-      padding: 8px 14px 4px;
+      padding: 7px 12px 3px;
       color: rgba(203,213,217,.45);
       font-size: 9px;
       font-weight: 800;
@@ -2759,16 +2773,16 @@
       text-transform: uppercase;
     }
     .app-sidebar__section--admin {
-      margin-top: 10px;
+      margin-top: 6px;
       border-top: 1px solid rgba(255,255,255,.08);
-      padding-top: 16px;
+      padding-top: 12px;
     }
     .app-sidebar__link {
       display: flex;
       align-items: center;
       gap: 11px;
-      min-height: 42px;
-      padding: 9px 12px;
+      min-height: 38px;
+      padding: 7px 12px;
     }
     .app-sidebar__link svg {
       flex: 0 0 auto;
