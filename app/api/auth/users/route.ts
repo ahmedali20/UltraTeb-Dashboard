@@ -24,13 +24,13 @@ export async function GET(request: NextRequest) {
   if (!(await adminSession(request))) {
     return NextResponse.json({ error: "Admin access required." }, { status: 403 });
   }
-  const { data, error } = await supabase
-    .from("dashboard_users")
-    .select("id, username, role, active, created_at")
-    .order("username");
+  const [{ data, error }, { data: salesReps }] = await Promise.all([
+    supabase.from("dashboard_users").select("id, username, role, active, created_at, sales_rep_id, sales_reps(name)").order("username"),
+    supabase.from("sales_reps").select("id, name").order("name"),
+  ]);
   return error
     ? NextResponse.json({ error: error.message }, { status: 400 })
-    : NextResponse.json({ data });
+    : NextResponse.json({ data, salesReps: salesReps ?? [] });
 }
 
 export async function POST(request: NextRequest) {
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
   const username = String(body.username ?? "").trim();
   const password = String(body.password ?? "");
   const role = body.role === "admin" ? "admin" : "user";
+  const salesRepId = role === "user" && body.salesRepId ? Number(body.salesRepId) : null;
 
   if (username.length < 3 || password.length < 8) {
     return NextResponse.json(
@@ -56,9 +57,10 @@ export async function POST(request: NextRequest) {
       password_hash: await hashDashboardPassword(password, salt),
       password_salt: salt,
       role,
+      sales_rep_id: salesRepId,
       active: true,
     })
-    .select("id, username, role, active, created_at")
+    .select("id, username, role, active, created_at, sales_rep_id, sales_reps(name)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   await writeAuditLog(request, {
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
     entityType: "USER",
     entityId: data.id,
     description: `Created user ${data.username} with role ${data.role}.`,
-    metadata: { username: data.username, role: data.role, active: data.active },
+    metadata: { username: data.username, role: data.role, active: data.active, salesRepId: data.sales_rep_id },
   });
   return NextResponse.json({ data });
 }
@@ -82,7 +84,7 @@ export async function PATCH(request: NextRequest) {
 
   const { data: target, error: targetError } = await supabase
     .from("dashboard_users")
-    .select("username, role, active")
+    .select("username, role, active, sales_rep_id")
     .eq("id", id)
     .single();
   if (targetError) {
@@ -102,6 +104,8 @@ export async function PATCH(request: NextRequest) {
 
   const changes: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.role === "admin" || body.role === "user") changes.role = body.role;
+  if (body.role === "admin") changes.sales_rep_id = null;
+  else if (body.salesRepId !== undefined) changes.sales_rep_id = body.salesRepId ? Number(body.salesRepId) : null;
   if (typeof body.active === "boolean") changes.active = body.active;
   if (body.password) {
     if (String(body.password).length < 8) {
@@ -122,7 +126,7 @@ export async function PATCH(request: NextRequest) {
     .from("dashboard_users")
     .update(changes)
     .eq("id", id)
-    .select("id, username, role, active, created_at")
+    .select("id, username, role, active, created_at, sales_rep_id, sales_reps(name)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   await writeAuditLog(request, {
@@ -131,8 +135,8 @@ export async function PATCH(request: NextRequest) {
     entityId: data.id,
     description: `Updated user ${data.username}.`,
     metadata: {
-      before: { username: target.username, role: target.role, active: target.active },
-      after: { username: data.username, role: data.role, active: data.active },
+      before: { username: target.username, role: target.role, active: target.active, salesRepId: target.sales_rep_id },
+      after: { username: data.username, role: data.role, active: data.active, salesRepId: data.sales_rep_id },
       passwordChanged: Boolean(body.password),
     },
   });
