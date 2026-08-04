@@ -18,6 +18,14 @@ type WhtRecord = {
   collection_date: string | null;
 };
 
+type InvoiceSuggestion = {
+  invoice_no: string;
+  customer_name: string;
+  sales_date: string;
+  sales_item_total: number;
+  tax: number;
+};
+
 const emptyForm = {
   customerName: "",
   invoiceNo: "",
@@ -31,7 +39,7 @@ const emptyForm = {
 const money = (value: number) => Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const displayDate = (value: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replaceAll(" ", "-") : "-";
 
-export default function WhtClient({ customers, initialRecords }: { customers: string[]; initialRecords: WhtRecord[] }) {
+export default function WhtClient({ customers, initialRecords, invoices }: { customers: string[]; initialRecords: WhtRecord[]; invoices: InvoiceSuggestion[] }) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [records, setRecords] = useState(initialRecords);
   const [form, setForm] = useState(emptyForm);
@@ -44,6 +52,10 @@ export default function WhtClient({ customers, initialRecords }: { customers: st
   const tax = Number(form.tax || 0);
   const calculatedWht = Math.round(subtotal * 0.01 * 100) / 100;
   const collected = Number(form.collectedAmount || 0);
+  const invoiceSuggestions = useMemo(
+    () => invoices.filter((item) => !form.customerName || item.customer_name === form.customerName),
+    [invoices, form.customerName]
+  );
   const filtered = useMemo(() => records.filter((item) =>
     (customerFilter === "All" || item.customer_name === customerFilter) &&
     (!search.trim() || item.invoice_no.toLowerCase().includes(search.trim().toLowerCase()))
@@ -58,6 +70,22 @@ export default function WhtClient({ customers, initialRecords }: { customers: st
 
   function update(name: keyof typeof emptyForm, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function updateInvoiceNumber(value: string) {
+    const match = invoiceSuggestions.find((item) => String(item.invoice_no) === value.trim());
+    setForm((current) => ({
+      ...current,
+      invoiceNo: value,
+      ...(match
+        ? {
+            customerName: match.customer_name,
+            invoiceDate: match.sales_date,
+            subtotal: String(match.sales_item_total ?? 0),
+            tax: String(match.tax ?? 0),
+          }
+        : {}),
+    }));
   }
 
   function edit(item: WhtRecord) {
@@ -113,7 +141,7 @@ export default function WhtClient({ customers, initialRecords }: { customers: st
           <div className="wht-section-heading"><div><p>{editingId ? "EDIT RECORD" : "NEW RECORD"}</p><h2>{editingId ? "Edit WHT Collection" : "Add WHT Collection"}</h2></div><strong>WHT Rate: 1%</strong></div>
           <div className="wht-form-grid">
             <label>Customer Name<select value={form.customerName} onChange={(e) => update("customerName", e.target.value)}><option value="">Select customer</option>{customers.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
-            <label>Invoice No.<input value={form.invoiceNo} onChange={(e) => update("invoiceNo", e.target.value)} placeholder="Enter any invoice number" /></label>
+            <label>Invoice No.<input list="wht-invoice-suggestions" value={form.invoiceNo} onChange={(e) => updateInvoiceNumber(e.target.value)} placeholder="Type an old invoice or select an existing one" /><datalist id="wht-invoice-suggestions">{invoiceSuggestions.map((item, index) => <option key={`${item.invoice_no}-${item.customer_name}-${index}`} value={item.invoice_no}>{item.customer_name} · {displayDate(item.sales_date)}</option>)}</datalist><small>Manual invoice numbers are allowed.</small></label>
             <label>Invoice Date<input type="date" value={form.invoiceDate} onChange={(e) => update("invoiceDate", e.target.value)} /></label>
             <label>Subtotal<input type="number" min="0" step="0.01" value={form.subtotal} onChange={(e) => update("subtotal", e.target.value)} /></label>
             <label>TAX<input type="number" min="0" step="0.01" value={form.tax} onChange={(e) => update("tax", e.target.value)} /></label>
