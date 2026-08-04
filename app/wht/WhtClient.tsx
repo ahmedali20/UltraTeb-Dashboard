@@ -129,6 +129,110 @@ export default function WhtClient({ customers, initialRecords, invoices }: { cus
     setRecords((current) => current.filter((item) => item.id !== id));
   }
 
+  async function downloadPdf() {
+    const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const purple: [number, number, number] = [80, 35, 155];
+    const teal: [number, number, number] = [103, 157, 166];
+    const loadImage = (path: string) =>
+      fetch(path)
+        .then((response) => response.blob())
+        .then((blob) => new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        }))
+        .catch(() => "");
+    const [logo, header, footer] = await Promise.all([
+      loadImage("/brand/ultra-teb-logo.png"),
+      loadImage("/brand/ultra-teb-header.png"),
+      loadImage("/brand/ultra-teb-footer.png"),
+    ]);
+    const brandedPages = new Set<number>();
+
+    function drawBrand() {
+      const page = doc.getCurrentPageInfo().pageNumber;
+      if (brandedPages.has(page)) return;
+      brandedPages.add(page);
+      const width = doc.internal.pageSize.getWidth();
+      const height = doc.internal.pageSize.getHeight();
+      if (header) doc.addImage(header, "PNG", 14, 9, 64, 19, undefined, "FAST");
+      if (logo) {
+        doc.saveGraphicsState();
+        doc.setGState(new (doc as any).GState({ opacity: 0.045 }));
+        doc.addImage(logo, "PNG", 72, 94, 78, 112, undefined, "FAST");
+        doc.restoreGraphicsState();
+      }
+      doc.setDrawColor(76, 127, 184);
+      doc.setLineWidth(0.8);
+      doc.line(15, 37, width - 15, 37);
+      if (footer) doc.addImage(footer, "PNG", 10, height - 49, 190, 46.4, undefined, "FAST");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(90, 90, 105);
+      doc.text(`Page ${page}`, width / 2, height - 8, { align: "center" });
+    }
+
+    drawBrand();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(...purple);
+    doc.text("WHT Collection Statement", 105, 50, { align: "center" });
+    doc.setFontSize(10);
+    doc.setTextColor(50, 55, 65);
+    doc.text(customerFilter === "All" ? "All Customers" : customerFilter, 15, 60);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 195, 60, { align: "right" });
+
+    autoTable(doc, {
+      startY: 68,
+      head: [["Customer", "Invoice", "Invoice Date", "Subtotal", "TAX", "Total", "WHT 1%", "Collected", "Collection Date"]],
+      body: filtered.map((item) => [
+        item.customer_name,
+        item.invoice_no,
+        displayDate(item.invoice_date),
+        money(item.subtotal),
+        money(item.tax),
+        money(item.total),
+        money(item.wht_amount),
+        money(item.collected_amount),
+        displayDate(item.collection_date),
+      ]),
+      foot: [["TOTAL", "", "", money(totals.subtotal), money(totals.tax), money(totals.total), money(totals.wht), money(totals.collected), ""]],
+      margin: { top: 42, right: 15, bottom: 53, left: 15 },
+      styles: { font: "helvetica", fontSize: 6.5, cellPadding: 2, lineColor: [218, 221, 228], lineWidth: 0.15, textColor: [35, 40, 52], overflow: "linebreak" },
+      headStyles: { fillColor: purple, textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
+      footStyles: { fillColor: [239, 234, 247], textColor: purple, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 249, 251] },
+      columnStyles: {
+        0: { cellWidth: 25 }, 1: { cellWidth: 15 }, 2: { cellWidth: 18 },
+        3: { cellWidth: 20, halign: "right" }, 4: { cellWidth: 17, halign: "right" },
+        5: { cellWidth: 20, halign: "right" }, 6: { cellWidth: 17, halign: "right" },
+        7: { cellWidth: 19, halign: "right" }, 8: { cellWidth: 20 },
+      },
+      didDrawPage: drawBrand,
+    });
+
+    const finalY = (doc as any).lastAutoTable?.finalY ?? 68;
+    if (finalY < 225) {
+      doc.setFillColor(245, 242, 250);
+      doc.roundedRect(15, finalY + 7, 180, 20, 2, 2, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...teal);
+      doc.text("Remaining WHT", 22, finalY + 19);
+      doc.setFontSize(14);
+      doc.setTextColor(...purple);
+      doc.text(`${money(totals.wht - totals.collected)} EGP`, 188, finalY + 19, { align: "right" });
+    }
+    doc.save(`ultra-teb-wht-${new Date().toISOString().slice(0, 10)}.pdf`);
+  }
+
   return (
     <div className="dashboard-shell" dir={lang === "ar" ? "rtl" : "ltr"}>
       <Header active="wht" lang={lang} onToggleLang={() => setLang((value) => value === "en" ? "ar" : "en")} />
