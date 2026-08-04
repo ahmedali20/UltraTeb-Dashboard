@@ -3262,11 +3262,11 @@
   .authorization-letter h3 { margin: 0 0 16mm; font-size: 6.8mm; }
   .authorization-letter p { margin: 3mm 0; }
   .authorization-greeting { margin-bottom: 6mm !important; }
-  .authorization-signature { display: flex; align-items: flex-end; justify-content: space-between; gap: 12mm; margin-top: 0; }
+  .authorization-signature { display: flex; align-items: center; justify-content: space-between; gap: 8mm; margin-top: 0; }
   .authorization-signature > div { display: grid; gap: 1mm; text-align: center; }
   .authorization-respect-row { position: relative; min-height: 0; }
   .authorization-respect-row p { margin: 2mm 0; }
-  .authorization-paper__stamp { position: absolute; z-index: 2; top: -7mm; left: 8mm; width: 25mm; max-height: 44mm; object-fit: contain; }
+  .authorization-paper__stamp { position: relative; z-index: 2; flex: 0 0 auto; width: 25mm; max-height: 44mm; object-fit: contain; }
   .authorization-stamp-toggle { display: flex !important; grid-auto-flow: column; grid-template-columns: auto 1fr; align-items: center; align-self: end; min-height: 40px; }
   .authorization-stamp-toggle input { width: 18px; min-height: 18px; }
   .authorization-paper__footer { position: absolute; z-index: 2; right: 5mm; bottom: 0; left: 5mm; width: 200mm; height: auto; }
