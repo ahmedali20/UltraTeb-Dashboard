@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import SalesTable from "./SalesTable";
+import { getCurrentDashboardUser } from "../../lib/current-dashboard-user";
 
 const supabaseServer = createClient(
   process.env.SUPABASE_URL as string,
@@ -10,24 +11,25 @@ const supabaseServer = createClient(
 export const revalidate = 0;
 
 export default async function SalesPage() {
+  const session = await getCurrentDashboardUser();
+  const repName = session?.salesRepName ?? null;
+  let salesQuery = supabaseServer.from("sales_view").select("*").order("sales_date", { ascending: false });
+  let customersQuery = supabaseServer.from("customers").select("customer_code, customer_name, sales_rep_name, payment_terms_days").order("customer_code", { ascending: true });
+  let repsQuery = supabaseServer.from("sales_reps").select("name").order("name", { ascending: true });
+  if (repName) {
+    salesQuery = salesQuery.eq("sales_rep", repName);
+    customersQuery = customersQuery.eq("sales_rep_name", repName);
+    repsQuery = repsQuery.eq("name", repName);
+  }
   const [
     { data: sales, error: salesError },
     { data: customers, error: customersError },
     { data: salesReps, error: salesRepsError },
     { data: syncStatus },
   ] = await Promise.all([
-    supabaseServer
-      .from("sales_view")
-      .select("*")
-      .order("sales_date", { ascending: false }),
-    supabaseServer
-      .from("customers")
-      .select("customer_code, customer_name, sales_rep_name, payment_terms_days")
-      .order("customer_code", { ascending: true }),
-    supabaseServer
-      .from("sales_reps")
-      .select("name")
-      .order("name", { ascending: true }),
+    salesQuery,
+    customersQuery,
+    repsQuery,
     supabaseServer
       .from("dashboard_settings")
       .select("value")
