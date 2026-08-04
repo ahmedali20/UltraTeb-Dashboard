@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import ReportsClient from "./ReportsClient";
+import { getCurrentDashboardUser } from "../../lib/current-dashboard-user";
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -10,25 +11,24 @@ const supabase = createClient(
 export const revalidate = 0;
 
 export default async function ReportsPage() {
+  const session = await getCurrentDashboardUser();
+  const repName = session?.salesRepName ?? null;
+  let salesQuery = supabase.from("sales_view").select("id, invoice_no, sales_date, month, customer_name, sales_rep, sales_item_total, tax, total_sales, document_type, original_invoice_no, note_reason, due_date").order("sales_date", { ascending: true });
+  let repsQuery = supabase.from("sales_reps").select("id, name, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus, monthly_salary");
+  let deductionsQuery = supabase.from("sales_rep_salary_deductions").select("id, sales_rep_id, month, amount, reason");
+  if (repName) {
+    salesQuery = salesQuery.eq("sales_rep", repName);
+    repsQuery = repsQuery.eq("name", repName);
+    if (session?.salesRepId) deductionsQuery = deductionsQuery.eq("sales_rep_id", session.salesRepId);
+  }
   const [
     { data, error },
     { data: bonusReps, error: bonusRepsError },
     { data: salaryDeductions, error: salaryDeductionsError },
   ] = await Promise.all([
-    supabase
-      .from("sales_view")
-      .select(
-        "id, invoice_no, sales_date, month, customer_name, sales_rep, sales_item_total, tax, total_sales, document_type, original_invoice_no, note_reason, due_date"
-      )
-      .order("sales_date", { ascending: true }),
-    supabase
-      .from("sales_reps")
-      .select(
-        "id, name, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus, monthly_salary"
-      ),
-    supabase
-      .from("sales_rep_salary_deductions")
-      .select("id, sales_rep_id, month, amount, reason"),
+    salesQuery,
+    repsQuery,
+    deductionsQuery,
   ]);
 
   if (error || bonusRepsError || salaryDeductionsError) {
