@@ -1713,7 +1713,7 @@
     .team-bonus__row {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      align-items: end;
+      align-items: flex-end;
       gap: 12px;
       border: 1px solid var(--border-color);
       border-radius: 12px;
@@ -1835,7 +1835,7 @@
 
     .team-deduction__actions {
       display: flex;
-      align-items: end;
+      align-items: flex-end;
     }
 
     .team-deduction__actions button {
