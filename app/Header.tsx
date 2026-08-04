@@ -57,6 +57,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
   const [currentUser, setCurrentUser] = useState<{
     username: string;
     role: "admin" | "user";
+    salesRepName: string | null;
   } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const headerRef = useRef<HTMLElement>(null);
@@ -211,7 +212,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
               </span>
               <span className="app-user-chip__copy">
                 <strong>{currentUser.username}</strong>
-                <small>{currentUser.role === "admin" ? t.admin : t.user}</small>
+                <small>{currentUser.role === "admin" ? t.admin : currentUser.salesRepName ?? t.user}</small>
               </span>
             </div>
           )}
