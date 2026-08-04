@@ -29,10 +29,12 @@
       if (
         (pathname === "/users" ||
           pathname === "/sales-teams" ||
+          pathname === "/wht" ||
           pathname === "/activity-log" ||
           pathname.startsWith("/api/auth/users") ||
           pathname.startsWith("/api/activity-log") ||
           pathname.startsWith("/api/sales-teams") ||
+          pathname.startsWith("/api/wht") ||
           pathname.startsWith("/api/sales-reps/bonus")) &&
         session.role !== "admin"
       ) {
