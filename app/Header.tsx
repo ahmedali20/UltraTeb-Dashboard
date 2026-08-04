@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
-  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "users" | "activity";
+  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "users" | "activity";
   lang: "en" | "ar";
   onToggleLang: () => void;
 };
@@ -17,6 +17,7 @@ const labels = {
     reps: "Sales Reps",
     teams: "Sales Teams",
     reports: "Reports",
+    wht: "Collected WHT",
     users: "Users",
     activity: "Activity Log",
     workspace: "Workspace",
@@ -34,6 +35,7 @@ const labels = {
     reps: "المندوبون",
     teams: "فرق المبيعات",
     reports: "التقارير",
+    wht: "ضريبة الخصم المحصلة",
     users: "المستخدمون",
     activity: "سجل النشاط",
     workspace: "مساحة العمل",
@@ -242,6 +244,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
             <>
               <span className="app-sidebar__section app-sidebar__section--admin">{t.administration}</span>
               <NavLink href="/sales-teams" page="teams" label={t.teams} icon="teams" className={linkClass("teams")} />
+              <NavLink href="/wht" page="wht" label={t.wht} icon="records" className={linkClass("wht")} />
               <NavLink href="/users" page="users" label={t.users} icon="users" className={linkClass("users")} />
               <NavLink href="/activity-log" page="activity" label={t.activity} icon="activity" className={linkClass("activity")} />
             </>
