@@ -136,9 +136,12 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
             <p>وهذا تفويض منا بذلك.</p>
             <div className="authorization-respect-row">
               <p><strong>وتفضلوا بقبول وافر الاحترام،</strong></p>
-              {showStamp && <img className="authorization-paper__stamp" src="/brand/ultra-teb-stamp.png" alt="Official Ultra Teb stamp" />}
             </div>
-            <div className="authorization-signature"><div><strong>مقدمه لسيادتكم</strong><span>الإدارة المالية (ألترا طب للتجارة)</span></div><strong dir="ltr">{printedDate(authorizationDate)}</strong></div>
+            <div className="authorization-signature">
+              <div><strong>مقدمه لسيادتكم</strong><span>الإدارة المالية (ألترا طب للتجارة)</span></div>
+              {showStamp && <img className="authorization-paper__stamp" src="/brand/ultra-teb-stamp.png" alt="Official Ultra Teb stamp" />}
+              <strong dir="ltr">{printedDate(authorizationDate)}</strong>
+            </div>
           </div>
           <img className="authorization-paper__footer" src="/brand/ultra-teb-footer.png" alt="" />
         </section>
