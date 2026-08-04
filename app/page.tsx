@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import HomeClient from "./HomeClient";
+import { getCurrentDashboardUser } from "../lib/current-dashboard-user";
 
 const supabaseServer = createClient(
   process.env.SUPABASE_URL as string,
@@ -10,19 +11,23 @@ const supabaseServer = createClient(
 export const revalidate = 0;
 
 export default async function HomePage() {
+  const session = await getCurrentDashboardUser();
+  const repName = session?.salesRepName ?? null;
+  let salesQuery = supabaseServer
+    .from("sales_view")
+    .select("id, invoice_no, sales_date, customer_code, customer_name, sales_rep, sales_item_total, tax, total_sales, document_type")
+    .order("sales_date", { ascending: false });
+  let customersQuery = supabaseServer.from("customers").select("*", { count: "exact", head: true });
+  if (repName) {
+    salesQuery = salesQuery.eq("sales_rep", repName);
+    customersQuery = customersQuery.eq("sales_rep_name", repName);
+  }
   const [
     { data: sales, error: salesError },
     { count: customerCount, error: customersError },
   ] = await Promise.all([
-    supabaseServer
-      .from("sales_view")
-      .select(
-        "id, invoice_no, sales_date, customer_code, customer_name, sales_rep, sales_item_total, tax, total_sales, document_type"
-      )
-      .order("sales_date", { ascending: false }),
-    supabaseServer
-      .from("customers")
-      .select("*", { count: "exact", head: true }),
+    salesQuery,
+    customersQuery,
   ]);
 
   const error = salesError || customersError;
