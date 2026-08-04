@@ -18,10 +18,12 @@ export async function POST(request: Request) {
   const normalizedUsername = String(username ?? "").trim();
   const submittedPassword = String(password ?? "");
   let authenticatedRole: "admin" | "user" | null = null;
+  let salesRepId: number | null = null;
+  let salesRepName: string | null = null;
 
   const { data: managedUser } = await supabase
     .from("dashboard_users")
-    .select("username, password_hash, password_salt, role, active")
+    .select("username, password_hash, password_salt, role, active, sales_rep_id, sales_reps(name)")
     .ilike("username", normalizedUsername)
     .maybeSingle();
 
@@ -32,6 +34,8 @@ export async function POST(request: Request) {
     );
     if (submittedHash === managedUser.password_hash) {
       authenticatedRole = managedUser.role;
+      salesRepId = managedUser.sales_rep_id ?? null;
+      salesRepName = (managedUser.sales_reps as any)?.name ?? null;
     }
   }
 
@@ -41,6 +45,8 @@ export async function POST(request: Request) {
 
   if (environmentAdmin) {
     authenticatedRole = "admin";
+    salesRepId = null;
+    salesRepName = null;
 
     if (!managedUser) {
       const salt = createPasswordSalt();
@@ -71,7 +77,9 @@ export async function POST(request: Request) {
 
   const token = await createDashboardSession(
     normalizedUsername,
-    authenticatedRole
+    authenticatedRole,
+    salesRepId,
+    salesRepName
   );
   const response = NextResponse.json({ success: true });
   await writeAuditLog(request, {
