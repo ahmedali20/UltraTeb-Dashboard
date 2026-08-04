@@ -34,18 +34,24 @@ async function signingKey() {
 export type DashboardSession = {
   username: string;
   role: "admin" | "user";
+  salesRepId: number | null;
+  salesRepName: string | null;
   expiresAt: number;
 };
 
 export async function createDashboardSession(
   username: string,
-  role: "admin" | "user"
+  role: "admin" | "user",
+  salesRepId: number | null = null,
+  salesRepName: string | null = null
 ) {
   const payload = bytesToBase64Url(
     encoder.encode(
       JSON.stringify({
         username,
         role,
+        salesRepId,
+        salesRepName,
         expiresAt: Date.now() + 8 * 60 * 60 * 1000,
       })
     )
@@ -80,6 +86,8 @@ export async function readDashboardSession(
     const validSession =
       typeof session.username === "string" &&
       (session.role === "admin" || session.role === "user") &&
+      (session.salesRepId === null || typeof session.salesRepId === "number") &&
+      (session.salesRepName === null || typeof session.salesRepName === "string") &&
       typeof session.expiresAt === "number" &&
       session.expiresAt > Date.now();
     return validSession ? session : null;
