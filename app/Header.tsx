@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
-  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "users" | "activity";
+  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "authorization" | "users" | "activity";
   lang: "en" | "ar";
   onToggleLang: () => void;
 };
@@ -18,6 +18,7 @@ const labels = {
     teams: "Sales Teams",
     reports: "Reports",
     wht: "Collected WHT",
+    authorization: "Authorization Letters",
     users: "Users",
     activity: "Activity Log",
     workspace: "Workspace",
@@ -36,6 +37,7 @@ const labels = {
     teams: "فرق المبيعات",
     reports: "التقارير",
     wht: "ضريبة الخصم المحصلة",
+    authorization: "خطابات التفويض",
     users: "المستخدمون",
     activity: "سجل النشاط",
     workspace: "مساحة العمل",
@@ -245,6 +247,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
               <span className="app-sidebar__section app-sidebar__section--admin">{t.administration}</span>
               <NavLink href="/sales-teams" page="teams" label={t.teams} icon="teams" className={linkClass("teams")} />
               <NavLink href="/wht" page="wht" label={t.wht} icon="records" className={linkClass("wht")} />
+              <NavLink href="/authorization" page="authorization" label={t.authorization} icon="reports" className={linkClass("authorization")} />
               <NavLink href="/users" page="users" label={t.users} icon="users" className={linkClass("users")} />
               <NavLink href="/activity-log" page="activity" label={t.activity} icon="activity" className={linkClass("activity")} />
             </>
