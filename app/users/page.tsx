@@ -10,7 +10,10 @@ type ManagedUser = {
   role: "admin" | "user";
   active: boolean;
   created_at: string;
+  sales_rep_id: number | null;
+  sales_reps: { name: string } | null;
 };
+type SalesRepOption = { id: number; name: string };
 
 export default function UsersPage() {
   const [lang, setLang] = useState<"en" | "ar">("en");
@@ -18,6 +21,8 @@ export default function UsersPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"admin" | "user">("user");
+  const [salesRepId, setSalesRepId] = useState("");
+  const [salesReps, setSalesReps] = useState<SalesRepOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -56,6 +61,7 @@ export default function UsersPage() {
       return;
     }
     setUsers(result.data ?? []);
+    setSalesReps(result.salesReps ?? []);
   }
 
   useEffect(() => {
@@ -69,7 +75,7 @@ export default function UsersPage() {
     const response = await fetch("/api/auth/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, role }),
+      body: JSON.stringify({ username, password, role, salesRepId }),
     });
     const result = await response.json();
     setSaving(false);
@@ -80,6 +86,7 @@ export default function UsersPage() {
     setUsername("");
     setPassword("");
     setRole("user");
+    setSalesRepId("");
     setMessage("User created successfully.");
     await loadUsers();
   }
@@ -153,6 +160,13 @@ export default function UsersPage() {
               />
             </label>
             <label>
+              Sales Representative
+              <select value={salesRepId} onChange={(event) => setSalesRepId(event.target.value)} disabled={role === "admin"}>
+                <option value="">Full access user</option>
+                {salesReps.map((rep) => <option key={rep.id} value={rep.id}>{rep.name}</option>)}
+              </select>
+            </label>
+            <label>
               {t.password}
               <input
                 type="password"
@@ -188,6 +202,7 @@ export default function UsersPage() {
                 <th>{t.username}</th>
                 <th>{t.role}</th>
                 <th>{t.status}</th>
+                <th>Sales Representative</th>
                 <th>{t.created}</th>
                 <th>{t.actions}</th>
               </tr>
@@ -217,6 +232,12 @@ export default function UsersPage() {
                     >
                       {user.active ? t.active : t.disabled}
                     </button>
+                  </td>
+                  <td>
+                    <select value={user.sales_rep_id ?? ""} disabled={user.role === "admin"} onChange={(event) => updateUser(user.id, { salesRepId: event.target.value })}>
+                      <option value="">Full access</option>
+                      {salesReps.map((rep) => <option key={rep.id} value={rep.id}>{rep.name}</option>)}
+                    </select>
                   </td>
                   <td>{new Date(user.created_at).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-EG")}</td>
                   <td>
