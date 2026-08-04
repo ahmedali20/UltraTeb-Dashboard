@@ -24,27 +24,8 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
   const [employeeName, setEmployeeName] = useState("");
   const [nationalId, setNationalId] = useState("");
   const [authorizationDate, setAuthorizationDate] = useState(cairoDate());
-  const [stampUrl, setStampUrl] = useState("");
   const [showStamp, setShowStamp] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  function chooseStamp(file?: File) {
-    if (!file) {
-      setStampUrl("");
-      setShowStamp(false);
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      alert("Please select a PNG or JPG stamp image.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setStampUrl(String(reader.result));
-      setShowStamp(true);
-    };
-    reader.readAsDataURL(file);
-  }
 
   function chooseEmployee(id: string) {
     setEmployeeId(id);
@@ -107,8 +88,7 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
           <label>Authorized Employee Name<input value={employeeName} onChange={(event) => { setEmployeeName(event.target.value); setEmployeeId(""); }} /></label>
           <label>National ID Number<input inputMode="numeric" maxLength={14} value={nationalId} onChange={(event) => { setNationalId(event.target.value.replace(/\D/g, "")); setEmployeeId(""); }} /></label>
           <label>Authorization Date<input type="date" value={authorizationDate} onChange={(event) => setAuthorizationDate(event.target.value)} /></label>
-          <label>Optional Stamp<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => chooseStamp(event.target.files?.[0])} /></label>
-          <label className="authorization-stamp-toggle"><input type="checkbox" checked={showStamp} disabled={!stampUrl} onChange={(event) => setShowStamp(event.target.checked)} /><span>Include stamp in letter</span></label>
+          <label className="authorization-stamp-toggle"><input type="checkbox" checked={showStamp} onChange={(event) => setShowStamp(event.target.checked)} /><span>Include official Ultra Teb stamp</span></label>
           <div className="authorization-control-actions"><button type="button" onClick={saveEmployee} disabled={saving || Boolean(employeeId)}>{saving ? "Saving..." : "Save Employee"}</button><button type="button" className="danger" onClick={deleteEmployee} disabled={!employeeId}>Delete Employee</button><button type="button" className="primary" onClick={printLetter}>Print / Save PDF</button></div>
         </section>
 
@@ -127,8 +107,8 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
             <p>وهذا تفويض منا بذلك.</p>
             <p><strong>وتفضلوا بقبول وافر الاحترام،</strong></p>
             <div className="authorization-signature"><div><strong>مقدمه لسيادتكم</strong><span>الإدارة المالية (ألترا طب للتجارة)</span></div><strong dir="ltr">{printedDate(authorizationDate)}</strong></div>
-            {showStamp && stampUrl && <img className="authorization-paper__stamp" src={stampUrl} alt="Company stamp" />}
           </div>
+          {showStamp && <img className="authorization-paper__stamp" src="/brand/ultra-teb-stamp.png" alt="Official Ultra Teb stamp" />}
           <img className="authorization-paper__footer" src="/brand/ultra-teb-footer.png" alt="" />
         </section>
       </main>
