@@ -372,6 +372,8 @@ async function syncInvoiceCogs(token: string) {
   const combined = new Map<string, {
     customer_name: string;
     invoice_no: string;
+    document_type: "INVOICE";
+    original_invoice_no: null;
     sales_date: string;
     month: string | null;
     cogs_subtotal: number;
@@ -416,6 +418,8 @@ async function syncInvoiceCogs(token: string) {
     combined.set(invoiceNo, {
       customer_name: customerName,
       invoice_no: invoiceNo,
+      document_type: "INVOICE",
+      original_invoice_no: null,
       sales_date: salesDate,
       month: getValue(row, ["month"]) || null,
       cogs_subtotal: subtotal,
@@ -429,7 +433,7 @@ async function syncInvoiceCogs(token: string) {
   let upserted = 0;
   const records = [...combined.values()];
   if (records.length) {
-    const { error } = await supabase.from("invoice_cogs").upsert(records, { onConflict: "invoice_no" });
+    const { error } = await supabase.from("invoice_cogs").upsert(records, { onConflict: "document_type,invoice_no" });
     if (error) throw new Error(`Could not save invoice COGS: ${error.message}`);
     upserted = records.length;
   }
@@ -437,7 +441,7 @@ async function syncInvoiceCogs(token: string) {
   let deleted = 0;
   let deletionSkipped = failed.length > 0 || records.length === 0;
   if (!deletionSkipped) {
-    const { data: existing, error } = await supabase.from("invoice_cogs").select("id, invoice_no");
+    const { data: existing, error } = await supabase.from("invoice_cogs").select("id, invoice_no").eq("document_type", "INVOICE");
     if (error) throw new Error(error.message);
     const currentInvoices = new Set(records.map((record) => record.invoice_no));
     const staleIds = (existing ?? []).filter((record) => !currentInvoices.has(String(record.invoice_no))).map((record) => record.id);
@@ -449,6 +453,97 @@ async function syncInvoiceCogs(token: string) {
   }
 
   return { rowsRead: values.length - headerRowIndex - 1, upserted, deleted, failed, deletionSkipped };
+}
+
+async function syncNoteCogs(token: string, sheetName: "CR Notes" | "DR Notes", documentType: "CR_NOTE" | "DR_NOTE") {
+  const range = encodeURIComponent(`'${sheetName}'!A:N`);
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE`,
+    { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+  );
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error?.message || `Could not read ${sheetName} COGS.`);
+  const values: string[][] = result.values ?? [];
+  const noteAliases = documentType === "CR_NOTE"
+    ? ["cr_no", "cr_number", "cr_note_no", "credit_note_no"]
+    : ["dr_no", "dr_number", "dr_note_no", "debit_note_no"];
+  const dateAliases = documentType === "CR_NOTE" ? ["cr_date", "note_date", "date"] : ["dr_date", "note_date", "date"];
+  const headerRowIndex = values.slice(0, 20).findIndex((candidate) => {
+    const headers = candidate.map(normalizeHeader);
+    return headers.some((header) => noteAliases.includes(header)) &&
+      headers.some((header) => ["cogs_sub_total", "cogs_subtotal"].includes(header));
+  });
+  if (headerRowIndex < 0) throw new Error(`COGS headers not found in "${sheetName}".`);
+
+  const headers = values[headerRowIndex].map(normalizeHeader);
+  const records = new Map<string, any>();
+  const failed: { row: number; invoice?: string; error: string }[] = [];
+  values.slice(headerRowIndex + 1).forEach((sheetValues, index) => {
+    const rowNumber = headerRowIndex + index + 2;
+    const row = Object.fromEntries(headers.map((header, column) => [header, String(sheetValues[column] ?? "").trim()]));
+    const noteNo = getValue(row, noteAliases);
+    const originalInvoiceNo = getValue(row, ["invoice_no", "invoice_number", "invoice"]);
+    const customerName = getValue(row, ["customer", "customer_name"]);
+    const rawDate = getValue(row, dateAliases);
+    if (!noteNo && !originalInvoiceNo && !customerName && !rawDate) return;
+    const noteDate = parseDate(rawDate);
+    const subtotal = parseNumber(getValue(row, ["cogs_sub_total", "cogs_subtotal"]));
+    const vat = parseNumber(getValue(row, ["cogs_tax", "cogs_vat"]));
+    const suppliedTotal = parseNumber(getValue(row, ["total_cogs", "cogs_total"]));
+    if (!noteNo || !originalInvoiceNo || !customerName || !noteDate) {
+      failed.push({ row: rowNumber, invoice: noteNo, error: "Missing note number, original invoice number, customer, or valid note date." });
+      return;
+    }
+    if (subtotal < 0 || vat < 0 || suppliedTotal < 0) {
+      failed.push({ row: rowNumber, invoice: noteNo, error: "COGS amounts cannot be negative." });
+      return;
+    }
+    const calculatedTotal = Math.round((subtotal + vat) * 100) / 100;
+    if (suppliedTotal && Math.abs(suppliedTotal - calculatedTotal) > 0.02) {
+      failed.push({ row: rowNumber, invoice: noteNo, error: `Total COGS must equal COGS Sub Total + COGS TAX (${calculatedTotal.toFixed(2)}).` });
+      return;
+    }
+    const existing = records.get(noteNo);
+    if (existing) {
+      existing.cogs_subtotal += subtotal;
+      existing.cogs_vat += vat;
+      existing.total = Math.round((existing.cogs_subtotal + existing.cogs_vat) * 100) / 100;
+      return;
+    }
+    records.set(noteNo, {
+      customer_name: customerName,
+      invoice_no: noteNo,
+      document_type: documentType,
+      original_invoice_no: originalInvoiceNo,
+      sales_date: noteDate,
+      month: getValue(row, ["month"]) || null,
+      cogs_subtotal: subtotal,
+      cogs_vat: vat,
+      total: calculatedTotal,
+      source: "GOOGLE_SHEET",
+      updated_at: new Date().toISOString(),
+    });
+  });
+
+  const payload = [...records.values()];
+  if (payload.length) {
+    const { error } = await supabase.from("invoice_cogs").upsert(payload, { onConflict: "document_type,invoice_no" });
+    if (error) throw new Error(`Could not save ${sheetName} COGS: ${error.message}`);
+  }
+  let deleted = 0;
+  const deletionSkipped = failed.length > 0 || payload.length === 0;
+  if (!deletionSkipped) {
+    const { data: existing, error } = await supabase.from("invoice_cogs").select("id, invoice_no").eq("document_type", documentType);
+    if (error) throw new Error(error.message);
+    const currentNotes = new Set(payload.map((record) => record.invoice_no));
+    const staleIds = (existing ?? []).filter((record) => !currentNotes.has(String(record.invoice_no))).map((record) => record.id);
+    if (staleIds.length) {
+      const { error: deleteError } = await supabase.from("invoice_cogs").delete().in("id", staleIds);
+      if (deleteError) throw new Error(`Could not remove old ${sheetName} COGS: ${deleteError.message}`);
+      deleted = staleIds.length;
+    }
+  }
+  return { rowsRead: values.length - headerRowIndex - 1, upserted: payload.length, deleted, failed, deletionSkipped };
 }
 
 async function nextCustomerCode() {
@@ -525,10 +620,23 @@ function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
 
 async function syncInvoices() {
   const token = await getGoogleAccessToken();
-  const [sheetGroups, cogsSync] = await Promise.all([
+  const [sheetGroups, invoiceCogs, creditNoteCogs, debitNoteCogs] = await Promise.all([
     Promise.all(SHEETS.map((sheet) => readSheet(token, sheet.name, sheet.documentType, sheet.range))),
     syncInvoiceCogs(token),
+    syncNoteCogs(token, "CR Notes", "CR_NOTE"),
+    syncNoteCogs(token, "DR Notes", "DR_NOTE"),
   ]);
+  const cogsParts = [invoiceCogs, creditNoteCogs, debitNoteCogs];
+  const cogsSync = {
+    rowsRead: cogsParts.reduce((sum, part) => sum + part.rowsRead, 0),
+    upserted: cogsParts.reduce((sum, part) => sum + part.upserted, 0),
+    deleted: cogsParts.reduce((sum, part) => sum + part.deleted, 0),
+    failed: cogsParts.flatMap((part) => part.failed),
+    deletionSkipped: cogsParts.some((part) => part.deletionSkipped),
+    invoices: invoiceCogs.upserted,
+    creditNotes: creditNoteCogs.upserted,
+    debitNotes: debitNoteCogs.upserted,
+  };
   const sheetRows = sheetGroups.flat();
   const combinedRows = combineRowsWithSameInvoice(sheetRows);
   const [{ data: customers, error: customersError }, { data: priorSales, error: salesError }] =
