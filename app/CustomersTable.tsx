@@ -12,6 +12,7 @@ type Customer = {
   customer_official_name: string | null;
   payment_terms_days: number | null;
   customer_trn: string | null;
+  customer_address: string | null;
   sales_rep_name: string | null;
   credit_limit: number | null;
 };
@@ -21,6 +22,7 @@ type FormFields = {
   customer_official_name: string;
   payment_terms_days: string;
   customer_trn: string;
+  customer_address: string;
   sales_rep_name: string;
   credit_limit: string;
 };
@@ -30,6 +32,7 @@ const emptyForm: FormFields = {
   customer_official_name: "",
   payment_terms_days: "",
   customer_trn: "",
+  customer_address: "",
   sales_rep_name: "",
   credit_limit: "",
 };
@@ -181,6 +184,7 @@ export default function CustomersTable({
       customer_official_name: c.customer_official_name ?? "",
       payment_terms_days: c.payment_terms_days?.toString() ?? "",
       customer_trn: c.customer_trn ?? "",
+      customer_address: c.customer_address ?? "",
       sales_rep_name: c.sales_rep_name ?? "",
       credit_limit: c.credit_limit?.toString() ?? "",
     });
@@ -306,6 +310,11 @@ export default function CustomersTable({
               />
             </label>
 
+            <label className="entry-form__field entry-form__field--wide">
+              <span className="entry-form__label">{lang === "ar" ? "العنوان" : "Address"}</span>
+              <input className="entry-form__input" placeholder={lang === "ar" ? "عنوان العميل" : "Customer address"} value={newCustomer.customer_address} onChange={(e) => setNewCustomer({ ...newCustomer, customer_address: e.target.value })} />
+            </label>
+
             <label className="entry-form__field">
               <span className="entry-form__label">{t.rep}</span>
               <select
@@ -421,6 +430,7 @@ export default function CustomersTable({
               <Th align={align}>{t.officialName}</Th>
               <Th align={align}>{t.terms}</Th>
               <Th align={align}>{t.trn}</Th>
+              <Th align={align}>{lang === "ar" ? "العنوان" : "Address"}</Th>
               <Th align={align}>{t.rep}</Th>
               <Th align={align}>{t.credit}</Th>
               <Th align={align}>{t.actions}</Th>
@@ -488,6 +498,7 @@ export default function CustomersTable({
                           }
                         />
                       </Td>
+                      <Td align={align}><input style={{ ...inputStyle, minWidth: 220 }} value={editForm.customer_address} onChange={(e) => setEditForm({ ...editForm, customer_address: e.target.value })} /></Td>
                       <Td align={align}>
                         <select
                           style={inputStyle}
@@ -550,6 +561,7 @@ export default function CustomersTable({
                       <Td align={align}>{c.customer_official_name ?? "-"}</Td>
                       <Td align={align}>{c.payment_terms_days ?? "-"}</Td>
                       <Td align={align}>{c.customer_trn ?? "-"}</Td>
+                      <Td align={align}>{c.customer_address ?? "-"}</Td>
                       <Td align={align}>{c.sales_rep_name ?? "-"}</Td>
                       <Td align={align}>{c.credit_limit ?? 0}</Td>
                       <Td align={align}>
