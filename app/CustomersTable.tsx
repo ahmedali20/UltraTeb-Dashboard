@@ -50,8 +50,7 @@ function hasMissingCustomerData(customer: Customer) {
     customer.payment_terms_days == null ||
     !customer.customer_trn?.trim() ||
     !customer.customer_address?.trim() ||
-    !customer.sales_rep_name?.trim() ||
-    customer.credit_limit == null
+    !customer.sales_rep_name?.trim()
   );
 }
 
@@ -355,18 +354,6 @@ export default function CustomersTable({
               </select>
             </label>
 
-            <label className="entry-form__field">
-              <span className="entry-form__label">{t.credit}</span>
-              <input
-                className="entry-form__input"
-                placeholder={t.credit}
-                type="number"
-                value={newCustomer.credit_limit}
-                onChange={(e) =>
-                  setNewCustomer({ ...newCustomer, credit_limit: e.target.value })
-                }
-              />
-            </label>
           </div>
 
           <div className="entry-form__actions">
@@ -466,7 +453,6 @@ export default function CustomersTable({
               <Th align={align}>{t.trn}</Th>
               <Th align={align}>{lang === "ar" ? "العنوان" : "Address"}</Th>
               <Th align={align}>{t.rep}</Th>
-              <Th align={align}>{t.credit}</Th>
               <Th align={align}>{t.actions}</Th>
             </tr>
           </thead>
@@ -559,19 +545,6 @@ export default function CustomersTable({
                         </select>
                       </Td>
                       <Td align={align}>
-                        <input
-                          style={inputStyle}
-                          type="number"
-                          value={editForm.credit_limit}
-                          onChange={(e) =>
-                            setEditForm({
-                              ...editForm,
-                              credit_limit: e.target.value,
-                            })
-                          }
-                        />
-                      </Td>
-                      <Td align={align}>
                         <div style={{ display: "flex", gap: 6 }}>
                           <ActionButton
                             onClick={() => handleSaveEdit(c.id)}
@@ -597,7 +570,6 @@ export default function CustomersTable({
                       <Td align={align}>{c.customer_trn ?? "-"}</Td>
                       <Td align={align}>{c.customer_address ?? "-"}</Td>
                       <Td align={align}>{c.sales_rep_name ?? "-"}</Td>
-                      <Td align={align}>{c.credit_limit ?? 0}</Td>
                       <Td align={align}>
                         <div style={{ display: "flex", gap: 6 }}>
                           <ActionButton
