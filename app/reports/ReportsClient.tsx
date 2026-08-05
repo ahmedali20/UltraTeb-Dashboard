@@ -56,6 +56,10 @@
   function csvCell(value: unknown) {
     return `"${String(value ?? "").replace(/"/g, '""')}"`;
   }
+
+  function safeFileName(value: string) {
+    return value.replace(/[<>:"/\\|?*]/g, "-").replace(/\s+/g, " ").trim();
+  }
   
   export default function ReportsClient({
     sales,
@@ -76,6 +80,29 @@
       "summary" | "details" | "both"
     >("both");
     const dir = lang === "ar" ? "rtl" : "ltr";
+
+    function reportFileName() {
+      const type =
+        reportType === "summary"
+          ? "Summary"
+          : reportType === "details"
+            ? "Detailed"
+            : "Summary and Detailed";
+      const period =
+        startDate || endDate
+          ? `${startDate || "Beginning"} to ${endDate || "Present"}`
+          : month !== "All"
+            ? month.replace(".", " ")
+            : "All Periods";
+      const subject =
+        customer !== "All"
+          ? ` - ${customer}`
+          : salesRep !== "All"
+            ? ` - ${salesRep}`
+            : "";
+
+      return safeFileName(`${type} of ${period} Sales${subject}`);
+    }
     const t = lang === "ar" ? {
       creditNotes: "الإشعارات الدائنة", debitNotes: "الإشعارات المدينة",
       title: "تقرير المبيعات", subtitle: "تصفية ومراجعة وطباعة أو تصدير أداء الفواتير.",
@@ -495,9 +522,7 @@
       );
       const link = document.createElement("a");
       link.href = url;
-      link.download = `ultra-teb-sales-report-${new Date()
-        .toISOString()
-        .slice(0, 10)}.csv`;
+      link.download = `${reportFileName()}.csv`;
       link.click();
       URL.revokeObjectURL(url);
     }
@@ -1003,7 +1028,7 @@
         );
       }
   
-      doc.save(`ultra-teb-sales-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+      doc.save(`${reportFileName()}.pdf`);
     }
   
     return (
