@@ -36,7 +36,7 @@ export async function PATCH(
 
   const { data: before } = await supabaseServer
     .from("customers")
-    .select("customer_name, customer_official_name, payment_terms_days, customer_trn, sales_rep_name, credit_limit")
+    .select("customer_name, customer_official_name, payment_terms_days, customer_trn, customer_address, sales_rep_name, credit_limit")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -49,6 +49,7 @@ export async function PATCH(
         ? Number(body.payment_terms_days)
         : null,
       customer_trn: body.customer_trn || null,
+      customer_address: body.customer_address || null,
       sales_rep_name: body.sales_rep_name || null,
       credit_limit: body.credit_limit ? Number(body.credit_limit) : 0,
     })
@@ -72,6 +73,7 @@ export async function PATCH(
         customer_official_name: data.customer_official_name,
         payment_terms_days: data.payment_terms_days,
         customer_trn: data.customer_trn,
+        customer_address: data.customer_address,
         sales_rep_name: data.sales_rep_name,
         credit_limit: data.credit_limit,
       },
@@ -86,7 +88,7 @@ export async function DELETE(
 ) {
   const { data: deletedRecord } = await supabaseServer
     .from("customers")
-    .select("customer_name, customer_official_name, payment_terms_days, customer_trn, sales_rep_name, credit_limit")
+    .select("customer_name, customer_official_name, payment_terms_days, customer_trn, customer_address, sales_rep_name, credit_limit")
     .eq("id", params.id)
     .maybeSingle();
   const { error } = await supabaseServer
