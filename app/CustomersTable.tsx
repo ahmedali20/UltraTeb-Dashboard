@@ -100,9 +100,11 @@ const translations = {
 export default function CustomersTable({
   customers,
   salesReps,
+  invoiceCustomerCodes,
 }: {
   customers: Customer[];
   salesReps: string[];
+  invoiceCustomerCodes: string[];
 }) {
   const router = useRouter();
   const [lang, setLang] = useState<"en" | "ar">("en");
@@ -131,10 +133,14 @@ export default function CustomersTable({
   const [customerDataFilter, setCustomerDataFilter] = useState<
     "All" | "Missing" | "Complete"
   >("All");
+  const [customerSalesLinkFilter, setCustomerSalesLinkFilter] = useState<
+    "All" | "Linked" | "Unlinked"
+  >("All");
   const [customerPage, setCustomerPage] = useState(1);
   const [customerSortDirection, setCustomerSortDirection] =
     useState<"asc" | "desc">("asc");
   const customersPerPage = 25;
+  const invoiceCustomerCodeSet = new Set(invoiceCustomerCodes);
 
   const filteredCustomers = customers
     .filter((customer) => {
@@ -153,7 +159,12 @@ export default function CustomersTable({
         customerDataFilter === "All" ||
         (customerDataFilter === "Missing" && isMissingData) ||
         (customerDataFilter === "Complete" && !isMissingData);
-      return matchesSearch && matchesRep && matchesData;
+      const hasInvoice = invoiceCustomerCodeSet.has(customer.customer_code);
+      const matchesSalesLink =
+        customerSalesLinkFilter === "All" ||
+        (customerSalesLinkFilter === "Linked" && hasInvoice) ||
+        (customerSalesLinkFilter === "Unlinked" && !hasInvoice);
+      return matchesSearch && matchesRep && matchesData && matchesSalesLink;
     })
     .sort((a, b) => {
       const comparison = (a.customer_name || "").localeCompare(
@@ -172,7 +183,7 @@ export default function CustomersTable({
 
   useEffect(() => {
     setCustomerPage(1);
-  }, [customerSearch, customerRepFilter, customerDataFilter, customerSortDirection]);
+  }, [customerSearch, customerRepFilter, customerDataFilter, customerSalesLinkFilter, customerSortDirection]);
 
   async function handleAdd() {
     if (
@@ -418,6 +429,21 @@ export default function CustomersTable({
             <option value="All">{lang === "ar" ? "كل العملاء" : "All Customers"}</option>
             <option value="Missing">{lang === "ar" ? "بيانات ناقصة" : "Missing Data"}</option>
             <option value="Complete">{lang === "ar" ? "بيانات مكتملة" : "Complete Data"}</option>
+          </select>
+        </label>
+        <label>
+          <span>{lang === "ar" ? "ربط فواتير المبيعات" : "Sales Link"}</span>
+          <select
+            value={customerSalesLinkFilter}
+            onChange={(event) =>
+              setCustomerSalesLinkFilter(
+                event.target.value as "All" | "Linked" | "Unlinked"
+              )
+            }
+          >
+            <option value="All">{lang === "ar" ? "كل العملاء" : "All Customers"}</option>
+            <option value="Linked">{lang === "ar" ? "لديه فواتير مبيعات" : "Has Sales Invoices"}</option>
+            <option value="Unlinked">{lang === "ar" ? "بدون فواتير مبيعات" : "No Sales Invoices"}</option>
           </select>
         </label>
       </div>
