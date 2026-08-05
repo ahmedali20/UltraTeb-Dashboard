@@ -48,9 +48,10 @@ export async function GET(request: NextRequest) {
       rowNumber += 1;
       const row = sheet.getRow(rowNumber);
       const subtotal = Math.abs(Number(record.sales_item_total || 0));
-      const vat = Math.abs(Number(record.tax || 0));
-      row.values = [record.invoice_no, record.vat_customer_name, record.customer_trn, record.customer_address, new Date(`${record.sales_date}T00:00:00`), subtotal, vat, 0, Number(record.wht || 0), null, group.note];
-      row.getCell(10).value = { formula: `F${rowNumber}+G${rowNumber}+H${rowNumber}`, result: subtotal + vat };
+      const vat = Math.abs(Number(record.vat_amount || 0));
+      const tableTax = Math.abs(Number(record.table_tax_amount || 0));
+      row.values = [record.invoice_no, record.vat_customer_name, record.customer_trn, record.customer_address, new Date(`${record.sales_date}T00:00:00`), subtotal, vat, tableTax, Number(record.wht || 0), null, group.note];
+      row.getCell(10).value = { formula: `F${rowNumber}+G${rowNumber}+H${rowNumber}`, result: subtotal + vat + tableTax };
       row.eachCell((cell, column) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: index % 2 ? lighterBlue : lightBlue } };
         cell.alignment = { horizontal: "center", vertical: "middle", wrapText: column <= 4, readingOrder: "rtl" };
