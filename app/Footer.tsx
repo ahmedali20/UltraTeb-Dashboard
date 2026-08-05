@@ -1,7 +1,7 @@
 "use client";
 
 const text = {
-  en: "Ultra Teb for Trade — Internal Dashboard",
+  en: "UltraTeb Tegara — Internal Dashboard",
   ar: "ألترا طب للتجارة — لوحة تحكم داخلية",
 };
 
