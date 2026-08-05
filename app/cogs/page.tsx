@@ -12,7 +12,7 @@ export const revalidate = 0;
 export default async function CogsPage() {
   const { data, error } = await supabase
     .from("invoice_cogs")
-    .select("id, customer_name, invoice_no, sales_date, month, cogs_subtotal, cogs_vat, total, updated_at")
+    .select("id, customer_name, invoice_no, document_type, original_invoice_no, sales_date, month, cogs_subtotal, cogs_vat, total, updated_at")
     .order("sales_date", { ascending: false })
     .order("invoice_no", { ascending: false });
 
