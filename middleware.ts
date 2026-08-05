@@ -30,6 +30,7 @@
         (pathname === "/users" ||
           pathname === "/sales-teams" ||
           pathname === "/wht" ||
+          pathname === "/cogs" ||
           pathname === "/authorization" ||
           pathname === "/activity-log" ||
           pathname.startsWith("/api/auth/users") ||
