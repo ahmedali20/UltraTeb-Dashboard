@@ -589,8 +589,7 @@ function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
       parseDocumentType(
         getValue(row, ["document_type", "document", "type", "invoice_type"])
       ) ?? "INVALID";
-    const salesDate = parseDate(getValue(row, ["sales_date", "invoice_date", "date"]));
-    const documentKey = `${documentType}:${invoiceNo}:${salesDate}`;
+    const documentKey = `${documentType}:${invoiceNo}`;
     const existing = combined.get(documentKey);
     if (!existing) {
       combined.set(documentKey, {
@@ -656,7 +655,7 @@ async function syncInvoices() {
         .select("customer_code, customer_name, sales_rep_name"),
       supabase
         .from("sales_view")
-        .select("id, invoice_no, sales_date, customer_code, customer_name, document_type"),
+        .select("id, invoice_no, customer_code, customer_name, document_type"),
     ]);
 
   if (customersError) throw new Error(customersError.message);
@@ -897,7 +896,6 @@ async function syncInvoices() {
     const existingMatches = (priorSales ?? []).filter(
       (sale) =>
         String(sale.invoice_no).trim() === invoiceNo &&
-        String(sale.sales_date ?? "").slice(0, 10) === salesDate &&
         (sale.document_type ?? "INVOICE") === documentType
     );
     const existing = existingMatches[0];
@@ -933,7 +931,7 @@ async function syncInvoices() {
     } else {
       inserted += 1;
     }
-    syncedDocumentKeys.add(`${documentType}:${invoiceNo}:${salesDate}`);
+    syncedDocumentKeys.add(`${documentType}:${invoiceNo}`);
     if (documentType === "CR_NOTE") creditNotes += 1;
     if (documentType === "DR_NOTE") debitNotes += 1;
   }
@@ -954,8 +952,7 @@ async function syncInvoices() {
       .filter((sale) => {
         const existingType = sale.document_type ?? "INVOICE";
         const existingInvoiceNo = String(sale.invoice_no ?? "").trim();
-        const existingSalesDate = String(sale.sales_date ?? "").slice(0, 10);
-        return !syncedDocumentKeys.has(`${existingType}:${existingInvoiceNo}:${existingSalesDate}`);
+        return !syncedDocumentKeys.has(`${existingType}:${existingInvoiceNo}`);
       })
       .map((sale) => sale.id)
       .filter(Boolean);
