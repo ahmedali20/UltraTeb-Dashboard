@@ -1473,6 +1473,8 @@ export default function SalesTable({
                         setEditForm({ ...editForm, invoice_no: event.target.value })
                       }
                     />
+                  ) : s.document_type === "INVOICE" ? (
+                    <a className="invoice-number-link" href={`/sales/${s.id}`}>{s.invoice_no}</a>
                   ) : s.invoice_no}
                 </Td>
                 <Td align={align}>
