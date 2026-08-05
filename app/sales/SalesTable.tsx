@@ -19,6 +19,9 @@ type SaleRow = {
   sales_rep: string | null;
   sales_item_total: number;
   tax: number;
+  vat_amount: number;
+  table_tax_amount: number;
+  tax_classification: "VAT" | "TABLE" | "VAT_TABLE" | "EXEMPT" | "UNKNOWN";
   total_sales: number;
   document_type: "INVOICE" | "CR_NOTE" | "DR_NOTE";
   original_invoice_no: string | null;
@@ -1415,6 +1418,9 @@ export default function SalesTable({
               </Th>
               <Th align={align}>{t.itemTotal}</Th>
               <Th align={align}>{t.tax}</Th>
+              <Th align={align}>{lang === "ar" ? "ضريبة القيمة المضافة" : "VAT"}</Th>
+              <Th align={align}>{lang === "ar" ? "ضريبة الجدول" : "Table Tax"}</Th>
+              <Th align={align}>{lang === "ar" ? "نوع الضريبة" : "Tax Type"}</Th>
               <Th align={align}>
                 <SortButton active={recordSort === "total"} direction={recordSortDirection} onClick={() => toggleRecordSort("total")}>{t.totalSales}</SortButton>
               </Th>
@@ -1579,6 +1585,9 @@ export default function SalesTable({
                     />
                   ) : s.tax}
                 </Td>
+                <Td align={align}>{Number(s.vat_amount || 0).toFixed(2)}</Td>
+                <Td align={align}>{Number(s.table_tax_amount || 0).toFixed(2)}</Td>
+                <Td align={align}>{s.tax_classification === "VAT_TABLE" ? "VAT + Table" : s.tax_classification || "UNKNOWN"}</Td>
                 <Td align={align}>
                   {isEditing ? editedTotal.toFixed(2) : s.total_sales}
                 </Td>
