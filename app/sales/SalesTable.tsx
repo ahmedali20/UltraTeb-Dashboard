@@ -430,7 +430,8 @@ export default function SalesTable({
           `${result.createdCustomers} customers created, ` +
           `${result.creditNotes ?? 0} credit notes, ` +
           `${result.debitNotes ?? 0} debit notes, ` +
-          `${result.cogs?.upserted ?? 0} COGS records synced, ` +
+          `${result.cogs?.upserted ?? 0} COGS records synced (` +
+          `${result.cogs?.invoices ?? 0} invoices, ${result.cogs?.creditNotes ?? 0} credit notes, ${result.cogs?.debitNotes ?? 0} debit notes), ` +
           `${result.cogs?.deleted ?? 0} old COGS records deleted, ` +
           `${result.deleted ?? 0} old records deleted, ` +
           `${result.cleanedCustomers ?? 0} invalid customers removed, ` +
