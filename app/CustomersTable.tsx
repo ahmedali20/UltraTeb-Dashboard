@@ -44,6 +44,17 @@ function normalizeSalesRepName(value: string) {
     .replace(/\b[a-z]/g, (letter) => letter.toLocaleUpperCase());
 }
 
+function hasMissingCustomerData(customer: Customer) {
+  return (
+    !customer.customer_official_name?.trim() ||
+    customer.payment_terms_days == null ||
+    !customer.customer_trn?.trim() ||
+    !customer.customer_address?.trim() ||
+    !customer.sales_rep_name?.trim() ||
+    customer.credit_limit == null
+  );
+}
+
 const translations = {
   en: {
     title: "Customers",
@@ -118,6 +129,9 @@ export default function CustomersTable({
   const [saving, setSaving] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerRepFilter, setCustomerRepFilter] = useState("All");
+  const [customerDataFilter, setCustomerDataFilter] = useState<
+    "All" | "Missing" | "Complete"
+  >("All");
   const [customerPage, setCustomerPage] = useState(1);
   const [customerSortDirection, setCustomerSortDirection] =
     useState<"asc" | "desc">("asc");
@@ -135,7 +149,12 @@ export default function CustomersTable({
         customerRepFilter === "All" ||
         normalizeSalesRepName(customer.sales_rep_name ?? "") ===
           customerRepFilter;
-      return matchesSearch && matchesRep;
+      const isMissingData = hasMissingCustomerData(customer);
+      const matchesData =
+        customerDataFilter === "All" ||
+        (customerDataFilter === "Missing" && isMissingData) ||
+        (customerDataFilter === "Complete" && !isMissingData);
+      return matchesSearch && matchesRep && matchesData;
     })
     .sort((a, b) => {
       const comparison = (a.customer_name || "").localeCompare(
@@ -154,7 +173,7 @@ export default function CustomersTable({
 
   useEffect(() => {
     setCustomerPage(1);
-  }, [customerSearch, customerRepFilter, customerSortDirection]);
+  }, [customerSearch, customerRepFilter, customerDataFilter, customerSortDirection]);
 
   async function handleAdd() {
     if (
@@ -397,6 +416,21 @@ export default function CustomersTable({
             {salesRepOptions.map((rep) => (
               <option key={rep} value={rep}>{rep}</option>
             ))}
+          </select>
+        </label>
+        <label>
+          <span>{lang === "ar" ? "اكتمال البيانات" : "Customer Data"}</span>
+          <select
+            value={customerDataFilter}
+            onChange={(event) =>
+              setCustomerDataFilter(
+                event.target.value as "All" | "Missing" | "Complete"
+              )
+            }
+          >
+            <option value="All">{lang === "ar" ? "كل العملاء" : "All Customers"}</option>
+            <option value="Missing">{lang === "ar" ? "بيانات ناقصة" : "Missing Data"}</option>
+            <option value="Complete">{lang === "ar" ? "بيانات مكتملة" : "Complete Data"}</option>
           </select>
         </label>
       </div>
