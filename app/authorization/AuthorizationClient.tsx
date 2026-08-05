@@ -103,6 +103,8 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
     window.print();
   }
 
+  const usesPassport = employeeName.replace(/\s+/g, " ").trim() === "رامي رامز خيري مهايني";
+
   return (
     <div className="dashboard-shell authorization-shell" dir={lang === "ar" ? "rtl" : "ltr"}>
       <Header active="authorization" lang={lang} onToggleLang={() => setLang((value) => value === "en" ? "ar" : "en")} />
@@ -131,7 +133,7 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
             <p className="authorization-greeting">تحية طيبة وبعد،</p>
             <p><strong>فوضنا نحن شركة ألترا طب للتجارة</strong></p>
             <p>السيد / <strong>{employeeName || "اسم الموظف المفوض"}</strong></p>
-            <p>بطاقة رقم قومي: <strong dir="ltr">{nationalId || "00000000000000"}</strong></p>
+            <p>{usesPassport ? "جواز سفر رقم:" : "بطاقة رقم قومي:"} <strong dir="ltr">{nationalId || "00000000000000"}</strong></p>
             <p>لاستلام المستحقات المالية (نقداً أو شيكات) وإشعارات الخصم والإضافة الخاصة بنا طرفكم.</p>
             <p>وهذا تفويض منا بذلك.</p>
             <div className="authorization-respect-row">
