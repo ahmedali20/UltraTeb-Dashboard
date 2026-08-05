@@ -430,6 +430,8 @@ export default function SalesTable({
           `${result.createdCustomers} customers created, ` +
           `${result.creditNotes ?? 0} credit notes, ` +
           `${result.debitNotes ?? 0} debit notes, ` +
+          `${result.cogs?.upserted ?? 0} COGS records synced, ` +
+          `${result.cogs?.deleted ?? 0} old COGS records deleted, ` +
           `${result.deleted ?? 0} old records deleted, ` +
           `${result.cleanedCustomers ?? 0} invalid customers removed, ` +
           `${result.cleanedSalesReps ?? 0} invalid reps removed, ` +
@@ -439,7 +441,10 @@ export default function SalesTable({
                 result.failed[0].row
               } — ${result.failed[0].error}`
             : ".") +
-          (result.deletionSkipped ? ` ${result.deletionSkipReason}` : "")
+          (result.deletionSkipped ? ` ${result.deletionSkipReason}` : "") +
+          (result.cogs?.failed?.length
+            ? ` ${result.cogs.failed.length} COGS rows failed. First COGS error: row ${result.cogs.failed[0].row} — ${result.cogs.failed[0].error}`
+            : "")
       );
       if (result.lastSuccessfulSync) {
         setLastSheetSync(result.lastSuccessfulSync);
