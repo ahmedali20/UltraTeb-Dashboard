@@ -3285,6 +3285,45 @@
   @media (max-width: 900px) { .cogs-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 600px) { .cogs-page { padding: 16px; } .cogs-kpis, .cogs-toolbar { grid-template-columns: 1fr; } }
 
+  .invoice-number-link { color: #2563eb; font-weight: 800; text-decoration: none; }
+  .invoice-number-link:hover { text-decoration: underline; }
+  .invoice-details-page { display: grid; gap: 14px; padding: 24px 28px 34px; }
+  .invoice-details-back { width: fit-content; color: var(--text-secondary); font-size: 12px; text-decoration: none; }
+  .invoice-details-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+  .invoice-details-heading > div:first-child { display: grid; gap: 4px; }
+  .invoice-details-heading p { margin: 0; color: var(--brand-primary); font-size: 10px; font-weight: 900; letter-spacing: .12em; }
+  .invoice-details-heading h1 { margin: 0; font-size: 25px; }
+  .invoice-details-heading span { color: var(--text-secondary); font-size: 12px; }
+  .invoice-status { display: grid; min-width: 130px; gap: 4px; border: 1px solid var(--border-color); border-radius: 10px; padding: 11px 15px; text-align: center; }
+  .invoice-status span { font-size: 10px; }
+  .invoice-status--overdue { border-color: rgba(220,38,38,.35); background: rgba(220,38,38,.08); color: #dc2626; }
+  .invoice-status--pending { border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.08); color: #d97706; }
+  .invoice-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .invoice-details-grid--top { grid-template-columns: 1fr 1.25fr; }
+  .invoice-detail-card { overflow: hidden; border: 1px solid var(--border-color); border-radius: 10px; background: var(--surface-color); }
+  .invoice-detail-card > h2 { margin: 0; border-bottom: 1px solid var(--border-color); padding: 10px 13px; font-size: 12px; }
+  .invoice-detail-card dl { display: grid; gap: 7px; margin: 0; padding: 13px; }
+  .invoice-detail-card dl > div { display: flex; justify-content: space-between; gap: 16px; }
+  .invoice-detail-card dt { color: var(--text-secondary); font-size: 11px; }
+  .invoice-detail-card dd { margin: 0; font-size: 11px; font-weight: 700; }
+  .invoice-detail-total { border-top: 1px solid var(--border-color); padding-top: 8px; }
+  .invoice-detail-note, .invoice-detail-empty { margin: 0; padding: 12px 13px; color: var(--text-secondary); font-size: 11px; }
+  .invoice-signal-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; padding: 0 12px 13px; }
+  .invoice-signal-grid article { display: grid; gap: 5px; border-radius: 7px; background: var(--surface-muted); padding: 10px; text-align: center; }
+  .invoice-signal-grid span, .invoice-summary-row span, .invoice-linked-list span { color: var(--text-secondary); font-size: 9px; }
+  .invoice-signal-grid strong { font-size: 11px; }
+  .invoice-summary-row { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 12px; padding: 14px; }
+  .invoice-summary-row > div { display: grid; gap: 5px; }
+  .invoice-linked-list { display: grid; }
+  .invoice-linked-list article { display: flex; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--border-color); padding: 11px 13px; }
+  .invoice-linked-list article:last-child { border-bottom: 0; }
+  .invoice-linked-list article > div { display: grid; gap: 3px; }
+  .invoice-linked-list article > div:last-child { text-align: end; }
+  .invoice-linked-list small { color: var(--text-secondary); }
+  .invoice-detail-cogs { border-color: rgba(124,58,237,.3); }
+  @media (max-width: 850px) { .invoice-details-grid, .invoice-details-grid--top { grid-template-columns: 1fr; } .invoice-signal-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .invoice-details-page { padding: 16px; } .invoice-details-heading { flex-direction: column; } .invoice-summary-row { grid-template-columns: 1fr 1fr; } }
+
   .authorization-page { display: grid; gap: 18px; padding: 28px; }
   .authorization-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--surface-color); padding: 18px; }
   .authorization-controls label { display: grid; gap: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 700; }
