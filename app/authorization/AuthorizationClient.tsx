@@ -16,6 +16,10 @@ function printedDate(value: string) {
   return `${day}-${month}-${year}`;
 }
 
+function safeDocumentTitle(value: string) {
+  return value.replace(/[<>:"/\\|?*]/g, "-").replace(/\s+/g, " ").trim();
+}
+
 export default function AuthorizationClient({ customers, initialEmployees }: { customers: string[]; initialEmployees: Employee[] }) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [employees, setEmployees] = useState(initialEmployees);
@@ -106,6 +110,11 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
         : "Choose a customer and enter a valid employee, 14-digit National ID, and authorization date.");
       return;
     }
+    const previousTitle = document.title;
+    document.title = safeDocumentTitle(`تفويض ${customer}`);
+    window.addEventListener("afterprint", () => {
+      document.title = previousTitle;
+    }, { once: true });
     window.print();
   }
 
