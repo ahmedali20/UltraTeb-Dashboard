@@ -5,7 +5,7 @@ import { writeAuditLog } from "../../../lib/audit-log";
 
 const SPREADSHEET_ID = "13L05U9X3f4cerrzSQu6qQxSTrqY-b8jo4SVYZ9Vrcc4";
 const SHEETS = [
-  { name: "Invoices Sales", documentType: "INVOICE", range: "B:I" },
+  { name: "Invoices Sales", documentType: "INVOICE", range: "B:L" },
   { name: "CR Notes", documentType: "CR_NOTE", range: "B:J" },
   { name: "DR Notes", documentType: "DR_NOTE", range: "B:J" },
 ] as const;
@@ -310,6 +310,9 @@ async function readSheet(
       tax:
         getValue(mapped, ["tax", "tax_value", "vat", "sales_tax"]) ||
         String(valuesRow[isInvoiceSheet ? 5 : 6] ?? ""),
+      vat_amount: getValue(mapped, ["vat_amount", "vat_tax_amount"]),
+      table_tax_amount: getValue(mapped, ["table_tax_amount", "table_tax"]),
+      tax_classification: getValue(mapped, ["tax_classification", "tax_type"]),
       sales_rep:
         getValue(mapped, [
           "sales_rep",
@@ -586,7 +589,8 @@ function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
       parseDocumentType(
         getValue(row, ["document_type", "document", "type", "invoice_type"])
       ) ?? "INVALID";
-    const documentKey = `${documentType}:${invoiceNo}`;
+    const salesDate = parseDate(getValue(row, ["sales_date", "invoice_date", "date"]));
+    const documentKey = `${documentType}:${invoiceNo}:${salesDate}`;
     const existing = combined.get(documentKey);
     if (!existing) {
       combined.set(documentKey, {
@@ -602,6 +606,12 @@ function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
     );
     existing.tax = String(
       parseNumber(existing.tax || "") + parseNumber(row.tax || "")
+    );
+    existing.vat_amount = String(
+      parseNumber(existing.vat_amount || "") + parseNumber(row.vat_amount || "")
+    );
+    existing.table_tax_amount = String(
+      parseNumber(existing.table_tax_amount || "") + parseNumber(row.table_tax_amount || "")
     );
     existing.customer_name ||= row.customer_name;
     existing.sales_date ||= row.sales_date;
@@ -646,7 +656,7 @@ async function syncInvoices() {
         .select("customer_code, customer_name, sales_rep_name"),
       supabase
         .from("sales_view")
-        .select("id, invoice_no, customer_code, customer_name, document_type"),
+        .select("id, invoice_no, sales_date, customer_code, customer_name, document_type"),
     ]);
 
   if (customersError) throw new Error(customersError.message);
@@ -695,6 +705,21 @@ async function syncInvoices() {
       ])
     );
     const tax = parseNumber(getValue(row, ["tax", "tax_value", "vat"]));
+    const vatAmount = parseNumber(getValue(row, ["vat_amount", "vat_tax_amount"]));
+    const tableTaxAmount = parseNumber(getValue(row, ["table_tax_amount", "table_tax"]));
+    const rawTaxClassification = getValue(row, ["tax_classification", "tax_type"])
+      .trim()
+      .toUpperCase();
+    const taxClassification =
+      vatAmount > 0 && tableTaxAmount > 0
+        ? "VAT_TABLE"
+        : vatAmount > 0
+          ? "VAT"
+          : tableTaxAmount > 0
+            ? "TABLE"
+            : rawTaxClassification === "EXEMPT" || tax === 0
+              ? "EXEMPT"
+              : "UNKNOWN";
     const rawSalesRep = getValue(row, [
       "sales_rep",
       "sales_representative",
@@ -763,6 +788,17 @@ async function syncInvoices() {
         row: sheetRowNumber,
         invoice: invoiceNo,
         error: `Unknown document type "${rawDocumentType}". Use Invoice, CR, Credit Note, DR, or Debit Note.`,
+      });
+      continue;
+    }
+    if (
+      taxClassification !== "UNKNOWN" &&
+      Math.abs(Math.abs(tax) - Math.abs(vatAmount) - Math.abs(tableTaxAmount)) > 0.05
+    ) {
+      failed.push({
+        row: sheetRowNumber,
+        invoice: invoiceNo,
+        error: "Total TAX must equal VAT Amount + Table Tax Amount.",
       });
       continue;
     }
@@ -850,6 +886,9 @@ async function syncInvoices() {
       customer_code: customer.customer_code,
       sales_item_total: sign * Math.abs(salesItemTotal),
       tax: sign * Math.abs(tax),
+      vat_amount: sign * Math.abs(vatAmount),
+      table_tax_amount: sign * Math.abs(tableTaxAmount),
+      tax_classification: taxClassification,
       document_type: documentType,
       original_invoice_no:
         documentType === "INVOICE" ? null : originalInvoiceNo,
@@ -858,6 +897,7 @@ async function syncInvoices() {
     const existingMatches = (priorSales ?? []).filter(
       (sale) =>
         String(sale.invoice_no).trim() === invoiceNo &&
+        String(sale.sales_date ?? "").slice(0, 10) === salesDate &&
         (sale.document_type ?? "INVOICE") === documentType
     );
     const existing = existingMatches[0];
@@ -893,7 +933,7 @@ async function syncInvoices() {
     } else {
       inserted += 1;
     }
-    syncedDocumentKeys.add(`${documentType}:${invoiceNo}`);
+    syncedDocumentKeys.add(`${documentType}:${invoiceNo}:${salesDate}`);
     if (documentType === "CR_NOTE") creditNotes += 1;
     if (documentType === "DR_NOTE") debitNotes += 1;
   }
@@ -914,7 +954,8 @@ async function syncInvoices() {
       .filter((sale) => {
         const existingType = sale.document_type ?? "INVOICE";
         const existingInvoiceNo = String(sale.invoice_no ?? "").trim();
-        return !syncedDocumentKeys.has(`${existingType}:${existingInvoiceNo}`);
+        const existingSalesDate = String(sale.sales_date ?? "").slice(0, 10);
+        return !syncedDocumentKeys.has(`${existingType}:${existingInvoiceNo}:${existingSalesDate}`);
       })
       .map((sale) => sale.id)
       .filter(Boolean);
