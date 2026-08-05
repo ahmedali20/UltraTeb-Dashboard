@@ -3380,6 +3380,28 @@
   @media (max-width: 900px) { .authorization-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } .authorization-paper { min-height: auto; aspect-ratio: 210 / 297; } .authorization-letter { font-size: clamp(12px, 2.7vw, 23px); } }
   @media (max-width: 600px) { .authorization-page { padding: 16px; } .authorization-controls { grid-template-columns: 1fr; } }
 
+  .is-data-page { display: grid; gap: 16px; padding: 28px; }
+  .is-entry-form { display: grid; grid-template-columns: 150px minmax(220px, 1fr) minmax(220px, 1fr) 170px; gap: 12px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--surface-color); padding: 16px; }
+  .is-entry-form label, .is-month-toolbar label { display: grid; gap: 6px; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+  .is-entry-form input, .is-entry-form select, .is-month-toolbar input { box-sizing: border-box; width: 100%; min-height: 40px; border: 1px solid var(--input-border); border-radius: 8px; background: var(--input-bg); color: var(--input-text); padding: 8px 10px; }
+  .is-description { grid-column: 1 / -2; }
+  .is-form-actions { display: flex; align-items: end; justify-content: flex-end; gap: 8px; }
+  .is-form-actions button, .is-row-actions button { min-height: 38px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-muted); color: var(--text-primary); padding: 0 14px; cursor: pointer; }
+  .is-form-actions .primary { border-color: transparent; background: var(--brand-primary); color: white; }
+  .is-month-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+  .is-month-toolbar > div { display: grid; gap: 3px; }
+  .is-month-toolbar span { color: var(--text-secondary); font-size: 11px; }
+  .is-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .is-summary-grid article { display: grid; gap: 5px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--surface-color); padding: 15px; }
+  .is-summary-grid span, .is-summary-grid small { color: var(--text-secondary); font-size: 11px; }
+  .is-summary-grid strong { font-size: 20px; }
+  .is-data-page .professional-data-table table { width: 100%; border-collapse: collapse; }
+  .is-data-page .professional-data-table th, .is-data-page .professional-data-table td { border-bottom: 1px solid var(--border-color); padding: 11px 12px; text-align: start; }
+  .is-row-actions { display: flex; gap: 7px; }
+  .is-row-actions .danger { color: #ef4444; }
+  @media (max-width: 1000px) { .is-entry-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } .is-description { grid-column: 1 / -1; } .is-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 600px) { .is-data-page { padding: 16px; } .is-entry-form, .is-summary-grid { grid-template-columns: 1fr; } .is-month-toolbar { align-items: stretch; flex-direction: column; } }
+
   @media print {
     @page { size: A4 portrait; margin: 0; }
     html, body { width: 210mm !important; min-width: 210mm !important; height: 297mm !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; background: white !important; }
