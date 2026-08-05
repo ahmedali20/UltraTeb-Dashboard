@@ -15,8 +15,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const employeeName = String(body.employeeName ?? "").trim();
   const nationalId = String(body.nationalId ?? "").replace(/\s+/g, "");
-  if (!employeeName || !nationalId) return NextResponse.json({ error: "Employee name and National ID are required." }, { status: 400 });
-  if (!/^\d{14}$/.test(nationalId)) return NextResponse.json({ error: "National ID must contain exactly 14 digits." }, { status: 400 });
+  const usesPassport = employeeName.replace(/\s+/g, " ") === "رامي رامز خيري مهايني";
+  if (!employeeName || !nationalId) return NextResponse.json({ error: `Employee name and ${usesPassport ? "passport number" : "National ID"} are required.` }, { status: 400 });
+  if (usesPassport && !/^[A-Za-z0-9]{3,13}$/.test(nationalId)) return NextResponse.json({ error: "Passport number must contain 3 to 13 letters or digits." }, { status: 400 });
+  if (!usesPassport && !/^\d{14}$/.test(nationalId)) return NextResponse.json({ error: "National ID must contain exactly 14 digits." }, { status: 400 });
   const { data, error } = await supabase.from("authorized_employees").insert({ employee_name: employeeName, national_id: nationalId }).select("id, employee_name, national_id").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   await writeAuditLog(request, { action: "CREATE_AUTHORIZED_EMPLOYEE", entityType: "AUTHORIZED_EMPLOYEE", entityId: data.id, description: `Saved authorized employee ${data.employee_name}.`, metadata: { after: data } });
