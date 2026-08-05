@@ -346,6 +346,111 @@ async function readSheet(
   });
 }
 
+async function syncInvoiceCogs(token: string) {
+  const sheetName = "Invoices COGS";
+  const range = encodeURIComponent(`'${sheetName}'!A:H`);
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE`,
+    { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+  );
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error?.message || `Could not read ${sheetName}.`);
+  }
+
+  const values: string[][] = result.values ?? [];
+  const headerRowIndex = values.slice(0, 20).findIndex((candidate) => {
+    const headers = candidate.map(normalizeHeader);
+    return headers.includes("invoice_no") &&
+      headers.some((header) => ["cogs_sub_total", "cogs_subtotal"].includes(header));
+  });
+  if (headerRowIndex < 0) {
+    throw new Error(`Header row not found in "${sheetName}". Expected Invoice No and COGS Sub Total.`);
+  }
+
+  const headers = values[headerRowIndex].map(normalizeHeader);
+  const combined = new Map<string, {
+    customer_name: string;
+    invoice_no: string;
+    sales_date: string;
+    month: string | null;
+    cogs_subtotal: number;
+    cogs_vat: number;
+    total: number;
+    source: string;
+    updated_at: string;
+  }>();
+  const failed: { row: number; invoice?: string; error: string }[] = [];
+
+  values.slice(headerRowIndex + 1).forEach((sheetValues, index) => {
+    const rowNumber = headerRowIndex + index + 2;
+    const row = Object.fromEntries(headers.map((header, column) => [header, String(sheetValues[column] ?? "").trim()]));
+    const invoiceNo = getValue(row, ["invoice_no", "invoice_number", "invoice"]);
+    const customerName = getValue(row, ["customer", "customer_name"]);
+    const rawDate = getValue(row, ["sales_date", "invoice_date", "date"]);
+    if (!invoiceNo && !customerName && !rawDate) return;
+    const salesDate = parseDate(rawDate);
+    const subtotal = parseNumber(getValue(row, ["cogs_sub_total", "cogs_subtotal", "subtotal"]));
+    const vat = parseNumber(getValue(row, ["cogs_vat", "vat", "tax"]));
+    const suppliedTotal = parseNumber(getValue(row, ["total", "cogs_total"]));
+    if (!invoiceNo || !customerName || !salesDate) {
+      failed.push({ row: rowNumber, invoice: invoiceNo, error: "Missing invoice number, customer, or valid sales date." });
+      return;
+    }
+    if (subtotal < 0 || vat < 0 || suppliedTotal < 0) {
+      failed.push({ row: rowNumber, invoice: invoiceNo, error: "COGS amounts cannot be negative." });
+      return;
+    }
+    const calculatedTotal = Math.round((subtotal + vat) * 100) / 100;
+    if (suppliedTotal && Math.abs(suppliedTotal - calculatedTotal) > 0.02) {
+      failed.push({ row: rowNumber, invoice: invoiceNo, error: `Total must equal COGS Sub Total + COGS VAT (${calculatedTotal.toFixed(2)}).` });
+      return;
+    }
+    const existing = combined.get(invoiceNo);
+    if (existing) {
+      existing.cogs_subtotal += subtotal;
+      existing.cogs_vat += vat;
+      existing.total = Math.round((existing.cogs_subtotal + existing.cogs_vat) * 100) / 100;
+      return;
+    }
+    combined.set(invoiceNo, {
+      customer_name: customerName,
+      invoice_no: invoiceNo,
+      sales_date: salesDate,
+      month: getValue(row, ["month"]) || null,
+      cogs_subtotal: subtotal,
+      cogs_vat: vat,
+      total: calculatedTotal,
+      source: "GOOGLE_SHEET",
+      updated_at: new Date().toISOString(),
+    });
+  });
+
+  let upserted = 0;
+  const records = [...combined.values()];
+  if (records.length) {
+    const { error } = await supabase.from("invoice_cogs").upsert(records, { onConflict: "invoice_no" });
+    if (error) throw new Error(`Could not save invoice COGS: ${error.message}`);
+    upserted = records.length;
+  }
+
+  let deleted = 0;
+  let deletionSkipped = failed.length > 0 || records.length === 0;
+  if (!deletionSkipped) {
+    const { data: existing, error } = await supabase.from("invoice_cogs").select("id, invoice_no");
+    if (error) throw new Error(error.message);
+    const currentInvoices = new Set(records.map((record) => record.invoice_no));
+    const staleIds = (existing ?? []).filter((record) => !currentInvoices.has(String(record.invoice_no))).map((record) => record.id);
+    if (staleIds.length) {
+      const { error: deleteError } = await supabase.from("invoice_cogs").delete().in("id", staleIds);
+      if (deleteError) throw new Error(`Could not remove old COGS records: ${deleteError.message}`);
+      deleted = staleIds.length;
+    }
+  }
+
+  return { rowsRead: values.length - headerRowIndex - 1, upserted, deleted, failed, deletionSkipped };
+}
+
 async function nextCustomerCode() {
   const { data, error } = await supabase.from("customers").select("customer_code");
   if (error) throw new Error(error.message);
@@ -420,11 +525,10 @@ function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
 
 async function syncInvoices() {
   const token = await getGoogleAccessToken();
-  const sheetGroups = await Promise.all(
-    SHEETS.map((sheet) =>
-      readSheet(token, sheet.name, sheet.documentType, sheet.range)
-    )
-  );
+  const [sheetGroups, cogsSync] = await Promise.all([
+    Promise.all(SHEETS.map((sheet) => readSheet(token, sheet.name, sheet.documentType, sheet.range))),
+    syncInvoiceCogs(token),
+  ]);
   const sheetRows = sheetGroups.flat();
   const combinedRows = combineRowsWithSameInvoice(sheetRows);
   const [{ data: customers, error: customersError }, { data: priorSales, error: salesError }] =
@@ -723,7 +827,8 @@ async function syncInvoices() {
 
   const syncedAt = new Date().toISOString();
   const fullSyncSucceeded =
-    failed.length === 0 && skippedIncomplete === 0 && !deletionSkipped;
+    failed.length === 0 && skippedIncomplete === 0 && !deletionSkipped &&
+    cogsSync.failed.length === 0 && !cogsSync.deletionSkipped;
 
   if (fullSyncSucceeded) {
     const [
@@ -814,6 +919,7 @@ async function syncInvoices() {
     createdCustomers,
     creditNotes,
     debitNotes,
+    cogs: cogsSync,
     deleted,
     deletionSkipped,
     deletionSkipReason,
@@ -836,7 +942,7 @@ async function runSync(request: Request, system = false) {
       role: system ? "admin" : undefined,
       action: "GOOGLE_SHEET_SYNC",
       entityType: "SYNC",
-      description: `Google Sheet sync completed: ${result.inserted} added, ${result.updated} updated, ${result.failed} failed.`,
+      description: `Google Sheet sync completed: ${result.inserted} sales added, ${result.updated} sales updated, ${result.cogs.upserted} COGS synced, ${result.failed.length + result.cogs.failed.length} rows failed.`,
       metadata: result,
     });
     return NextResponse.json(result);
