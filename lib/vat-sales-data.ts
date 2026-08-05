@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 const supabase = createClient(process.env.SUPABASE_URL as string, process.env.SUPABASE_SERVICE_ROLE_KEY as string, { auth: { persistSession: false } });
 
 export async function loadVatSalesData(from?: string, to?: string) {
-  let salesQuery = supabase.from("sales_view").select("id, invoice_no, sales_date, customer_code, customer_name, sales_item_total, tax, total_sales, document_type").order("sales_date").order("invoice_no");
+  let salesQuery = supabase.from("sales_view").select("id, invoice_no, sales_date, customer_code, customer_name, sales_item_total, tax, vat_amount, table_tax_amount, tax_classification, total_sales, document_type").order("sales_date").order("invoice_no");
   if (from) salesQuery = salesQuery.gte("sales_date", from);
   if (to) salesQuery = salesQuery.lte("sales_date", to);
   const [{ data: sales, error: salesError }, { data: customers, error: customersError }, { data: wht, error: whtError }] = await Promise.all([
