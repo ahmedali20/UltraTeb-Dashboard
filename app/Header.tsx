@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
-  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "cogs" | "vat" | "authorization" | "users" | "activity";
+  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "cogs" | "vat" | "incomeStatement" | "authorization" | "users" | "activity";
   lang: "en" | "ar";
   onToggleLang: () => void;
 };
@@ -20,6 +20,7 @@ const labels = {
     wht: "Collected WHT",
     cogs: "Invoices COGS",
     vat: "VAT Report",
+    incomeStatement: "Income Statement Data",
     authorization: "Authorization Letters",
     users: "Users",
     activity: "Activity Log",
@@ -41,6 +42,7 @@ const labels = {
     wht: "ضريبة الخصم المحصلة",
     cogs: "تكلفة الفواتير",
     vat: "تقرير ضريبة القيمة المضافة",
+    incomeStatement: "بيانات قائمة الدخل",
     authorization: "خطابات التفويض",
     users: "المستخدمون",
     activity: "سجل النشاط",
@@ -254,6 +256,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
               <NavLink href="/wht" page="wht" label={t.wht} icon="records" className={linkClass("wht")} />
               <NavLink href="/cogs" page="cogs" label={t.cogs} icon="records" className={linkClass("cogs")} />
               <NavLink href="/vat-report" page="vat" label={t.vat} icon="reports" className={linkClass("vat")} />
+              <NavLink href="/income-statement-data" page="incomeStatement" label={t.incomeStatement} icon="reports" className={linkClass("incomeStatement")} />
               <NavLink href="/authorization" page="authorization" label={t.authorization} icon="reports" className={linkClass("authorization")} />
               <NavLink href="/users" page="users" label={t.users} icon="users" className={linkClass("users")} />
               <NavLink href="/activity-log" page="activity" label={t.activity} icon="activity" className={linkClass("activity")} />
