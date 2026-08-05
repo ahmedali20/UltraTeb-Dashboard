@@ -138,9 +138,9 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
               <p><strong>وتفضلوا بقبول وافر الاحترام،</strong></p>
             </div>
             <div className="authorization-signature">
-              <div><strong>مقدمه لسيادتكم</strong><span>الإدارة المالية (ألترا طب للتجارة)</span></div>
+              <div className="authorization-signature__company"><strong>مقدمه لسيادتكم</strong><span>الإدارة المالية (ألترا طب للتجارة)</span></div>
               {showStamp && <img className="authorization-paper__stamp" src="/brand/ultra-teb-stamp.png" alt="Official Ultra Teb stamp" />}
-              <strong dir="ltr">{printedDate(authorizationDate)}</strong>
+              <strong className="authorization-signature__date" dir="ltr">{printedDate(authorizationDate)}</strong>
             </div>
           </div>
           <img className="authorization-paper__footer" src="/brand/ultra-teb-footer.png" alt="" />
