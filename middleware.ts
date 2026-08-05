@@ -31,12 +31,14 @@
           pathname === "/sales-teams" ||
           pathname === "/wht" ||
           pathname === "/cogs" ||
+          pathname === "/vat-report" ||
           pathname === "/authorization" ||
           pathname === "/activity-log" ||
           pathname.startsWith("/api/auth/users") ||
           pathname.startsWith("/api/activity-log") ||
           pathname.startsWith("/api/sales-teams") ||
           pathname.startsWith("/api/wht") ||
+          pathname.startsWith("/api/vat-report") ||
           pathname.startsWith("/api/authorized-employees") ||
           pathname.startsWith("/api/sales-reps/bonus")) &&
         session.role !== "admin"
