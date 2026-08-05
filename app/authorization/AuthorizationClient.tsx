@@ -24,6 +24,7 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [employees, setEmployees] = useState(initialEmployees);
   const [customer, setCustomer] = useState("");
+  const [customerNameAddition, setCustomerNameAddition] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [employeeName, setEmployeeName] = useState("");
   const [nationalId, setNationalId] = useState("");
@@ -111,7 +112,7 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
       return;
     }
     const previousTitle = document.title;
-    document.title = safeDocumentTitle(`تفويض ${customer}`);
+    document.title = safeDocumentTitle(`تفويض ${fullCustomerName}`);
     window.addEventListener("afterprint", () => {
       document.title = previousTitle;
     }, { once: true });
@@ -119,6 +120,8 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
   }
 
   const usesPassport = employeeName.replace(/\s+/g, " ").trim() === "رامي رامز خيري مهايني";
+
+  const fullCustomerName = [customer, customerNameAddition.trim()].filter(Boolean).join(" ");
 
   return (
     <div className="dashboard-shell authorization-shell" dir={lang === "ar" ? "rtl" : "ltr"}>
@@ -130,6 +133,7 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
 
         <section className="authorization-controls authorization-screen-only">
           <label>Customer Name<select value={customer} onChange={(event) => setCustomer(event.target.value)}><option value="">Select customer</option>{customers.map((name) => <option key={name}>{name}</option>)}</select></label>
+          <label>Additional Customer Text (Optional)<input value={customerNameAddition} onChange={(event) => setCustomerNameAddition(event.target.value)} placeholder="Write the rest of the customer name" /></label>
           <label>Saved Employee<select value={employeeId} onChange={(event) => chooseEmployee(event.target.value)}><option value="">Add new employee</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.employee_name} - {employee.national_id}</option>)}</select></label>
           <label>Authorized Employee Name<input value={employeeName} onChange={(event) => { setEmployeeName(event.target.value); setEmployeeId(""); }} /></label>
           <label>{usesPassport ? "Passport Number" : "National ID Number"}<input inputMode={usesPassport ? "text" : "numeric"} maxLength={usesPassport ? 13 : 14} value={nationalId} onChange={(event) => { setNationalId(usesPassport ? event.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase() : event.target.value.replace(/\D/g, "")); setEmployeeId(""); }} /></label>
@@ -144,7 +148,7 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
           <img className="authorization-paper__watermark" src="/brand/ultra-teb-logo.png" alt="" />
           <div className="authorization-letter">
             <h2>تفويض</h2>
-            <h3>السادة / {customer || "اسم العميل"}</h3>
+            <h3>السادة / {fullCustomerName || "اسم العميل"}</h3>
             <p className="authorization-greeting">تحية طيبة وبعد،</p>
             <p><strong>فوضنا نحن شركة ألترا طب للتجارة</strong></p>
             <p>السيد / <strong>{employeeName || "اسم الموظف المفوض"}</strong></p>
