@@ -330,7 +330,7 @@ export default function CustomersTable({
 
             <label className="entry-form__field entry-form__field--wide">
               <span className="entry-form__label">{lang === "ar" ? "العنوان" : "Address"}</span>
-              <input className="entry-form__input" placeholder={lang === "ar" ? "عنوان العميل" : "Customer address"} value={newCustomer.customer_address} onChange={(e) => setNewCustomer({ ...newCustomer, customer_address: e.target.value })} />
+              <input dir="auto" className="entry-form__input" placeholder={lang === "ar" ? "عنوان العميل" : "Customer address"} value={newCustomer.customer_address} onChange={(e) => setNewCustomer({ ...newCustomer, customer_address: e.target.value })} />
             </label>
 
             <label className="entry-form__field">
@@ -518,7 +518,7 @@ export default function CustomersTable({
                           }
                         />
                       </Td>
-                      <Td align={align}><input style={{ ...inputStyle, minWidth: 220 }} value={editForm.customer_address} onChange={(e) => setEditForm({ ...editForm, customer_address: e.target.value })} /></Td>
+                      <Td align={align}><input dir="auto" style={{ ...inputStyle, minWidth: 220 }} value={editForm.customer_address} onChange={(e) => setEditForm({ ...editForm, customer_address: e.target.value })} /></Td>
                       <Td align={align}>
                         <select
                           style={inputStyle}
@@ -568,7 +568,7 @@ export default function CustomersTable({
                       <Td align={align}>{c.customer_official_name ?? "-"}</Td>
                       <Td align={align}>{c.payment_terms_days ?? "-"}</Td>
                       <Td align={align}>{c.customer_trn ?? "-"}</Td>
-                      <Td align={align}>{c.customer_address ?? "-"}</Td>
+                      <Td align={align}><bdi dir="auto">{c.customer_address ?? "-"}</bdi></Td>
                       <Td align={align}>{c.sales_rep_name ?? "-"}</Td>
                       <Td align={align}>
                         <div style={{ display: "flex", gap: 6 }}>
