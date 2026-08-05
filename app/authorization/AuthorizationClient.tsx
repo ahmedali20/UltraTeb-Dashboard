@@ -96,8 +96,14 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
   }
 
   function printLetter() {
-    if (!customer || !employeeName.trim() || !/^\d{14}$/.test(nationalId.replace(/\s+/g, "")) || !authorizationDate) {
-      alert("Choose a customer and enter a valid employee, 14-digit National ID, and authorization date.");
+    const identityNumber = nationalId.replace(/\s+/g, "");
+    const validIdentity = usesPassport
+      ? /^[A-Za-z0-9]{3,13}$/.test(identityNumber)
+      : /^\d{14}$/.test(identityNumber);
+    if (!customer || !employeeName.trim() || !validIdentity || !authorizationDate) {
+      alert(usesPassport
+        ? "Choose a customer and enter a valid employee, passport number, and authorization date."
+        : "Choose a customer and enter a valid employee, 14-digit National ID, and authorization date.");
       return;
     }
     window.print();
@@ -117,7 +123,7 @@ export default function AuthorizationClient({ customers, initialEmployees }: { c
           <label>Customer Name<select value={customer} onChange={(event) => setCustomer(event.target.value)}><option value="">Select customer</option>{customers.map((name) => <option key={name}>{name}</option>)}</select></label>
           <label>Saved Employee<select value={employeeId} onChange={(event) => chooseEmployee(event.target.value)}><option value="">Add new employee</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.employee_name} - {employee.national_id}</option>)}</select></label>
           <label>Authorized Employee Name<input value={employeeName} onChange={(event) => { setEmployeeName(event.target.value); setEmployeeId(""); }} /></label>
-          <label>National ID Number<input inputMode="numeric" maxLength={14} value={nationalId} onChange={(event) => { setNationalId(event.target.value.replace(/\D/g, "")); setEmployeeId(""); }} /></label>
+          <label>{usesPassport ? "Passport Number" : "National ID Number"}<input inputMode={usesPassport ? "text" : "numeric"} maxLength={usesPassport ? 13 : 14} value={nationalId} onChange={(event) => { setNationalId(usesPassport ? event.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase() : event.target.value.replace(/\D/g, "")); setEmployeeId(""); }} /></label>
           <label>Authorization Date<input type="date" value={authorizationDate} onChange={(event) => setAuthorizationDate(event.target.value)} /></label>
           <label className="authorization-stamp-toggle"><input type="checkbox" checked={showStamp} onChange={(event) => setShowStamp(event.target.checked)} /><span>Include official Ultra Teb stamp</span></label>
           <div className="authorization-control-actions"><button type="button" onClick={saveEmployee} disabled={saving || Boolean(employeeId)}>{saving ? "Saving..." : "Save Employee"}</button><button type="button" className="danger" onClick={deleteEmployee} disabled={!employeeId}>Delete Employee</button><button type="button" className="primary" onClick={printLetter}>Print / Save PDF</button></div>
