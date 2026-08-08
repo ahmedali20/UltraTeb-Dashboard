@@ -6,6 +6,7 @@ import {
   readDashboardSession,
 } from "../../../../lib/dashboard-auth";
 import { writeAuditLog } from "../../../../lib/audit-log";
+import { normalizePermissions } from "../../../../lib/dashboard-permissions";
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Admin access required." }, { status: 403 });
   }
   const [{ data, error }, { data: salesReps }] = await Promise.all([
-    supabase.from("dashboard_users").select("id, username, role, active, created_at, sales_rep_id, sales_reps(name)").order("username"),
+    supabase.from("dashboard_users").select("id, username, role, active, created_at, sales_rep_id, permissions, sales_reps(name)").order("username"),
     supabase.from("sales_reps").select("id, name").order("name"),
   ]);
   return error
@@ -58,9 +59,10 @@ export async function POST(request: NextRequest) {
       password_salt: salt,
       role,
       sales_rep_id: salesRepId,
+      permissions: role === "admin" ? {} : normalizePermissions(body.permissions),
       active: true,
     })
-    .select("id, username, role, active, created_at, sales_rep_id, sales_reps(name)")
+    .select("id, username, role, active, created_at, sales_rep_id, permissions, sales_reps(name)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   await writeAuditLog(request, {
@@ -84,7 +86,7 @@ export async function PATCH(request: NextRequest) {
 
   const { data: target, error: targetError } = await supabase
     .from("dashboard_users")
-    .select("username, role, active, sales_rep_id")
+    .select("username, role, active, sales_rep_id, permissions")
     .eq("id", id)
     .single();
   if (targetError) {
@@ -107,6 +109,7 @@ export async function PATCH(request: NextRequest) {
   if (body.role === "admin") changes.sales_rep_id = null;
   else if (body.salesRepId !== undefined) changes.sales_rep_id = body.salesRepId ? Number(body.salesRepId) : null;
   if (typeof body.active === "boolean") changes.active = body.active;
+  if (body.permissions !== undefined) changes.permissions = normalizePermissions(body.permissions);
   if (body.password) {
     if (String(body.password).length < 8) {
       return NextResponse.json(
@@ -126,7 +129,7 @@ export async function PATCH(request: NextRequest) {
     .from("dashboard_users")
     .update(changes)
     .eq("id", id)
-    .select("id, username, role, active, created_at, sales_rep_id, sales_reps(name)")
+    .select("id, username, role, active, created_at, sales_rep_id, permissions, sales_reps(name)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   await writeAuditLog(request, {
@@ -135,8 +138,8 @@ export async function PATCH(request: NextRequest) {
     entityId: data.id,
     description: `Updated user ${data.username}.`,
     metadata: {
-      before: { username: target.username, role: target.role, active: target.active, salesRepId: target.sales_rep_id },
-      after: { username: data.username, role: data.role, active: data.active, salesRepId: data.sales_rep_id },
+      before: { username: target.username, role: target.role, active: target.active, salesRepId: target.sales_rep_id, permissions: target.permissions },
+      after: { username: data.username, role: data.role, active: data.active, salesRepId: data.sales_rep_id, permissions: data.permissions },
       passwordChanged: Boolean(body.password),
     },
   });
