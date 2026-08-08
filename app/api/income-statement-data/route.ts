@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { readDashboardSession } from "../../../lib/dashboard-auth";
 import { writeAuditLog } from "../../../lib/audit-log";
+import { hasDashboardPermission } from "../../../lib/dashboard-permissions";
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -20,7 +21,7 @@ const sections = new Set([
 
 async function isAdmin(request: NextRequest) {
   const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
-  return session?.role === "admin";
+  return Boolean(session && hasDashboardPermission(session, "incomeStatement", "edit"));
 }
 
 function values(body: Record<string, unknown>) {
