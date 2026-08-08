@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Header from "../Header";
 import Footer from "../Footer";
+import { dashboardModules, normalizePermissions, type DashboardModule, type DashboardPermissions } from "../../lib/dashboard-permissions";
 
 type ManagedUser = {
   id: string;
@@ -12,8 +13,14 @@ type ManagedUser = {
   created_at: string;
   sales_rep_id: number | null;
   sales_reps: { name: string } | null;
+  permissions: DashboardPermissions;
 };
 type SalesRepOption = { id: number; name: string };
+const permissionLabels: Record<DashboardModule, string> = {
+  home: "Home", customers: "Customers", sales: "Invoices", reps: "Sales Reps",
+  reports: "Reports", teams: "Sales Teams", wht: "Collected WHT", cogs: "Invoices COGS",
+  vat: "VAT Report", incomeStatement: "Income Statement Data", authorization: "Authorization Letters",
+};
 
 export default function UsersPage() {
   const [lang, setLang] = useState<"en" | "ar">("en");
@@ -26,6 +33,8 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [permissionUser, setPermissionUser] = useState<ManagedUser | null>(null);
+  const [permissionDraft, setPermissionDraft] = useState<DashboardPermissions>({});
   const dir = lang === "ar" ? "rtl" : "ltr";
   const t = lang === "ar" ? {
     administration: "الإدارة", title: "إدارة المستخدمين",
@@ -128,6 +137,27 @@ export default function UsersPage() {
     }
     setMessage("User deleted.");
     await loadUsers();
+  }
+
+  function openPermissions(user: ManagedUser) {
+    setPermissionUser(user);
+    setPermissionDraft(normalizePermissions(user.permissions));
+  }
+
+  function changePermission(module: DashboardModule, field: "view" | "edit", checked: boolean) {
+    setPermissionDraft((current) => {
+      const previous = current[module] ?? { view: false, edit: false };
+      const next = { ...previous, [field]: checked };
+      if (field === "edit" && checked) next.view = true;
+      if (field === "view" && !checked) next.edit = false;
+      return { ...current, [module]: next };
+    });
+  }
+
+  async function savePermissions() {
+    if (!permissionUser) return;
+    await updateUser(permissionUser.id, { permissions: permissionDraft });
+    setPermissionUser(null);
   }
 
   return (
@@ -245,6 +275,9 @@ export default function UsersPage() {
                       <button type="button" onClick={() => resetPassword(user)}>
                         {t.changePassword}
                       </button>
+                      <button type="button" onClick={() => openPermissions(user)} disabled={user.role === "admin"}>
+                        Permissions
+                      </button>
                       <button
                         type="button"
                         className="users-delete"
@@ -263,6 +296,20 @@ export default function UsersPage() {
             <div className="users-empty">{t.empty}</div>
           )}
         </section>
+        {permissionUser && (
+          <div className="permissions-modal" role="dialog" aria-modal="true" aria-label={`Permissions for ${permissionUser.username}`}>
+            <section className="permissions-card">
+              <div className="permissions-card__heading"><div><p>USER ACCESS</p><h2>{permissionUser.username}</h2><span>Choose what this user can view or edit.</span></div><button onClick={() => setPermissionUser(null)}>×</button></div>
+              <div className="permissions-grid permissions-grid--header"><strong>Module</strong><strong>View</strong><strong>Edit</strong></div>
+              {dashboardModules.map((module) => {
+                const access = permissionDraft[module] ?? { view: false, edit: false };
+                return <div className="permissions-grid" key={module}><span>{permissionLabels[module]}</span><input type="checkbox" checked={access.view} onChange={(event) => changePermission(module, "view", event.target.checked)} /><input type="checkbox" checked={access.edit} onChange={(event) => changePermission(module, "edit", event.target.checked)} /></div>;
+              })}
+              <p className="permissions-note">The user must sign out and sign in again after permissions are changed.</p>
+              <div className="permissions-actions"><button onClick={() => setPermissionUser(null)}>Cancel</button><button className="primary" onClick={savePermissions}>Save Permissions</button></div>
+            </section>
+          </div>
+        )}
       </main>
       <Footer lang={lang} />
     </div>
