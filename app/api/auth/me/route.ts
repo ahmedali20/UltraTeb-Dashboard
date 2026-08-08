@@ -13,5 +13,6 @@ export async function GET(request: NextRequest) {
     role: session.role,
     salesRepId: session.salesRepId,
     salesRepName: session.salesRepName,
+    permissions: session.permissions,
   });
 }
