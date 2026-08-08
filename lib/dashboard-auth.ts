@@ -1,3 +1,5 @@
+import type { DashboardPermissions } from "./dashboard-permissions";
+
 const encoder = new TextEncoder();
 
 function bytesToBase64Url(bytes: Uint8Array) {
@@ -36,6 +38,7 @@ export type DashboardSession = {
   role: "admin" | "user";
   salesRepId: number | null;
   salesRepName: string | null;
+  permissions: DashboardPermissions;
   expiresAt: number;
 };
 
@@ -43,7 +46,8 @@ export async function createDashboardSession(
   username: string,
   role: "admin" | "user",
   salesRepId: number | null = null,
-  salesRepName: string | null = null
+  salesRepName: string | null = null,
+  permissions: DashboardPermissions = {}
 ) {
   const payload = bytesToBase64Url(
     encoder.encode(
@@ -52,6 +56,7 @@ export async function createDashboardSession(
         role,
         salesRepId,
         salesRepName,
+        permissions,
         expiresAt: Date.now() + 8 * 60 * 60 * 1000,
       })
     )
@@ -88,6 +93,7 @@ export async function readDashboardSession(
       (session.role === "admin" || session.role === "user") &&
       (session.salesRepId === null || typeof session.salesRepId === "number") &&
       (session.salesRepName === null || typeof session.salesRepName === "string") &&
+      session.permissions !== null && typeof session.permissions === "object" &&
       typeof session.expiresAt === "number" &&
       session.expiresAt > Date.now();
     return validSession ? session : null;
