@@ -6,6 +6,7 @@ import {
   hashDashboardPassword,
 } from "../../../../lib/dashboard-auth";
 import { writeAuditLog } from "../../../../lib/audit-log";
+import { normalizePermissions, type DashboardPermissions } from "../../../../lib/dashboard-permissions";
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -20,10 +21,11 @@ export async function POST(request: Request) {
   let authenticatedRole: "admin" | "user" | null = null;
   let salesRepId: number | null = null;
   let salesRepName: string | null = null;
+  let permissions: DashboardPermissions = {};
 
   const { data: managedUser } = await supabase
     .from("dashboard_users")
-    .select("username, password_hash, password_salt, role, active, sales_rep_id, sales_reps(name)")
+    .select("username, password_hash, password_salt, role, active, sales_rep_id, permissions, sales_reps(name)")
     .ilike("username", normalizedUsername)
     .maybeSingle();
 
@@ -36,6 +38,7 @@ export async function POST(request: Request) {
       authenticatedRole = managedUser.role;
       salesRepId = managedUser.sales_rep_id ?? null;
       salesRepName = (managedUser.sales_reps as any)?.name ?? null;
+      permissions = normalizePermissions(managedUser.permissions);
     }
   }
 
@@ -47,6 +50,7 @@ export async function POST(request: Request) {
     authenticatedRole = "admin";
     salesRepId = null;
     salesRepName = null;
+    permissions = {};
 
     if (!managedUser) {
       const salt = createPasswordSalt();
@@ -79,7 +83,8 @@ export async function POST(request: Request) {
     normalizedUsername,
     authenticatedRole,
     salesRepId,
-    salesRepName
+    salesRepName,
+    permissions
   );
   const response = NextResponse.json({ success: true });
   await writeAuditLog(request, {
