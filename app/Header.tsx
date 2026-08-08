@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { normalizePermissions, type DashboardModule, type DashboardPermissions } from "../lib/dashboard-permissions";
 
 type Props = {
   active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "cogs" | "vat" | "incomeStatement" | "authorization" | "users" | "activity";
@@ -64,6 +65,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
     username: string;
     role: "admin" | "user";
     salesRepName: string | null;
+    permissions: DashboardPermissions;
   } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const headerRef = useRef<HTMLElement>(null);
@@ -157,6 +159,9 @@ export default function Header({ active, lang, onToggleLang }: Props) {
 
   const linkClass = (page: string) =>
     `app-sidebar__link${active === page ? " app-sidebar__link--active" : ""}`;
+  const canView = (module: DashboardModule) =>
+    isAdmin || normalizePermissions(currentUser?.permissions)[module]?.view === true;
+  const hasAdministrationAccess = isAdmin || (["teams", "wht", "cogs", "vat", "incomeStatement", "authorization"] as DashboardModule[]).some(canView);
 
   return (
     <header
@@ -244,22 +249,22 @@ export default function Header({ active, lang, onToggleLang }: Props) {
         </div>
         <nav className="app-sidebar__nav" aria-label="Main navigation">
           <span className="app-sidebar__section">{t.workspace}</span>
-          <NavLink href="/" page="home" label={t.home} icon="home" className={linkClass("home")} />
-          <NavLink href="/customers" page="customers" label={t.customers} icon="customers" className={linkClass("customers")} />
-          <NavLink href="/sales#all-records" page="sales" label={t.sales} icon="records" className={linkClass("sales")} />
-          <NavLink href="/sales-reps" page="reps" label={t.reps} icon="reps" className={linkClass("reps")} />
-          <NavLink href="/reports" page="reports" label={t.reports} icon="reports" className={linkClass("reports")} />
-          {isAdmin && (
+          {canView("home") && <NavLink href="/" page="home" label={t.home} icon="home" className={linkClass("home")} />}
+          {canView("customers") && <NavLink href="/customers" page="customers" label={t.customers} icon="customers" className={linkClass("customers")} />}
+          {canView("sales") && <NavLink href="/sales#all-records" page="sales" label={t.sales} icon="records" className={linkClass("sales")} />}
+          {canView("reps") && <NavLink href="/sales-reps" page="reps" label={t.reps} icon="reps" className={linkClass("reps")} />}
+          {canView("reports") && <NavLink href="/reports" page="reports" label={t.reports} icon="reports" className={linkClass("reports")} />}
+          {hasAdministrationAccess && (
             <>
               <span className="app-sidebar__section app-sidebar__section--admin">{t.administration}</span>
-              <NavLink href="/sales-teams" page="teams" label={t.teams} icon="teams" className={linkClass("teams")} />
-              <NavLink href="/wht" page="wht" label={t.wht} icon="records" className={linkClass("wht")} />
-              <NavLink href="/cogs" page="cogs" label={t.cogs} icon="records" className={linkClass("cogs")} />
-              <NavLink href="/vat-report" page="vat" label={t.vat} icon="reports" className={linkClass("vat")} />
-              <NavLink href="/income-statement-data" page="incomeStatement" label={t.incomeStatement} icon="reports" className={linkClass("incomeStatement")} />
-              <NavLink href="/authorization" page="authorization" label={t.authorization} icon="reports" className={linkClass("authorization")} />
-              <NavLink href="/users" page="users" label={t.users} icon="users" className={linkClass("users")} />
-              <NavLink href="/activity-log" page="activity" label={t.activity} icon="activity" className={linkClass("activity")} />
+              {canView("teams") && <NavLink href="/sales-teams" page="teams" label={t.teams} icon="teams" className={linkClass("teams")} />}
+              {canView("wht") && <NavLink href="/wht" page="wht" label={t.wht} icon="records" className={linkClass("wht")} />}
+              {canView("cogs") && <NavLink href="/cogs" page="cogs" label={t.cogs} icon="records" className={linkClass("cogs")} />}
+              {canView("vat") && <NavLink href="/vat-report" page="vat" label={t.vat} icon="reports" className={linkClass("vat")} />}
+              {canView("incomeStatement") && <NavLink href="/income-statement-data" page="incomeStatement" label={t.incomeStatement} icon="reports" className={linkClass("incomeStatement")} />}
+              {canView("authorization") && <NavLink href="/authorization" page="authorization" label={t.authorization} icon="reports" className={linkClass("authorization")} />}
+              {isAdmin && <NavLink href="/users" page="users" label={t.users} icon="users" className={linkClass("users")} />}
+              {isAdmin && <NavLink href="/activity-log" page="activity" label={t.activity} icon="activity" className={linkClass("activity")} />}
             </>
           )}
         </nav>
