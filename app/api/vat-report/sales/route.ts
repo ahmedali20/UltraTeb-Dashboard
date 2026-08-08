@@ -3,12 +3,13 @@ import ExcelJS from "exceljs";
 import { readDashboardSession } from "../../../../lib/dashboard-auth";
 import { loadVatSalesData } from "../../../../lib/vat-sales-data";
 import { writeAuditLog } from "../../../../lib/audit-log";
+import { hasDashboardPermission } from "../../../../lib/dashboard-permissions";
 
 const headers = ["رقم الفاتورة", "اسم العميل", "رقم التسجيل الضريبي للعميل", "العنوان", "تاريخ الفاتورة", "المبلغ الصافي", "قيمة الضريبة", "Table TAX", "WHT", "إجمالي", "ملاحظات"];
 
 export async function GET(request: NextRequest) {
   const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
-  if (session?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  if (!session || !hasDashboardPermission(session, "vat", "view")) return NextResponse.json({ error: "View permission required." }, { status: 403 });
   const from = request.nextUrl.searchParams.get("from") ?? "";
   const to = request.nextUrl.searchParams.get("to") ?? "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return NextResponse.json({ error: "A valid date range is required." }, { status: 400 });
