@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { readDashboardSession } from "../../../lib/dashboard-auth";
 import { writeAuditLog } from "../../../lib/audit-log";
+import { hasDashboardPermission } from "../../../lib/dashboard-permissions";
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -11,7 +12,7 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
-  if (session?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  if (!session || !hasDashboardPermission(session, "authorization", "edit")) return NextResponse.json({ error: "Edit permission required." }, { status: 403 });
   const body = await request.json();
   const employeeName = String(body.employeeName ?? "").trim();
   const nationalId = String(body.nationalId ?? "").replace(/\s+/g, "");
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
-  if (session?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  if (!session || !hasDashboardPermission(session, "authorization", "edit")) return NextResponse.json({ error: "Edit permission required." }, { status: 403 });
   const id = Number(new URL(request.url).searchParams.get("id"));
   const { data: before } = await supabase.from("authorized_employees").select("id, employee_name, national_id").eq("id", id).maybeSingle();
   const { error } = await supabase.from("authorized_employees").delete().eq("id", id);
