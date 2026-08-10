@@ -18,7 +18,7 @@ type ManagedUser = {
 type SalesRepOption = { id: number; name: string };
 const permissionLabels: Record<DashboardModule, string> = {
   home: "Home", customers: "Customers", sales: "Invoices", reps: "Sales Reps",
-  reports: "Reports", teams: "Sales Teams", wht: "Collected WHT", collections: "Collections", cogs: "Invoices COGS",
+  reports: "Reports", teams: "Sales Teams", wht: "Collected WHT", collections: "Collections", cheques: "Cheques", cogs: "Invoices COGS",
   vat: "VAT Report", incomeStatement: "Income Statement Data", authorization: "Authorization Letters",
 };
 
