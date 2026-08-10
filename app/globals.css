@@ -3317,6 +3317,41 @@
 @media (max-width: 950px) { .collection-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 650px) { .collections-page { padding: 16px; } .collections-hero { align-items: stretch; flex-direction: column; } .collection-form-grid, .collection-invoice-preview { grid-template-columns: 1fr; } .collection-invoice-field, .collection-notes-field { grid-column: span 1; } .collections-toolbar { align-items: stretch; } .collections-toolbar select, .collections-toolbar input { width: 100%; margin-inline-start: 0; } }
 
+/* Cheque treasury workflow */
+.cheques-page { display: grid; gap: 18px; padding: 28px; }
+.cheques-hero { border: 1px solid var(--border-color); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 13%, var(--surface-color)), var(--surface-color)); padding: 22px; }
+.cheques-hero p { margin: 0; color: var(--brand-primary); font-size: 10px; font-weight: 900; letter-spacing: .12em; }
+.cheques-hero h1 { margin: 4px 0; }
+.cheques-hero span { color: var(--text-secondary); }
+.cheque-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.cheque-kpis button { display: grid; gap: 6px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--surface-color); color: var(--text-primary); padding: 14px; text-align: start; }
+.cheque-kpis button:hover, .cheque-kpis button.active { border-color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 9%, var(--surface-color)); }
+.cheque-kpis span, .cheque-kpis small { color: var(--text-secondary); font-size: 10px; }
+.cheque-kpis strong { font-size: 15px; }
+.cheques-table-card { border: 1px solid var(--border-color); border-radius: 14px; background: var(--surface-color); padding: 18px; }
+.cheques-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.cheques-toolbar > div { display: flex; align-items: baseline; gap: 10px; }
+.cheques-toolbar h2 { margin: 0; }
+.cheques-toolbar span { color: var(--text-secondary); font-size: 11px; }
+.cheques-toolbar select, .cheques-toolbar input, .cheque-update select, .cheque-update input { box-sizing: border-box; min-height: 38px; border: 1px solid var(--input-border); border-radius: 8px; background: var(--input-bg); color: var(--input-text); padding: 7px 9px; }
+.cheques-toolbar select { width: 190px; margin-inline-start: auto; }
+.cheques-toolbar input { width: min(290px, 100%); }
+.cheques-table-card .table-scroll { overflow-x: auto; }
+.cheques-table-card table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+.cheques-table-card th, .cheques-table-card td { border-bottom: 1px solid var(--border-color); padding: 11px 8px; text-align: start; font-size: 11px; }
+.cheques-table-card th { color: var(--text-secondary); font-size: 9px; text-transform: uppercase; }
+.cheques-table-card a { color: var(--brand-primary); font-weight: 800; text-decoration: none; }
+.cheque-badge { display: inline-flex; border-radius: 999px; background: var(--surface-muted); padding: 5px 8px; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+.cheque-badge--in_treasury { color: #8b5cf6; }
+.cheque-badge--under_collection { color: #f59e0b; }
+.cheque-badge--collected { color: #10b981; }
+.cheque-badge--refused { color: #ef4444; }
+.cheque-badge--returned_to_customer { color: #f97316; }
+.cheque-update { display: grid; grid-template-columns: 150px 125px 70px; gap: 6px; }
+.cheque-update button { min-height: 38px; }
+@media (max-width: 1100px) { .cheque-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 650px) { .cheques-page { padding: 16px; } .cheque-kpis { grid-template-columns: 1fr; } .cheques-toolbar { align-items: stretch; } .cheques-toolbar select, .cheques-toolbar input { width: 100%; margin-inline-start: 0; } }
+
   .cogs-page { display: grid; gap: 16px; padding: 28px; }
   .cogs-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
   .cogs-kpis article, .cogs-card { border: 1px solid var(--border-color); border-radius: 12px; background: var(--surface-color); }
