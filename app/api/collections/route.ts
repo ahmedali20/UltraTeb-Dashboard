@@ -30,6 +30,7 @@ function validationError(values: ReturnType<typeof collectionValues>) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(values.collection_date)) return "Collection date is required.";
   if (!Number.isFinite(values.amount) || values.amount <= 0) return "Collected amount must be greater than zero.";
   if (!["CASH", "BANK_TRANSFER", "CHEQUE", "OTHER"].includes(values.payment_method)) return "Invalid payment method.";
+  if (values.payment_method === "CHEQUE" && !values.reference_no) return "Cheque number is required.";
   return null;
 }
 
@@ -53,6 +54,8 @@ export async function POST(request: NextRequest) {
   if (!invoice) return NextResponse.json({ error: "Invoice not found or unavailable to this user." }, { status: 404 });
   const { data, error } = await supabase.from("invoice_collections").insert({
     ...values,
+    cheque_status: values.payment_method === "CHEQUE" ? "IN_TREASURY" : null,
+    cheque_status_date: values.payment_method === "CHEQUE" ? values.collection_date : null,
     invoice_id: String(invoice.id),
     invoice_no: String(invoice.invoice_no),
     customer_code: invoice.customer_code,
@@ -74,7 +77,14 @@ export async function PATCH(request: NextRequest) {
   if (errorMessage) return NextResponse.json({ error: errorMessage }, { status: 400 });
   const { data: before } = await supabase.from("invoice_collections").select("*").eq("id", id).maybeSingle();
   if (!before || !(await permittedInvoice(String(before.invoice_id), session.salesRepName))) return NextResponse.json({ error: "Collection not found or unavailable to this user." }, { status: 404 });
-  const { data, error } = await supabase.from("invoice_collections").update(values).eq("id", id).select("*").single();
+  const chequeStatus = values.payment_method === "CHEQUE"
+    ? before.payment_method === "CHEQUE" ? before.cheque_status || "IN_TREASURY" : "IN_TREASURY"
+    : null;
+  const { data, error } = await supabase.from("invoice_collections").update({
+    ...values,
+    cheque_status: chequeStatus,
+    cheque_status_date: chequeStatus ? before.cheque_status_date || values.collection_date : null,
+  }).eq("id", id).select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   await writeAuditLog(request, { action: "UPDATE_COLLECTION", entityType: "COLLECTION", entityId: id, description: `Updated collection for invoice ${data.invoice_no}.`, metadata: { before, after: data } });
   return NextResponse.json({ data });
@@ -91,4 +101,3 @@ export async function DELETE(request: NextRequest) {
   await writeAuditLog(request, { action: "DELETE_COLLECTION", entityType: "COLLECTION", entityId: id, description: `Deleted collection for invoice ${before.invoice_no}.`, metadata: { before } });
   return NextResponse.json({ success: true });
 }
-
