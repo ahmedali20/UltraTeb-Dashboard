@@ -3274,6 +3274,49 @@
   @media (max-width: 900px) { .wht-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .wht-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 600px) { .wht-page { padding: 16px; } .wht-form-grid, .wht-kpis { grid-template-columns: 1fr; } .wht-toolbar { align-items: stretch; } .wht-toolbar input, .wht-toolbar select { width: 100%; } }
 
+/* Invoice collections */
+.collections-page { display: grid; gap: 18px; padding: 28px; }
+.collections-hero { display: flex; align-items: end; justify-content: space-between; gap: 20px; border: 1px solid var(--border-color); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 10%, var(--surface-color)), var(--surface-color)); padding: 22px; }
+.collections-hero p, .collections-heading p { margin: 0; color: var(--brand-primary); font-size: 10px; font-weight: 900; letter-spacing: .12em; }
+.collections-hero h1, .collections-heading h2 { margin: 4px 0; }
+.collections-hero > div > span, .collections-heading span { color: var(--text-secondary); }
+.collections-hero article { display: grid; gap: 5px; min-width: 210px; border-radius: 12px; background: var(--brand-primary); color: white; padding: 15px; }
+.collections-hero article span { font-size: 11px; opacity: .82; }
+.collections-hero article strong { font-size: 20px; }
+.collection-form-card, .collection-table-card { border: 1px solid var(--border-color); border-radius: 14px; background: var(--surface-color); padding: 18px; }
+.collections-heading, .collections-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.collection-form-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; }
+.collection-form-grid label { display: grid; align-content: start; gap: 6px; color: var(--text-secondary); font-size: 11px; font-weight: 800; }
+.collection-form-grid input, .collection-form-grid select, .collections-toolbar input, .collections-toolbar select { box-sizing: border-box; width: 100%; min-height: 40px; border: 1px solid var(--input-border); border-radius: 8px; background: var(--input-bg); color: var(--input-text); padding: 8px 10px; }
+.collection-invoice-field { grid-column: span 2; }
+.collection-notes-field { grid-column: span 2; }
+.collection-invoice-preview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; overflow: hidden; border: 1px solid var(--border-color); border-radius: 10px; margin-top: 14px; background: var(--border-color); }
+.collection-invoice-preview span { display: grid; gap: 5px; background: var(--surface-muted); color: var(--text-secondary); padding: 12px; font-size: 11px; }
+.collection-invoice-preview strong { color: var(--text-primary); font-size: 14px; }
+.collection-form-actions { display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); margin-top: 14px; padding-top: 14px; }
+.collection-form-actions button { min-width: 150px; min-height: 40px; }
+.collections-toolbar > div { display: flex; align-items: baseline; gap: 10px; }
+.collections-toolbar h2 { margin: 0; }
+.collections-toolbar span { color: var(--text-secondary); font-size: 11px; }
+.collections-toolbar select { width: min(230px, 100%); margin-inline-start: auto; }
+.collections-toolbar input { width: min(300px, 100%); }
+.collection-table-card .table-scroll, .invoice-collection-table { overflow-x: auto; }
+.collection-table-card table, .invoice-collection-table table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+.collection-table-card th, .collection-table-card td, .invoice-collection-table th, .invoice-collection-table td { border-bottom: 1px solid var(--border-color); padding: 11px 9px; text-align: start; font-size: 12px; }
+.collection-table-card th, .invoice-collection-table th { color: var(--text-secondary); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
+.collection-table-card a, .invoice-collection-heading a { color: var(--brand-primary); font-weight: 800; text-decoration: none; }
+.collection-paid { color: #10b981; font-weight: 800; }
+.collection-row-actions { display: flex; gap: 6px; }
+.collection-row-actions button { min-height: 30px; }
+.collection-row-actions .danger { color: #ef4444; }
+.collection-empty { color: var(--text-secondary); text-align: center !important; padding: 28px !important; }
+.invoice-collection-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.invoice-collection-table tfoot td { background: var(--surface-muted); font-weight: 800; }
+.invoice-collection-table th:last-child, .invoice-collection-table td:last-child { text-align: end; }
+.invoice-status--paid { border-color: #10b981 !important; color: #10b981 !important; }
+@media (max-width: 950px) { .collection-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 650px) { .collections-page { padding: 16px; } .collections-hero { align-items: stretch; flex-direction: column; } .collection-form-grid, .collection-invoice-preview { grid-template-columns: 1fr; } .collection-invoice-field, .collection-notes-field { grid-column: span 1; } .collections-toolbar { align-items: stretch; } .collections-toolbar select, .collections-toolbar input { width: 100%; margin-inline-start: 0; } }
+
   .cogs-page { display: grid; gap: 16px; padding: 28px; }
   .cogs-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
   .cogs-kpis article, .cogs-card { border: 1px solid var(--border-color); border-radius: 12px; background: var(--surface-color); }
