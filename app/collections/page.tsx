@@ -24,4 +24,3 @@ export default async function CollectionsPage() {
   if (error) return <main style={{ padding: 32, color: "#dc2626" }}>{error.message}</main>;
   return <CollectionsClient invoices={invoices ?? []} initialCollections={collectionsResult.data ?? []} canEdit={Boolean(session && hasDashboardPermission(session, "collections", "edit"))} />;
 }
-
