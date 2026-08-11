@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { writeAuditLog } from "../../../../lib/audit-log";
+import { readDashboardSession } from "../../../../lib/dashboard-auth";
+import { NON_ADMIN_SALES_START_DATE } from "../../../../lib/sales-visibility";
 
 const supabaseServer = createClient(
   process.env.SUPABASE_URL as string,
@@ -8,8 +10,10 @@ const supabaseServer = createClient(
   { auth: { persistSession: false } }
 );
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const body = await request.json();
+  const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
+  if (!session) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   const rows: any[] = body.rows || [];
 
   let inserted = 0;
@@ -18,6 +22,10 @@ export async function POST(request: Request) {
   for (const row of rows) {
     if (!row.invoice_no || !row.sales_date || !row.customer_code) {
       failed.push({ row, error: "Missing required field" });
+      continue;
+    }
+    if (session.role !== "admin" && String(row.sales_date) < NON_ADMIN_SALES_START_DATE) {
+      failed.push({ row, error: "Only Admin can upload invoices dated before 2026." });
       continue;
     }
 

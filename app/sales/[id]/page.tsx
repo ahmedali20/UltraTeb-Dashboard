@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import { getCurrentDashboardUser } from "../../../lib/current-dashboard-user";
 import { hasDashboardPermission } from "../../../lib/dashboard-permissions";
+import { canViewPre2026Sales, NON_ADMIN_SALES_START_DATE } from "../../../lib/sales-visibility";
 import InvoiceDetailsClient from "./InvoiceDetailsClient";
 
 const supabase = createClient(
@@ -15,15 +16,22 @@ export const revalidate = 0;
 export default async function InvoiceDetailsPage({ params }: { params: { id: string } }) {
   const session = await getCurrentDashboardUser();
   let invoiceQuery = supabase.from("sales_view").select("*").eq("id", params.id).eq("document_type", "INVOICE");
+  if (!canViewPre2026Sales(session)) invoiceQuery = invoiceQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   if (session?.salesRepName) invoiceQuery = invoiceQuery.eq("sales_rep", session.salesRepName);
   const { data: invoice, error } = await invoiceQuery.maybeSingle();
   if (error || !invoice) notFound();
   const canViewCollections = Boolean(session && hasDashboardPermission(session, "collections", "view"));
+  let notesQuery = supabase.from("sales_view").select("id, invoice_no, sales_date, document_type, original_invoice_no, note_reason, sales_item_total, tax, total_sales").eq("original_invoice_no", invoice.invoice_no).in("document_type", ["CR_NOTE", "DR_NOTE"]).order("sales_date");
+  let whtQuery = supabase.from("wht_collections").select("id, wht_amount, collected_amount, collection_date").eq("invoice_no", invoice.invoice_no).order("collection_date", { ascending: false });
+  if (!canViewPre2026Sales(session)) {
+    notesQuery = notesQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
+    whtQuery = whtQuery.gte("invoice_date", NON_ADMIN_SALES_START_DATE);
+  }
 
   const queries: any[] = [
-    supabase.from("sales_view").select("id, invoice_no, sales_date, document_type, original_invoice_no, note_reason, sales_item_total, tax, total_sales").eq("original_invoice_no", invoice.invoice_no).in("document_type", ["CR_NOTE", "DR_NOTE"]).order("sales_date"),
+    notesQuery,
     supabase.from("customers").select("customer_official_name, payment_terms_days").eq("customer_code", invoice.customer_code).maybeSingle(),
-    supabase.from("wht_collections").select("id, wht_amount, collected_amount, collection_date").eq("invoice_no", invoice.invoice_no).order("collection_date", { ascending: false }),
+    whtQuery,
     canViewCollections
       ? supabase.from("invoice_collections").select("id, collection_date, amount, payment_method, cheque_status, cheque_status_date, reference_no, notes").eq("invoice_id", String(invoice.id)).order("collection_date", { ascending: false }).order("id", { ascending: false })
       : Promise.resolve({ data: [], error: null }),

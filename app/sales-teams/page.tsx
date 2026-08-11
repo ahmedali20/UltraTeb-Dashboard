@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import SalesTeamsClient from "./SalesTeamsClient";
+import { getCurrentDashboardUser } from "../../lib/current-dashboard-user";
+import { canViewPre2026Sales, NON_ADMIN_SALES_START_DATE } from "../../lib/sales-visibility";
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -10,6 +12,11 @@ const supabase = createClient(
 export const revalidate = 0;
 
 export default async function SalesTeamsPage() {
+  const session = await getCurrentDashboardUser();
+  let salesQuery = supabase
+    .from("sales_view")
+    .select("id, month, sales_rep, total_sales, document_type");
+  if (!canViewPre2026Sales(session)) salesQuery = salesQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   const [
     { data: teams, error: teamsError },
     { data: reps, error: repsError },
@@ -26,9 +33,7 @@ export default async function SalesTeamsPage() {
         "id, name, team_id, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus, monthly_salary"
       )
       .order("name"),
-    supabase
-      .from("sales_view")
-      .select("id, month, sales_rep, total_sales, document_type"),
+    salesQuery,
     supabase
       .from("sales_rep_salary_deductions")
       .select("id, sales_rep_id, month, amount, reason")

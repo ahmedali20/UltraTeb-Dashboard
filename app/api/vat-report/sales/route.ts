@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const to = request.nextUrl.searchParams.get("to") ?? "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return NextResponse.json({ error: "A valid date range is required." }, { status: 400 });
 
-  const records = await loadVatSalesData(from, to);
+  const records = await loadVatSalesData(from, to, session.role === "admin");
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Ultra Teb Dashboard";
   workbook.created = new Date();

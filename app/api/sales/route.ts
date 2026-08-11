@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { writeAuditLog } from "../../../lib/audit-log";
+import { readDashboardSession } from "../../../lib/dashboard-auth";
+import { NON_ADMIN_SALES_START_DATE } from "../../../lib/sales-visibility";
 
 const supabaseServer = createClient(
   process.env.SUPABASE_URL as string,
@@ -8,8 +10,13 @@ const supabaseServer = createClient(
   { auth: { persistSession: false } }
 );
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const body = await request.json();
+  const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
+  if (!session) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (session.role !== "admin" && String(body.sales_date ?? "") < NON_ADMIN_SALES_START_DATE) {
+    return NextResponse.json({ error: "Only Admin can create invoices dated before 2026." }, { status: 403 });
+  }
   const documentType =
     body.document_type === "CR_NOTE" || body.document_type === "DR_NOTE"
       ? body.document_type
@@ -92,7 +99,9 @@ export async function POST(request: Request) {
   return NextResponse.json({ data });
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
+  const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
+  if (session?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
   const { error } = await supabaseServer
     .from("sales")
     .delete()

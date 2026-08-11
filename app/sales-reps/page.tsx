@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import SalesRepsClient from "./SalesRepsClient";
 import { getCurrentDashboardUser } from "../../lib/current-dashboard-user";
+import { canViewPre2026Sales, NON_ADMIN_SALES_START_DATE } from "../../lib/sales-visibility";
 
 const supabaseServer = createClient(
   process.env.SUPABASE_URL as string,
@@ -15,6 +16,7 @@ export default async function SalesRepsPage() {
   const repName = session?.salesRepName ?? null;
   let salesQuery = supabaseServer.from("sales_view").select("id, invoice_no, sales_date, month, sales_rep, customer_name, sales_item_total, tax, total_sales").order("sales_date", { ascending: false });
   let repsQuery = supabaseServer.from("sales_reps").select("id, name").order("name", { ascending: true });
+  if (!canViewPre2026Sales(session)) salesQuery = salesQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   if (repName) {
     salesQuery = salesQuery.eq("sales_rep", repName);
     repsQuery = repsQuery.eq("name", repName);

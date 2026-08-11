@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { readDashboardSession } from "../../../lib/dashboard-auth";
 import { writeAuditLog } from "../../../lib/audit-log";
 import { hasDashboardPermission } from "../../../lib/dashboard-permissions";
+import { NON_ADMIN_SALES_START_DATE } from "../../../lib/sales-visibility";
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -10,9 +11,9 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-async function isAdmin(request: NextRequest) {
+async function editableSession(request: NextRequest) {
   const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
-  return Boolean(session && hasDashboardPermission(session, "wht", "edit"));
+  return session && hasDashboardPermission(session, "wht", "edit") ? session : null;
 }
 
 function values(body: Record<string, unknown>) {
@@ -37,8 +38,10 @@ function validate(data: ReturnType<typeof values>) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!(await isAdmin(request))) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const session = await editableSession(request);
+  if (!session) return NextResponse.json({ error: "WHT edit permission required." }, { status: 403 });
   const data = values(await request.json());
+  if (session.role !== "admin" && data.invoice_date < NON_ADMIN_SALES_START_DATE) return NextResponse.json({ error: "Only Admin can manage WHT for invoices before 2026." }, { status: 403 });
   const validationError = validate(data);
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
   const { data: created, error } = await supabase.from("wht_collections").insert(data).select("*").single();
@@ -48,10 +51,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  if (!(await isAdmin(request))) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const session = await editableSession(request);
+  if (!session) return NextResponse.json({ error: "WHT edit permission required." }, { status: 403 });
   const body = await request.json();
   const id = Number(body.id);
   const data = values(body);
+  if (session.role !== "admin" && data.invoice_date < NON_ADMIN_SALES_START_DATE) return NextResponse.json({ error: "Only Admin can manage WHT for invoices before 2026." }, { status: 403 });
   const validationError = validate(data);
   if (!Number.isSafeInteger(id) || id <= 0) return NextResponse.json({ error: "Invalid WHT record." }, { status: 400 });
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
@@ -63,9 +68,11 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  if (!(await isAdmin(request))) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const session = await editableSession(request);
+  if (!session) return NextResponse.json({ error: "WHT edit permission required." }, { status: 403 });
   const id = Number(new URL(request.url).searchParams.get("id"));
   const { data: before } = await supabase.from("wht_collections").select("*").eq("id", id).maybeSingle();
+  if (session.role !== "admin" && String(before?.invoice_date ?? "") < NON_ADMIN_SALES_START_DATE) return NextResponse.json({ error: "Only Admin can manage WHT for invoices before 2026." }, { status: 403 });
   const { error } = await supabase.from("wht_collections").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   await writeAuditLog(request, { action: "DELETE_WHT", entityType: "WHT", entityId: id, description: `Deleted WHT collection for invoice ${before?.invoice_no ?? id}.`, metadata: { before } });

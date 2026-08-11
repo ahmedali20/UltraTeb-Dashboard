@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { readDashboardSession } from "../../../lib/dashboard-auth";
 import { hasDashboardPermission } from "../../../lib/dashboard-permissions";
 import { writeAuditLog } from "../../../lib/audit-log";
+import { NON_ADMIN_SALES_START_DATE } from "../../../lib/sales-visibility";
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -34,9 +35,10 @@ function validationError(values: ReturnType<typeof collectionValues>) {
   return null;
 }
 
-async function permittedInvoice(invoiceId: string, salesRepName: string | null) {
+async function permittedInvoice(invoiceId: string, salesRepName: string | null, isAdmin: boolean) {
   let query = supabase.from("sales_view").select("id, invoice_no, customer_code, customer_name, sales_rep, document_type").eq("id", invoiceId).eq("document_type", "INVOICE");
   if (salesRepName) query = query.eq("sales_rep", salesRepName);
+  if (!isAdmin) query = query.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   const { data } = await query.maybeSingle();
   return data;
 }
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
   const errorMessage = validationError(values);
   if (!invoiceId) return NextResponse.json({ error: "Please choose an invoice." }, { status: 400 });
   if (errorMessage) return NextResponse.json({ error: errorMessage }, { status: 400 });
-  const invoice = await permittedInvoice(invoiceId, session.salesRepName);
+  const invoice = await permittedInvoice(invoiceId, session.salesRepName, session.role === "admin");
   if (!invoice) return NextResponse.json({ error: "Invoice not found or unavailable to this user." }, { status: 404 });
   const { data, error } = await supabase.from("invoice_collections").insert({
     ...values,
@@ -76,7 +78,7 @@ export async function PATCH(request: NextRequest) {
   if (!Number.isSafeInteger(id) || id <= 0) return NextResponse.json({ error: "Invalid collection record." }, { status: 400 });
   if (errorMessage) return NextResponse.json({ error: errorMessage }, { status: 400 });
   const { data: before } = await supabase.from("invoice_collections").select("*").eq("id", id).maybeSingle();
-  if (!before || !(await permittedInvoice(String(before.invoice_id), session.salesRepName))) return NextResponse.json({ error: "Collection not found or unavailable to this user." }, { status: 404 });
+  if (!before || !(await permittedInvoice(String(before.invoice_id), session.salesRepName, session.role === "admin"))) return NextResponse.json({ error: "Collection not found or unavailable to this user." }, { status: 404 });
   const chequeStatus = values.payment_method === "CHEQUE"
     ? before.payment_method === "CHEQUE" ? before.cheque_status || "IN_TREASURY" : "IN_TREASURY"
     : null;
@@ -95,7 +97,7 @@ export async function DELETE(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Collections edit permission required." }, { status: 403 });
   const id = Number(new URL(request.url).searchParams.get("id"));
   const { data: before } = await supabase.from("invoice_collections").select("*").eq("id", id).maybeSingle();
-  if (!before || !(await permittedInvoice(String(before.invoice_id), session.salesRepName))) return NextResponse.json({ error: "Collection not found or unavailable to this user." }, { status: 404 });
+  if (!before || !(await permittedInvoice(String(before.invoice_id), session.salesRepName, session.role === "admin"))) return NextResponse.json({ error: "Collection not found or unavailable to this user." }, { status: 404 });
   const { error } = await supabase.from("invoice_collections").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   await writeAuditLog(request, { action: "DELETE_COLLECTION", entityType: "COLLECTION", entityId: id, description: `Deleted collection for invoice ${before.invoice_no}.`, metadata: { before } });

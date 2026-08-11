@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { writeAuditLog } from "../../../../lib/audit-log";
+import { readDashboardSession } from "../../../../lib/dashboard-auth";
+import { NON_ADMIN_SALES_START_DATE } from "../../../../lib/sales-visibility";
 
 const supabaseServer = createClient(
   process.env.SUPABASE_URL as string,
@@ -9,10 +11,12 @@ const supabaseServer = createClient(
 );
 
 export async function PATCH(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const body = await request.json();
+  const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
+  if (!session) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   const documentType =
     body.document_type === "CR_NOTE" || body.document_type === "DR_NOTE"
       ? body.document_type
@@ -42,6 +46,9 @@ export async function PATCH(
     .select("invoice_no, sales_date, due_date, sales_item_total, tax, document_type, original_invoice_no, note_reason")
     .eq("id", params.id)
     .maybeSingle();
+  if (session.role !== "admin" && (String(before?.sales_date ?? "") < NON_ADMIN_SALES_START_DATE || String(body.sales_date ?? "") < NON_ADMIN_SALES_START_DATE)) {
+    return NextResponse.json({ error: "Only Admin can edit invoices dated before 2026." }, { status: 403 });
+  }
 
   const { data: customerBefore } = await supabaseServer
     .from("customers")
@@ -126,14 +133,19 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
+  if (!session) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   const { data: deletedRecord } = await supabaseServer
     .from("sales")
     .select("invoice_no, sales_date, due_date, sales_item_total, tax, document_type, original_invoice_no, note_reason")
     .eq("id", params.id)
     .maybeSingle();
+  if (session.role !== "admin" && String(deletedRecord?.sales_date ?? "") < NON_ADMIN_SALES_START_DATE) {
+    return NextResponse.json({ error: "Only Admin can delete invoices dated before 2026." }, { status: 403 });
+  }
   const { error } = await supabaseServer
     .from("sales")
     .delete()
