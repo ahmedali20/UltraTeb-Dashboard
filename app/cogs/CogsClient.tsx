@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Header from "../Header";
 import Footer from "../Footer";
 
@@ -28,8 +28,10 @@ export default function CogsClient({ records }: { records: CogsRecord[] }) {
   const [customer, setCustomer] = useState("All");
   const [month, setMonth] = useState("All");
   const [documentType, setDocumentType] = useState("All");
-  const customers = useMemo(() => [...new Set(records.map((item) => item.customer_name))].sort(), [records]);
-  const months = useMemo(() => [...new Set(records.map((item) => monthKey(item.sales_date)).filter(Boolean))].sort().reverse(), [records]);
+  const customers = useMemo(() => [...new Set(records.filter((item) => (month === "All" || monthKey(item.sales_date) === month) && (documentType === "All" || item.document_type === documentType)).map((item) => item.customer_name))].sort(), [records, month, documentType]);
+  const months = useMemo(() => [...new Set(records.filter((item) => (customer === "All" || item.customer_name === customer) && (documentType === "All" || item.document_type === documentType)).map((item) => monthKey(item.sales_date)).filter(Boolean))].sort().reverse(), [records, customer, documentType]);
+  useEffect(() => { if (customer !== "All" && !customers.includes(customer)) setCustomer("All"); }, [customer, customers]);
+  useEffect(() => { if (month !== "All" && !months.includes(month)) setMonth("All"); }, [month, months]);
   const filtered = useMemo(() => records.filter((item) =>
     (customer === "All" || item.customer_name === customer) &&
     (month === "All" || monthKey(item.sales_date) === month) &&

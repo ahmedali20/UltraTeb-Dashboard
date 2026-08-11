@@ -1,6 +1,6 @@
   "use client";
   
-  import { useMemo, useState } from "react";
+  import { useEffect, useMemo, useState } from "react";
   import Header from "../Header";
   import Footer from "../Footer";
 
@@ -136,25 +136,29 @@
   
     const months = useMemo(
       () =>
-        Array.from(new Set([currentReportMonth, ...sales.map((sale) => sale.month).filter(Boolean)])).sort(
+        Array.from(new Set(sales.filter((sale) => (!startDate || sale.sales_date >= startDate) && (!endDate || sale.sales_date <= endDate) && (customer === "All" || sale.customer_name === customer) && (salesRep === "All" || normalizeRep(sale.sales_rep) === salesRep) && (!invoiceSearch.trim() || String(sale.invoice_no || "").toLowerCase().includes(invoiceSearch.trim().toLowerCase()))).map((sale) => sale.month).filter(Boolean))).sort(
           (a, b) => b.localeCompare(a)
         ),
-      [sales]
+      [sales, startDate, endDate, customer, salesRep, invoiceSearch]
     );
     const customers = useMemo(
       () =>
         Array.from(
-          new Set(sales.map((sale) => sale.customer_name).filter(Boolean))
+          new Set(sales.filter((sale) => (!startDate || sale.sales_date >= startDate) && (!endDate || sale.sales_date <= endDate) && (month === "All" || sale.month === month) && (salesRep === "All" || normalizeRep(sale.sales_rep) === salesRep) && (!invoiceSearch.trim() || String(sale.invoice_no || "").toLowerCase().includes(invoiceSearch.trim().toLowerCase()))).map((sale) => sale.customer_name).filter(Boolean))
         ).sort((a, b) => a.localeCompare(b)),
-      [sales]
+      [sales, startDate, endDate, month, salesRep, invoiceSearch]
     );
     const reps = useMemo(
       () =>
-        Array.from(new Set(sales.map((sale) => normalizeRep(sale.sales_rep)))).sort(
+        Array.from(new Set(sales.filter((sale) => (!startDate || sale.sales_date >= startDate) && (!endDate || sale.sales_date <= endDate) && (month === "All" || sale.month === month) && (customer === "All" || sale.customer_name === customer) && (!invoiceSearch.trim() || String(sale.invoice_no || "").toLowerCase().includes(invoiceSearch.trim().toLowerCase()))).map((sale) => normalizeRep(sale.sales_rep)))).sort(
           (a, b) => a.localeCompare(b)
         ),
-      [sales]
+      [sales, startDate, endDate, month, customer, invoiceSearch]
     );
+
+    useEffect(() => { if (month !== "All" && !months.includes(month)) setMonth("All"); }, [month, months]);
+    useEffect(() => { if (customer !== "All" && !customers.includes(customer)) setCustomer("All"); }, [customer, customers]);
+    useEffect(() => { if (salesRep !== "All" && !reps.includes(salesRep)) setSalesRep("All"); }, [salesRep, reps]);
   
     const filtered = useMemo(
       () =>

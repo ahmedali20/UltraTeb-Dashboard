@@ -61,6 +61,7 @@ export default function WhtClient({ customers, initialRecords, invoices }: { cus
     (customerFilter === "All" || item.customer_name === customerFilter) &&
     (!search.trim() || item.invoice_no.toLowerCase().includes(search.trim().toLowerCase()))
   ), [records, customerFilter, search]);
+  const recordCustomers = useMemo(() => Array.from(new Set(records.map((item) => item.customer_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [records]);
   const totals = useMemo(() => filtered.reduce((sum, item) => ({
     subtotal: sum.subtotal + Number(item.subtotal || 0),
     tax: sum.tax + Number(item.tax || 0),
@@ -269,7 +270,7 @@ export default function WhtClient({ customers, initialRecords, invoices }: { cus
         </section>
 
         <section className="wht-table-card">
-          <div className="wht-toolbar"><h2>WHT Records</h2><select value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}><option value="All">All Customers</option>{customers.map((name) => <option key={name}>{name}</option>)}</select><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search invoice number" /></div>
+          <div className="wht-toolbar"><h2>WHT Records</h2><select value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}><option value="All">All Customers</option>{recordCustomers.map((name) => <option key={name}>{name}</option>)}</select><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search invoice number" /></div>
           <div className="table-scroll"><table><thead><tr><th>Customer</th><th>Invoice No.</th><th>Date</th><th>Subtotal</th><th>TAX</th><th>Total</th><th>WHT</th><th>Collected</th><th>Remaining</th><th>Collection Date</th><th>Actions</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}><td>{item.customer_name}</td><td>{item.invoice_no}</td><td>{displayDate(item.invoice_date)}</td><td>{money(item.subtotal)}</td><td>{money(item.tax)}</td><td>{money(item.total)}</td><td>{money(item.wht_amount)}</td><td>{money(item.collected_amount)}</td><td>{money(item.wht_amount - item.collected_amount)}</td><td>{displayDate(item.collection_date)}</td><td><div className="wht-row-actions"><button onClick={() => edit(item)}>Edit</button><button className="danger" onClick={() => remove(item.id)}>Delete</button></div></td></tr>)}</tbody></table>{filtered.length === 0 && <p className="empty-state">No WHT records found.</p>}</div>
         </section>
       </main>

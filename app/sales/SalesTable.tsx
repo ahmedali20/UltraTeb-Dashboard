@@ -249,16 +249,16 @@ export default function SalesTable({
     return recordSortDirection === "asc" ? comparison : -comparison;
   });
   const recordReps = Array.from(
-    new Set(sales.map((sale) => normalizeSalesRep(sale.sales_rep)))
+    new Set(sales.filter((sale) => (recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`)) && (recordMonthFilter === "All" || sale.month === recordMonthFilter) && (recordCustomerFilter === "All" || sale.customer_name === recordCustomerFilter)).map((sale) => normalizeSalesRep(sale.sales_rep)))
   ).sort();
   const recordMonths = Array.from(
-    new Set([currentRecordsMonth, ...sales.map((sale) => sale.month).filter(Boolean)])
+    new Set(sales.filter((sale) => recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`)).map((sale) => sale.month).filter(Boolean))
   ).sort((a, b) => b.localeCompare(a));
   const recordYears = Array.from(
     new Set(sales.map((sale) => String(sale.sales_date || "").slice(0, 4)).filter(Boolean))
   ).sort((a, b) => b.localeCompare(a));
   const recordCustomers = Array.from(
-    new Set(sales.map((sale) => sale.customer_name).filter(Boolean))
+    new Set(sales.filter((sale) => (recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`)) && (recordMonthFilter === "All" || sale.month === recordMonthFilter) && (recordRepFilter === "All" || normalizeSalesRep(sale.sales_rep) === recordRepFilter)).map((sale) => sale.customer_name).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b));
   const displayedSales = sortedSales.filter(
     (sale) =>
@@ -296,6 +296,8 @@ export default function SalesTable({
     recordSort,
     recordSortDirection,
   ]);
+  useEffect(() => { if (recordRepFilter !== "All" && !recordReps.includes(recordRepFilter)) setRecordRepFilter("All"); }, [recordRepFilter, recordReps]);
+  useEffect(() => { if (recordCustomerFilter !== "All" && !recordCustomers.includes(recordCustomerFilter)) setRecordCustomerFilter("All"); }, [recordCustomerFilter, recordCustomers]);
 
   function toggleRecordSort(
     key: "invoice" | "date" | "customer" | "total"
@@ -1396,7 +1398,7 @@ export default function SalesTable({
         </label>
         <label>
           {lang === "ar" ? "السنة" : "Year"}
-          <select value={recordYearFilter} onChange={(event) => setRecordYearFilter(event.target.value)}>
+          <select value={recordYearFilter} onChange={(event) => { setRecordYearFilter(event.target.value); setRecordMonthFilter("All"); }}>
             <option value="All">{lang === "ar" ? "كل السنوات" : "All Years"}</option>
             {recordYears.map((year) => <option key={year} value={year}>{year}</option>)}
           </select>

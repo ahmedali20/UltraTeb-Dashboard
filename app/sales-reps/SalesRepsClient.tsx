@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../Header";
 import Footer from "../Footer";
@@ -109,11 +109,13 @@ export default function SalesRepsClient({
       )
     : [];
   const hospitals = Array.from(
-    new Set(repSales.map((sale) => sale.customer_name).filter(Boolean))
+    new Set(repSales.filter((sale) => monthFilter === "All" || sale.month === monthFilter).map((sale) => sale.customer_name).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b));
   const months = Array.from(
-    new Set([currentRepMonth, ...repSales.map((sale) => sale.month).filter(Boolean)])
+    new Set(repSales.filter((sale) => hospitalFilter === "All" || sale.customer_name === hospitalFilter).map((sale) => sale.month).filter(Boolean))
   ).sort((a, b) => b.localeCompare(a));
+  useEffect(() => { if (hospitalFilter !== "All" && !hospitals.includes(hospitalFilter)) setHospitalFilter("All"); }, [hospitalFilter, hospitals]);
+  useEffect(() => { if (monthFilter !== "All" && !months.includes(monthFilter)) setMonthFilter("All"); }, [monthFilter, months]);
   const visibleSales = repSales
     .filter(
       (sale) =>
