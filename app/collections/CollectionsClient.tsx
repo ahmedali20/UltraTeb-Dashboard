@@ -6,7 +6,7 @@ import Footer from "../Footer";
 
 type Invoice = { id: string | number; invoice_no: string; customer_name: string; sales_date: string; due_date: string | null; total_sales: number; sales_rep: string | null };
 type Collection = { id: number; invoice_id: string; invoice_no: string; customer_name: string; collection_date: string; amount: number; payment_method: string; reference_no: string | null; notes: string | null };
-type WhtCollection = { invoice_no: string; collected_amount: number };
+type WhtCollection = { invoice_no: string; wht_amount: number; collected_amount: number };
 type ChequeAllocation = { id: number; cheque_id: number; invoice_id: string; invoice_no: string; allocated_amount: number; cheque: { id: number; cheque_no: string; collection_date: string; cheque_date: string; cheque_status: string; cheque_status_date: string; customer_name: string; amount: number; notes: string | null } | null };
 const today = new Date().toISOString().slice(0, 10);
 const emptyForm = { customerName: "", invoiceId: "", collectionDate: today, chequeDate: today, amount: "", paymentMethod: "BANK_TRANSFER", referenceNo: "", notes: "" };
@@ -25,7 +25,10 @@ export default function CollectionsClient({ invoices, initialCollections, initia
   const invoiceMap = useMemo(() => new Map(invoices.map((invoice) => [String(invoice.id), invoice])), [invoices]);
   const customers = useMemo(() => Array.from(new Set(invoices.map((invoice) => invoice.customer_name))).sort(), [invoices]);
   const customerInvoices = useMemo(() => invoices.filter((invoice) => invoice.customer_name === form.customerName), [invoices, form.customerName]);
-  const whtByInvoice = useMemo(() => initialWht.reduce((map, item) => map.set(String(item.invoice_no), (map.get(String(item.invoice_no)) ?? 0) + Number(item.collected_amount || 0)), new Map<string, number>()), [initialWht]);
+  const whtByInvoice = useMemo(() => initialWht.reduce((map, item) => {
+    const invoiceNo = String(item.invoice_no ?? "").trim();
+    return map.set(invoiceNo, (map.get(invoiceNo) ?? 0) + Number(item.wht_amount || 0));
+  }, new Map<string, number>()), [initialWht]);
   const settledByInvoice = useMemo(() => {
     const map = records.reduce((result, record) => result.set(record.invoice_id, (result.get(record.invoice_id) ?? 0) + Number(record.amount || 0)), new Map<string, number>());
     initialChequeAllocations.forEach((allocation) => {

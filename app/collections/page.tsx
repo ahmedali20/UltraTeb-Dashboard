@@ -32,7 +32,7 @@ export default async function CollectionsPage() {
   const chequeMap = new Map((chequesResult.data ?? []).map((cheque) => [cheque.id, cheque]));
   const chequeAllocations = (allocationResult.data ?? []).map((allocation) => ({ ...allocation, cheque: chequeMap.get(allocation.cheque_id) ?? null }));
   const invoiceNumbers = (invoices ?? []).map((invoice) => String(invoice.invoice_no));
-  let whtQuery = supabase.from("wht_collections").select("invoice_no, collected_amount").in("invoice_no", invoiceNumbers);
+  let whtQuery = supabase.from("wht_collections").select("invoice_no, wht_amount, collected_amount").in("invoice_no", invoiceNumbers);
   if (!canViewPre2026Sales(session)) whtQuery = whtQuery.gte("invoice_date", NON_ADMIN_SALES_START_DATE);
   const whtResult = invoiceNumbers.length
     ? await whtQuery
