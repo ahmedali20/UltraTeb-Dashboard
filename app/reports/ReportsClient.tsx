@@ -76,6 +76,7 @@
     const [month, setMonth] = useState(currentReportMonth);
     const [customer, setCustomer] = useState("All");
     const [salesRep, setSalesRep] = useState("All");
+    const [invoiceSearch, setInvoiceSearch] = useState("");
     const [reportType, setReportType] = useState<
       "summary" | "details" | "both"
     >("both");
@@ -164,7 +165,8 @@
               (!endDate || sale.sales_date <= endDate) &&
               (month === "All" || sale.month === month) &&
               (customer === "All" || sale.customer_name === customer) &&
-              (salesRep === "All" || normalizeRep(sale.sales_rep) === salesRep)
+              (salesRep === "All" || normalizeRep(sale.sales_rep) === salesRep) &&
+              (!invoiceSearch.trim() || String(sale.invoice_no || "").toLowerCase().includes(invoiceSearch.trim().toLowerCase()))
           )
           .sort((a, b) => {
             const date = a.sales_date.localeCompare(b.sales_date);
@@ -176,7 +178,7 @@
               })
             );
           }),
-      [sales, startDate, endDate, month, customer, salesRep]
+      [sales, startDate, endDate, month, customer, salesRep, invoiceSearch]
     );
   
     const totals = filtered.reduce(
@@ -401,6 +403,7 @@
       setMonth("All");
       setCustomer("All");
       setSalesRep("All");
+      setInvoiceSearch("");
     }
   
     function exportCsv() {
@@ -1131,6 +1134,10 @@
                 <option value="All">{t.allReps}</option>
                 {reps.map((value) => <option key={value} value={value}>{value}</option>)}
               </select>
+            </label>
+            <label>
+              {lang === "ar" ? "بحث برقم الفاتورة" : "Invoice No. Search"}
+              <input type="search" value={invoiceSearch} placeholder={t.invoiceNo} onChange={(event) => setInvoiceSearch(event.target.value)} />
             </label>
             <button type="button" onClick={clearFilters}>{t.clear}</button>
           </section>

@@ -187,6 +187,7 @@ export default function SalesTable({
     Record<number, string>
   >({});
   const [recordRepFilter, setRecordRepFilter] = useState("All");
+  const [recordYearFilter, setRecordYearFilter] = useState("All");
   const [recordMonthFilter, setRecordMonthFilter] = useState(currentRecordsMonth);
   const [recordCustomerFilter, setRecordCustomerFilter] = useState("All");
   const [recordPage, setRecordPage] = useState(1);
@@ -253,6 +254,9 @@ export default function SalesTable({
   const recordMonths = Array.from(
     new Set([currentRecordsMonth, ...sales.map((sale) => sale.month).filter(Boolean)])
   ).sort((a, b) => b.localeCompare(a));
+  const recordYears = Array.from(
+    new Set(sales.map((sale) => String(sale.sales_date || "").slice(0, 4)).filter(Boolean))
+  ).sort((a, b) => b.localeCompare(a));
   const recordCustomers = Array.from(
     new Set(sales.map((sale) => sale.customer_name).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b));
@@ -260,6 +264,7 @@ export default function SalesTable({
     (sale) =>
       (recordRepFilter === "All" ||
         normalizeSalesRep(sale.sales_rep) === recordRepFilter) &&
+      (recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`)) &&
       (recordMonthFilter === "All" || sale.month === recordMonthFilter) &&
       (recordCustomerFilter === "All" ||
         sale.customer_name === recordCustomerFilter)
@@ -285,6 +290,7 @@ export default function SalesTable({
     setRecordPage(1);
   }, [
     recordRepFilter,
+    recordYearFilter,
     recordMonthFilter,
     recordCustomerFilter,
     recordSort,
@@ -1386,6 +1392,13 @@ export default function SalesTable({
             {recordCustomers.map((customerName) => (
               <option key={customerName} value={customerName}>{customerName}</option>
             ))}
+          </select>
+        </label>
+        <label>
+          {lang === "ar" ? "السنة" : "Year"}
+          <select value={recordYearFilter} onChange={(event) => setRecordYearFilter(event.target.value)}>
+            <option value="All">{lang === "ar" ? "كل السنوات" : "All Years"}</option>
+            {recordYears.map((year) => <option key={year} value={year}>{year}</option>)}
           </select>
         </label>
       </div>
