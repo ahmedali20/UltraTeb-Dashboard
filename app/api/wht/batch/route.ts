@@ -14,8 +14,13 @@ export async function POST(request: NextRequest) {
   const customerName = String(body.customerName ?? "").trim();
   const certificateNo = String(body.certificateNo ?? "").trim();
   const collectionDate = String(body.collectionDate ?? "").trim();
-  const invoiceNumbers: string[] = Array.from(new Set((Array.isArray(body.invoiceNumbers) ? body.invoiceNumbers : []).map((value: unknown) => String(value).trim()).filter(Boolean)));
-  if (!customerName || !certificateNo || !/^\d{4}-\d{2}-\d{2}$/.test(collectionDate) || !invoiceNumbers.length) return NextResponse.json({ error: "Customer, certificate number, collection date, and at least one invoice are required." }, { status: 400 });
+  const collectedAmount = Number(body.collectedAmount ?? 0);
+  const rawAllocations: Record<string, unknown>[] = Array.isArray(body.allocations) ? body.allocations : [];
+  const allocations = rawAllocations.map((item) => ({ invoiceNo: String(item.invoiceNo ?? "").trim(), amount: Number(item.amount ?? 0) })).filter((item) => item.invoiceNo && Number.isFinite(item.amount) && item.amount > 0);
+  const invoiceNumbers: string[] = Array.from(new Set(allocations.map((item) => item.invoiceNo)));
+  const allocatedTotal = allocations.reduce((sum, item) => sum + item.amount, 0);
+  if (!customerName || !/^\d{4}-\d{2}-\d{2}$/.test(collectionDate) || !invoiceNumbers.length) return NextResponse.json({ error: "Customer, collection date, and at least one invoice allocation are required." }, { status: 400 });
+  if (!Number.isFinite(collectedAmount) || collectedAmount <= 0 || Math.abs(collectedAmount - allocatedTotal) > 0.01) return NextResponse.json({ error: "Total invoice allocations must equal the collected WHT amount." }, { status: 400 });
 
   let query = supabase.from("sales_view").select("invoice_no, customer_name, sales_date, sales_item_total, tax, sales_rep").eq("document_type", "INVOICE").eq("customer_name", customerName).in("invoice_no", invoiceNumbers);
   if (session.salesRepName) query = query.eq("sales_rep", session.salesRepName);
@@ -24,15 +29,26 @@ export async function POST(request: NextRequest) {
   if (invoiceError) return NextResponse.json({ error: invoiceError.message }, { status: 400 });
   if ((invoices ?? []).length !== invoiceNumbers.length) return NextResponse.json({ error: "One or more invoices are unavailable, duplicated, or belong to another customer." }, { status: 400 });
 
+  const invoiceByNumber = new Map((invoices ?? []).map((invoice) => [String(invoice.invoice_no), invoice]));
+  const excessiveAllocation = allocations.find((allocation) => {
+    const invoice = invoiceByNumber.get(allocation.invoiceNo);
+    const maximumWht = Math.round(Number(invoice?.sales_item_total || 0) * 0.01 * 100) / 100;
+    return allocation.amount > maximumWht + 0.01;
+  });
+  if (excessiveAllocation) return NextResponse.json({ error: `Allocation for invoice ${excessiveAllocation.invoiceNo} exceeds its calculated WHT.` }, { status: 400 });
+
   const { data: existing } = await supabase.from("wht_collections").select("invoice_no").in("invoice_no", invoiceNumbers);
   if (existing?.length) return NextResponse.json({ error: `WHT already exists for invoice(s): ${existing.map((item) => item.invoice_no).join(", ")}.` }, { status: 400 });
   const groupId = crypto.randomUUID();
+  const allocationMap = new Map(allocations.map((item) => [item.invoiceNo, item.amount]));
   const rows = (invoices ?? []).map((invoice) => {
     const subtotal = Number(invoice.sales_item_total || 0);
-    return { customer_name: customerName, invoice_no: String(invoice.invoice_no), invoice_date: invoice.sales_date, subtotal, tax: Number(invoice.tax || 0), wht_rate: 1, collected_amount: Math.round(subtotal * 0.01 * 100) / 100, collection_date: collectionDate, wht_group_id: groupId, certificate_no: certificateNo };
+    const maximumWht = Math.round(subtotal * 0.01 * 100) / 100;
+    const allocation = Number(allocationMap.get(String(invoice.invoice_no)) || 0);
+    return { customer_name: customerName, invoice_no: String(invoice.invoice_no), invoice_date: invoice.sales_date, subtotal, tax: Number(invoice.tax || 0), wht_rate: 1, collected_amount: allocation, collection_date: collectionDate, wht_group_id: groupId, certificate_no: certificateNo || null };
   });
   const { data: created, error } = await supabase.from("wht_collections").insert(rows).select("*");
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  await writeAuditLog(request, { action: "CREATE_WHT_GROUP", entityType: "WHT", entityId: groupId, description: `Added WHT certificate ${certificateNo} for ${rows.length} invoices.`, metadata: { customerName, certificateNo, collectionDate, invoiceNumbers, records: created } });
+  await writeAuditLog(request, { action: "CREATE_WHT_GROUP", entityType: "WHT", entityId: groupId, description: `Added grouped WHT${certificateNo ? ` certificate ${certificateNo}` : ""} for ${rows.length} invoices.`, metadata: { customerName, certificateNo: certificateNo || null, collectionDate, collectedAmount, allocations, records: created } });
   return NextResponse.json({ data: created, groupId });
 }
