@@ -3357,6 +3357,10 @@
 .cheque-allocation-summary > span strong { color: var(--text-primary); font-size: 13px; }
 .cheque-allocation-summary .balanced strong { color: #10b981; }
 .cheque-allocation-summary .unbalanced strong { color: #ef4444; }
+.cheque-allocation-tools { display: flex; align-items: center; gap: 10px; }
+.cheque-allocation-tools button { min-height: 38px; border: 0; border-radius: 8px; background: var(--brand-primary); color: #fff; padding: 0 14px; font-weight: 800; cursor: pointer; }
+.cheque-allocation-tools button:disabled { opacity: .45; cursor: not-allowed; }
+.cheque-allocation-tools span { color: var(--text-secondary); font-size: 10px; }
 .cheque-allocation-list { display: grid; gap: 7px; max-height: 320px; overflow-y: auto; }
 .cheque-allocation-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(270px, 360px); align-items: center; gap: 12px; border-bottom: 1px solid var(--border-color); padding: 9px 0; }
 .cheque-allocation-row:last-child { border-bottom: 0; }
@@ -3368,7 +3372,7 @@
 .cheque-allocation-list small { color: var(--text-secondary); }
 .cheque-allocation-list input { width: 100%; }
 @media (max-width: 1100px) { .cheque-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 650px) { .cheques-page { padding: 16px; } .cheque-kpis, .cheque-allocation-summary, .cheque-allocation-row { grid-template-columns: 1fr; } .cheques-toolbar { align-items: stretch; } .cheques-toolbar select, .cheques-toolbar input { width: 100%; margin-inline-start: 0; } }
+@media (max-width: 650px) { .cheques-page { padding: 16px; } .cheque-kpis, .cheque-allocation-summary, .cheque-allocation-row { grid-template-columns: 1fr; } .cheques-toolbar, .cheque-allocation-tools { align-items: stretch; flex-direction: column; } .cheques-toolbar select, .cheques-toolbar input { width: 100%; margin-inline-start: 0; } }
 
   .cogs-page { display: grid; gap: 16px; padding: 28px; }
   .cogs-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }

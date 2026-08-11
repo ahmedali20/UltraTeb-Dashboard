@@ -79,6 +79,22 @@ export default function CollectionsClient({ invoices, initialCollections, initia
     setRecords((current) => current.filter((record) => record.id !== id));
   }
 
+  function autoAllocateCheque() {
+    let chequeRemaining = Math.max(0, Number(form.amount) || 0);
+    const next: Record<string, string> = {};
+    for (const invoice of customerInvoices) {
+      if (chequeRemaining <= 0) break;
+      const invoiceId = String(invoice.id);
+      const invoiceRemaining = Math.max(0, Number(invoice.total_sales) - (settledByInvoice.get(invoiceId) ?? 0));
+      const allocation = Math.min(invoiceRemaining, chequeRemaining);
+      if (allocation > 0) {
+        next[invoiceId] = allocation.toFixed(2);
+        chequeRemaining = Math.round((chequeRemaining - allocation) * 100) / 100;
+      }
+    }
+    setAllocations(next);
+  }
+
   const chequeValid = form.paymentMethod === "CHEQUE" && Boolean(form.customerName && form.referenceNo && form.collectionDate && form.chequeDate && Number(form.amount) > 0 && allocatedTotal > 0 && Math.abs(allocatedTotal - Number(form.amount)) <= .01);
   return <div className="dashboard-shell" dir={lang === "ar" ? "rtl" : "ltr"}>
     <Header active="collections" lang={lang} onToggleLang={() => setLang((value) => value === "en" ? "ar" : "en")} />
@@ -98,6 +114,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
         </div>
         {form.paymentMethod === "CHEQUE" && form.customerName && <div className="cheque-allocation-panel">
           <div className="cheque-allocation-summary"><span>Cheque Amount <strong>EGP {money(Number(form.amount))}</strong></span><span>Allocated <strong>EGP {money(allocatedTotal)}</strong></span><span className={Math.abs(allocatedTotal - Number(form.amount)) <= .01 ? "balanced" : "unbalanced"}>Unallocated <strong>EGP {money(Number(form.amount) - allocatedTotal)}</strong></span></div>
+          <div className="cheque-allocation-tools"><button type="button" disabled={!Number(form.amount)} onClick={autoAllocateCheque}>Auto Allocate Cheque</button><span>Invoices receive their full remaining balance in order; the final invoice receives only the cheque balance left.</span></div>
           <div className="cheque-allocation-list">{customerInvoices.map((invoice) => { const invoiceId = String(invoice.id); const wht = whtByInvoice.get(String(invoice.invoice_no)) ?? 0; const remaining = Number(invoice.total_sales) - (settledByInvoice.get(invoiceId) ?? 0); return <div className="cheque-allocation-row" key={invoiceId}><span><strong>Invoice {invoice.invoice_no} · {dateLabel(invoice.sales_date)}</strong><small><b>Invoice Total:</b> EGP {money(invoice.total_sales)} <b>WHT:</b> EGP {money(wht)} <b>Remaining:</b> EGP {money(remaining)}</small></span><div><input type="number" min="0" max={Math.max(0, remaining)} step="0.01" placeholder="Write amount" value={allocations[invoiceId] ?? ""} onChange={(event) => setAllocations((current) => ({ ...current, [invoiceId]: event.target.value }))} /><button type="button" disabled={remaining <= 0} onClick={() => setAllocations((current) => ({ ...current, [invoiceId]: Math.max(0, remaining).toFixed(2) }))}>Use Full Remaining</button></div></div>; })}</div>
         </div>}
         {selectedInvoice && form.paymentMethod !== "CHEQUE" && <div className="collection-invoice-preview"><span>Invoice Total <strong>EGP {money(selectedInvoice.total_sales)}</strong></span><span>Total Settled <strong>EGP {money(settledByInvoice.get(String(selectedInvoice.id)) ?? 0)}</strong></span><span>Remaining <strong>EGP {money(Number(selectedInvoice.total_sales) - (settledByInvoice.get(String(selectedInvoice.id)) ?? 0))}</strong></span></div>}
