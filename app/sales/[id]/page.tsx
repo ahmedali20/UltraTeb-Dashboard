@@ -27,13 +27,22 @@ export default async function InvoiceDetailsPage({ params }: { params: { id: str
     notesQuery = notesQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
     whtQuery = whtQuery.gte("invoice_date", NON_ADMIN_SALES_START_DATE);
   }
+  const allocationResult = canViewCollections
+    ? await supabase.from("cheque_allocations").select("id, cheque_id, invoice_id, invoice_no, allocated_amount").eq("invoice_id", String(invoice.id))
+    : { data: [], error: null };
+  const chequeIds = Array.from(new Set((allocationResult.data ?? []).map((allocation) => allocation.cheque_id)));
+  const linkedChequesResult = chequeIds.length
+    ? await supabase.from("customer_cheques").select("id, cheque_no, cheque_date, amount, cheque_status, cheque_status_date, notes").in("id", chequeIds)
+    : { data: [], error: null };
+  const linkedChequeMap = new Map((linkedChequesResult.data ?? []).map((cheque) => [cheque.id, cheque]));
+  const chequeAllocations = (allocationResult.data ?? []).map((allocation) => ({ ...allocation, cheque: linkedChequeMap.get(allocation.cheque_id) ?? null }));
 
   const queries: any[] = [
     notesQuery,
     supabase.from("customers").select("customer_official_name, payment_terms_days").eq("customer_code", invoice.customer_code).maybeSingle(),
     whtQuery,
     canViewCollections
-      ? supabase.from("invoice_collections").select("id, collection_date, amount, payment_method, cheque_status, cheque_status_date, reference_no, notes").eq("invoice_id", String(invoice.id)).order("collection_date", { ascending: false }).order("id", { ascending: false })
+      ? supabase.from("invoice_collections").select("id, collection_date, amount, payment_method, cheque_status, cheque_status_date, reference_no, notes").eq("invoice_id", String(invoice.id)).neq("payment_method", "CHEQUE").order("collection_date", { ascending: false }).order("id", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
   ];
   if (session?.role === "admin") {
@@ -51,6 +60,7 @@ export default async function InvoiceDetailsPage({ params }: { params: { id: str
       customer={customerResult.data ?? null}
       wht={whtResult.data ?? []}
       collections={collectionsResult.data ?? []}
+      chequeAllocations={chequeAllocations}
       canViewCollections={canViewCollections}
       cogs={[...(invoiceCogsResult?.data ?? []), ...(noteCogsResult?.data ?? [])]}
       isAdmin={session?.role === "admin"}

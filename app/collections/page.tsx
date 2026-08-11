@@ -20,15 +20,24 @@ export default async function CollectionsPage() {
   const { data: invoices, error: invoicesError } = await invoiceQuery;
   const invoiceIds = (invoices ?? []).map((invoice) => String(invoice.id));
   const collectionsResult = invoiceIds.length
-    ? await supabase.from("invoice_collections").select("*").in("invoice_id", invoiceIds).order("collection_date", { ascending: false }).order("id", { ascending: false })
+    ? await supabase.from("invoice_collections").select("*").in("invoice_id", invoiceIds).neq("payment_method", "CHEQUE").order("collection_date", { ascending: false }).order("id", { ascending: false })
     : { data: [], error: null };
+  const allocationResult = invoiceIds.length
+    ? await supabase.from("cheque_allocations").select("id, cheque_id, invoice_id, invoice_no, allocated_amount").in("invoice_id", invoiceIds)
+    : { data: [], error: null };
+  const chequeIds = Array.from(new Set((allocationResult.data ?? []).map((item) => item.cheque_id)));
+  const chequesResult = chequeIds.length
+    ? await supabase.from("customer_cheques").select("id, cheque_no, cheque_date, cheque_status, cheque_status_date, customer_name, amount, notes").in("id", chequeIds)
+    : { data: [], error: null };
+  const chequeMap = new Map((chequesResult.data ?? []).map((cheque) => [cheque.id, cheque]));
+  const chequeAllocations = (allocationResult.data ?? []).map((allocation) => ({ ...allocation, cheque: chequeMap.get(allocation.cheque_id) ?? null }));
   const invoiceNumbers = (invoices ?? []).map((invoice) => String(invoice.invoice_no));
   let whtQuery = supabase.from("wht_collections").select("invoice_no, collected_amount").in("invoice_no", invoiceNumbers);
   if (!canViewPre2026Sales(session)) whtQuery = whtQuery.gte("invoice_date", NON_ADMIN_SALES_START_DATE);
   const whtResult = invoiceNumbers.length
     ? await whtQuery
     : { data: [], error: null };
-  const error = invoicesError || collectionsResult.error || whtResult.error;
+  const error = invoicesError || collectionsResult.error || allocationResult.error || chequesResult.error || whtResult.error;
   if (error) return <main style={{ padding: 32, color: "#dc2626" }}>{error.message}</main>;
-  return <CollectionsClient invoices={invoices ?? []} initialCollections={collectionsResult.data ?? []} initialWht={whtResult.data ?? []} canEdit={Boolean(session && hasDashboardPermission(session, "collections", "edit"))} />;
+  return <CollectionsClient invoices={invoices ?? []} initialCollections={collectionsResult.data ?? []} initialChequeAllocations={chequeAllocations} initialWht={whtResult.data ?? []} canEdit={Boolean(session && hasDashboardPermission(session, "collections", "edit"))} />;
 }

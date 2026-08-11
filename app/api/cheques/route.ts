@@ -19,15 +19,18 @@ export async function PATCH(request: NextRequest) {
   if (!statuses.includes(status)) return NextResponse.json({ error: "Invalid cheque status." }, { status: 400 });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(statusDate)) return NextResponse.json({ error: "Status date is required." }, { status: 400 });
 
-  const { data: before } = await supabase.from("invoice_collections").select("*").eq("id", id).eq("payment_method", "CHEQUE").maybeSingle();
+  const { data: before } = await supabase.from("customer_cheques").select("*").eq("id", id).maybeSingle();
   if (!before) return NextResponse.json({ error: "Cheque not found." }, { status: 404 });
-  let invoiceQuery = supabase.from("sales_view").select("id").eq("id", before.invoice_id).eq("document_type", "INVOICE");
+  const { data: allocations } = await supabase.from("cheque_allocations").select("invoice_id").eq("cheque_id", id);
+  const invoiceIds = (allocations ?? []).map((allocation) => allocation.invoice_id);
+  if (!invoiceIds.length) return NextResponse.json({ error: "Cheque has no invoice allocations." }, { status: 400 });
+  let invoiceQuery = supabase.from("sales_view").select("id").in("id", invoiceIds).eq("document_type", "INVOICE");
   if (session.salesRepName) invoiceQuery = invoiceQuery.eq("sales_rep", session.salesRepName);
   if (session.role !== "admin") invoiceQuery = invoiceQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
-  const { data: invoice } = await invoiceQuery.maybeSingle();
-  if (!invoice) return NextResponse.json({ error: "Cheque unavailable to this user." }, { status: 404 });
-  const { data, error } = await supabase.from("invoice_collections").update({ cheque_status: status, cheque_status_date: statusDate, updated_at: new Date().toISOString() }).eq("id", id).select("*").single();
+  const { data: visibleInvoices } = await invoiceQuery;
+  if ((visibleInvoices ?? []).length !== invoiceIds.length) return NextResponse.json({ error: "Cheque unavailable to this user." }, { status: 404 });
+  const { data, error } = await supabase.from("customer_cheques").update({ cheque_status: status, cheque_status_date: statusDate, updated_at: new Date().toISOString() }).eq("id", id).select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  await writeAuditLog(request, { action: "UPDATE_CHEQUE_STATUS", entityType: "CHEQUE", entityId: id, description: `Changed cheque ${data.reference_no || id} from ${before.cheque_status} to ${status}.`, metadata: { before: { status: before.cheque_status, statusDate: before.cheque_status_date }, after: { status, statusDate }, invoiceNo: data.invoice_no, amount: data.amount } });
+  await writeAuditLog(request, { action: "UPDATE_CHEQUE_STATUS", entityType: "CHEQUE", entityId: id, description: `Changed cheque ${data.cheque_no || id} from ${before.cheque_status} to ${status}.`, metadata: { before: { status: before.cheque_status, statusDate: before.cheque_status_date }, after: { status, statusDate }, invoiceIds, amount: data.amount } });
   return NextResponse.json({ data });
 }

@@ -50,14 +50,51 @@ export async function POST(request: NextRequest) {
   const invoiceId = String(body.invoiceId ?? "").trim();
   const values = collectionValues(body);
   const errorMessage = validationError(values);
-  if (!invoiceId) return NextResponse.json({ error: "Please choose an invoice." }, { status: 400 });
   if (errorMessage) return NextResponse.json({ error: errorMessage }, { status: 400 });
+
+  if (values.payment_method === "CHEQUE") {
+    const customerName = String(body.customerName ?? "").trim();
+    const rawAllocations = Array.isArray(body.allocations) ? body.allocations : [];
+    const allocations = rawAllocations.map((item: Record<string, unknown>) => ({ invoiceId: String(item.invoiceId ?? "").trim(), amount: Number(item.amount ?? 0) })).filter((item) => item.invoiceId && Number.isFinite(item.amount) && item.amount > 0);
+    const allocatedTotal = allocations.reduce((sum, item) => sum + item.amount, 0);
+    if (!customerName || !allocations.length) return NextResponse.json({ error: "Customer and at least one invoice allocation are required." }, { status: 400 });
+    if (Math.abs(allocatedTotal - values.amount) > 0.01) return NextResponse.json({ error: "Total invoice allocations must equal the cheque amount." }, { status: 400 });
+
+    const invoices: { invoice: any; amount: number }[] = [];
+    for (const allocation of allocations) {
+      const invoice = await permittedInvoice(allocation.invoiceId, session.salesRepName, session.role === "admin");
+      if (!invoice || invoice.customer_name !== customerName) return NextResponse.json({ error: "Every allocated invoice must belong to the selected customer and be available to this user." }, { status: 400 });
+      invoices.push({ invoice, amount: allocation.amount });
+    }
+    const customerCode = invoices[0].invoice.customer_code;
+    const { data: cheque, error: chequeError } = await supabase.from("customer_cheques").insert({
+      customer_code: customerCode,
+      customer_name: customerName,
+      cheque_no: values.reference_no,
+      cheque_date: values.collection_date,
+      amount: values.amount,
+      cheque_status: "IN_TREASURY",
+      cheque_status_date: values.collection_date,
+      notes: values.notes,
+    }).select("*").single();
+    if (chequeError) return NextResponse.json({ error: chequeError.message }, { status: 400 });
+    const allocationPayload = invoices.map(({ invoice, amount }) => ({ cheque_id: cheque.id, invoice_id: String(invoice.id), invoice_no: String(invoice.invoice_no), allocated_amount: amount }));
+    const { data: createdAllocations, error: allocationError } = await supabase.from("cheque_allocations").insert(allocationPayload).select("*");
+    if (allocationError) {
+      await supabase.from("customer_cheques").delete().eq("id", cheque.id);
+      return NextResponse.json({ error: allocationError.message }, { status: 400 });
+    }
+    await writeAuditLog(request, { action: "CREATE_CHEQUE", entityType: "CHEQUE", entityId: cheque.id, description: `Recorded cheque ${cheque.cheque_no} allocated to ${createdAllocations?.length ?? 0} invoices.`, metadata: { cheque, allocations: createdAllocations } });
+    return NextResponse.json({ data: { cheque, allocations: createdAllocations } });
+  }
+
+  if (!invoiceId) return NextResponse.json({ error: "Please choose an invoice." }, { status: 400 });
   const invoice = await permittedInvoice(invoiceId, session.salesRepName, session.role === "admin");
   if (!invoice) return NextResponse.json({ error: "Invoice not found or unavailable to this user." }, { status: 404 });
   const { data, error } = await supabase.from("invoice_collections").insert({
     ...values,
-    cheque_status: values.payment_method === "CHEQUE" ? "IN_TREASURY" : null,
-    cheque_status_date: values.payment_method === "CHEQUE" ? values.collection_date : null,
+    cheque_status: null,
+    cheque_status_date: null,
     invoice_id: String(invoice.id),
     invoice_no: String(invoice.invoice_no),
     customer_code: invoice.customer_code,
@@ -77,15 +114,13 @@ export async function PATCH(request: NextRequest) {
   const errorMessage = validationError(values);
   if (!Number.isSafeInteger(id) || id <= 0) return NextResponse.json({ error: "Invalid collection record." }, { status: 400 });
   if (errorMessage) return NextResponse.json({ error: errorMessage }, { status: 400 });
+  if (values.payment_method === "CHEQUE") return NextResponse.json({ error: "Create and manage cheques through the cheque workflow." }, { status: 400 });
   const { data: before } = await supabase.from("invoice_collections").select("*").eq("id", id).maybeSingle();
   if (!before || !(await permittedInvoice(String(before.invoice_id), session.salesRepName, session.role === "admin"))) return NextResponse.json({ error: "Collection not found or unavailable to this user." }, { status: 404 });
-  const chequeStatus = values.payment_method === "CHEQUE"
-    ? before.payment_method === "CHEQUE" ? before.cheque_status || "IN_TREASURY" : "IN_TREASURY"
-    : null;
   const { data, error } = await supabase.from("invoice_collections").update({
     ...values,
-    cheque_status: chequeStatus,
-    cheque_status_date: chequeStatus ? before.cheque_status_date || values.collection_date : null,
+    cheque_status: null,
+    cheque_status_date: null,
   }).eq("id", id).select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   await writeAuditLog(request, { action: "UPDATE_COLLECTION", entityType: "COLLECTION", entityId: id, description: `Updated collection for invoice ${data.invoice_no}.`, metadata: { before, after: data } });
