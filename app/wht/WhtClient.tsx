@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Header from "../Header";
 import Footer from "../Footer";
+import WhtBatchForm from "./WhtBatchForm";
 
 type WhtRecord = {
   id: number;
@@ -240,6 +241,8 @@ export default function WhtClient({ customers, initialRecords, invoices }: { cus
         <section className="page-hero">
           <div><p>WITHHOLDING TAX</p><h1>Collected WHT</h1><span>Record and track collected withholding tax at 1% of invoice subtotal.</span></div>
         </section>
+
+        <WhtBatchForm customers={customers} invoices={invoices} />
 
         <section className="wht-form-card">
           <div className="wht-section-heading"><div><p>{editingId ? "EDIT RECORD" : "NEW RECORD"}</p><h2>{editingId ? "Edit WHT Collection" : "Add WHT Collection"}</h2></div><strong>WHT Rate: 1%</strong></div>

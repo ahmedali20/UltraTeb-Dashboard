@@ -3526,6 +3526,18 @@
   @media (max-width: 1000px) { .is-entry-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } .is-description { grid-column: 1 / -1; } .is-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 600px) { .is-data-page { padding: 16px; } .is-entry-form, .is-summary-grid { grid-template-columns: 1fr; } .is-month-toolbar { align-items: stretch; flex-direction: column; } }
 
+  .wht-batch-card { display: grid; gap: 14px; }
+  .wht-batch-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .wht-batch-controls label { display: grid; gap: 6px; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+  .wht-batch-controls input, .wht-batch-controls select { min-height: 40px; border: 1px solid var(--input-border); border-radius: 8px; background: var(--input-bg); color: var(--input-text); padding: 8px 10px; }
+  .wht-batch-list { display: grid; max-height: 340px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 10px; }
+  .wht-batch-list > label { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-color); padding: 10px 12px; cursor: pointer; }
+  .wht-batch-list > label:last-child { border-bottom: 0; }
+  .wht-batch-list > label > span { display: grid; gap: 3px; }
+  .wht-batch-list small { color: var(--text-secondary); }
+  .wht-batch-list input { width: 17px; height: 17px; }
+  @media (max-width: 700px) { .wht-batch-controls { grid-template-columns: 1fr; } .wht-batch-list > label { grid-template-columns: auto 1fr; } .wht-batch-list > label > b { grid-column: 2; } }
+
   @media print {
     @page { size: A4 portrait; margin: 0; }
     html, body { width: 210mm !important; min-width: 210mm !important; height: 297mm !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; background: white !important; }
