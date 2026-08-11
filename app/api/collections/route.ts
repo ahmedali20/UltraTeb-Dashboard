@@ -55,7 +55,9 @@ export async function POST(request: NextRequest) {
   if (values.payment_method === "CHEQUE") {
     const customerName = String(body.customerName ?? "").trim();
     const chequeDate = String(body.chequeDate ?? "").trim();
+    const bankName = String(body.bankName ?? "").trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(chequeDate)) return NextResponse.json({ error: "Cheque date is required." }, { status: 400 });
+    if (!bankName) return NextResponse.json({ error: "Bank name is required." }, { status: 400 });
     const rawAllocations: Record<string, unknown>[] = Array.isArray(body.allocations) ? body.allocations : [];
     const allocations: { invoiceId: string; amount: number }[] = rawAllocations
       .map((item: Record<string, unknown>) => ({
@@ -81,6 +83,7 @@ export async function POST(request: NextRequest) {
       customer_name: customerName,
       collection_date: values.collection_date,
       cheque_no: values.reference_no,
+      bank_name: bankName,
       cheque_date: chequeDate,
       amount: values.amount,
       cheque_status: "IN_TREASURY",

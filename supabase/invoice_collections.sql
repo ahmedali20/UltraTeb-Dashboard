@@ -74,6 +74,7 @@ create table if not exists public.customer_cheques (
   customer_name text not null,
   collection_date date not null,
   cheque_no text not null,
+  bank_name text not null default '',
   cheque_date date not null,
   amount numeric(14,2) not null check (amount > 0),
   cheque_status text not null default 'IN_TREASURY'
@@ -105,6 +106,7 @@ alter table public.customer_cheques enable row level security;
 alter table public.cheque_allocations enable row level security;
 
 alter table public.customer_cheques add column if not exists collection_date date;
+alter table public.customer_cheques add column if not exists bank_name text not null default '';
 update public.customer_cheques set collection_date = coalesce(collection_date, cheque_date) where collection_date is null;
 alter table public.customer_cheques alter column collection_date set not null;
 

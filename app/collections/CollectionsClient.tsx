@@ -9,7 +9,7 @@ type Collection = { id: number; invoice_id: string; invoice_no: string; customer
 type WhtCollection = { invoice_no: string; wht_amount: number; collected_amount: number };
 type ChequeAllocation = { id: number; cheque_id: number; invoice_id: string; invoice_no: string; allocated_amount: number; cheque: { id: number; cheque_no: string; collection_date: string; cheque_date: string; cheque_status: string; cheque_status_date: string; customer_name: string; amount: number; notes: string | null } | null };
 const today = new Date().toISOString().slice(0, 10);
-const emptyForm = { customerName: "", invoiceId: "", collectionDate: today, chequeDate: today, amount: "", paymentMethod: "BANK_TRANSFER", referenceNo: "", notes: "" };
+const emptyForm = { customerName: "", invoiceId: "", collectionDate: today, chequeDate: today, bankName: "", amount: "", paymentMethod: "BANK_TRANSFER", referenceNo: "", notes: "" };
 const money = (value: number) => Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateLabel = (value: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replaceAll(" ", "-") : "—";
 
@@ -56,7 +56,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
 
   function update(name: keyof typeof emptyForm, value: string) { setForm((current) => ({ ...current, [name]: value })); }
   function reset() { setForm(emptyForm); setAllocations({}); setEditingId(null); }
-  function edit(record: Collection) { setEditingId(record.id); setForm({ customerName: record.customer_name, invoiceId: record.invoice_id, collectionDate: record.collection_date, chequeDate: record.collection_date, amount: String(record.amount), paymentMethod: record.payment_method, referenceNo: record.reference_no ?? "", notes: record.notes ?? "" }); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  function edit(record: Collection) { setEditingId(record.id); setForm({ customerName: record.customer_name, invoiceId: record.invoice_id, collectionDate: record.collection_date, chequeDate: record.collection_date, bankName: "", amount: String(record.amount), paymentMethod: record.payment_method, referenceNo: record.reference_no ?? "", notes: record.notes ?? "" }); window.scrollTo({ top: 0, behavior: "smooth" }); }
 
   async function save() {
     setSaving(true);
@@ -95,7 +95,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
     setAllocations(next);
   }
 
-  const chequeValid = form.paymentMethod === "CHEQUE" && Boolean(form.customerName && form.referenceNo && form.collectionDate && form.chequeDate && Number(form.amount) > 0 && allocatedTotal > 0 && Math.abs(allocatedTotal - Number(form.amount)) <= .01);
+  const chequeValid = form.paymentMethod === "CHEQUE" && Boolean(form.customerName && form.referenceNo && form.bankName.trim() && form.collectionDate && form.chequeDate && Number(form.amount) > 0 && allocatedTotal > 0 && Math.abs(allocatedTotal - Number(form.amount)) <= .01);
   return <div className="dashboard-shell" dir={lang === "ar" ? "rtl" : "ltr"}>
     <Header active="collections" lang={lang} onToggleLang={() => setLang((value) => value === "en" ? "ar" : "en")} />
     <main className="collections-page">
@@ -107,6 +107,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
           {form.paymentMethod !== "CHEQUE" && <label><span>Invoice No. *</span><select value={form.invoiceId} disabled={!form.customerName || Boolean(editingId)} onChange={(event) => update("invoiceId", event.target.value)}><option value="">{form.customerName ? "Select invoice" : "Choose customer first"}</option>{customerInvoices.map((invoice) => <option key={String(invoice.id)} value={String(invoice.id)}>Invoice {invoice.invoice_no} — EGP {money(invoice.total_sales)}</option>)}</select></label>}
           <label><span>Collection Date *</span><input type="date" value={form.collectionDate} onChange={(event) => update("collectionDate", event.target.value)} /></label>
           {form.paymentMethod === "CHEQUE" && <label><span>Cheque Date *</span><input type="date" value={form.chequeDate} onChange={(event) => update("chequeDate", event.target.value)} /></label>}
+          {form.paymentMethod === "CHEQUE" && <label><span>Bank Name *</span><input value={form.bankName} placeholder="Enter bank name" onChange={(event) => update("bankName", event.target.value)} /></label>}
           <label><span>{form.paymentMethod === "CHEQUE" ? "Cheque Amount *" : "Collected Amount *"}</span><input type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => update("amount", event.target.value)} /></label>
           <label><span>Payment Method *</span><select value={form.paymentMethod} disabled={Boolean(editingId)} onChange={(event) => { update("paymentMethod", event.target.value); setAllocations({}); }}><option value="BANK_TRANSFER">Bank Transfer</option><option value="CHEQUE">Cheque</option><option value="CASH">Cash</option><option value="OTHER">Other</option></select></label>
           <label><span>{form.paymentMethod === "CHEQUE" ? "Cheque No. *" : "Reference No."}</span><input value={form.referenceNo} onChange={(event) => update("referenceNo", event.target.value)} /></label>
