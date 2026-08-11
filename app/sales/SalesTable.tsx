@@ -1071,7 +1071,7 @@ export default function SalesTable({
       <div
         id="bulk-upload"
         style={{
-          display: activeSalesView === "add" ? undefined : "none",
+          display: undefined,
           background: "var(--surface-bg)",
           borderRadius: 8,
           boxShadow: "var(--surface-shadow)",
