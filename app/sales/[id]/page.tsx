@@ -32,7 +32,7 @@ export default async function InvoiceDetailsPage({ params }: { params: { id: str
     : { data: [], error: null };
   const chequeIds = Array.from(new Set((allocationResult.data ?? []).map((allocation) => allocation.cheque_id)));
   const linkedChequesResult = chequeIds.length
-    ? await supabase.from("customer_cheques").select("id, cheque_no, cheque_date, amount, cheque_status, cheque_status_date, notes").in("id", chequeIds)
+    ? await supabase.from("customer_cheques").select("id, cheque_no, collection_date, cheque_date, amount, cheque_status, cheque_status_date, notes").in("id", chequeIds)
     : { data: [], error: null };
   const linkedChequeMap = new Map((linkedChequesResult.data ?? []).map((cheque) => [cheque.id, cheque]));
   const chequeAllocations = (allocationResult.data ?? []).map((allocation) => ({ ...allocation, cheque: linkedChequeMap.get(allocation.cheque_id) ?? null }));

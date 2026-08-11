@@ -27,7 +27,7 @@ export default async function CollectionsPage() {
     : { data: [], error: null };
   const chequeIds = Array.from(new Set((allocationResult.data ?? []).map((item) => item.cheque_id)));
   const chequesResult = chequeIds.length
-    ? await supabase.from("customer_cheques").select("id, cheque_no, cheque_date, cheque_status, cheque_status_date, customer_name, amount, notes").in("id", chequeIds)
+    ? await supabase.from("customer_cheques").select("id, cheque_no, collection_date, cheque_date, cheque_status, cheque_status_date, customer_name, amount, notes").in("id", chequeIds)
     : { data: [], error: null };
   const chequeMap = new Map((chequesResult.data ?? []).map((cheque) => [cheque.id, cheque]));
   const chequeAllocations = (allocationResult.data ?? []).map((allocation) => ({ ...allocation, cheque: chequeMap.get(allocation.cheque_id) ?? null }));

@@ -3358,13 +3358,17 @@
 .cheque-allocation-summary .balanced strong { color: #10b981; }
 .cheque-allocation-summary .unbalanced strong { color: #ef4444; }
 .cheque-allocation-list { display: grid; gap: 7px; max-height: 320px; overflow-y: auto; }
-.cheque-allocation-list label { display: grid; grid-template-columns: minmax(0, 1fr) 150px; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-color); padding: 7px 0; }
-.cheque-allocation-list label:last-child { border-bottom: 0; }
-.cheque-allocation-list label > span { display: grid; gap: 3px; }
+.cheque-allocation-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(270px, 360px); align-items: center; gap: 12px; border-bottom: 1px solid var(--border-color); padding: 9px 0; }
+.cheque-allocation-row:last-child { border-bottom: 0; }
+.cheque-allocation-row > span { display: grid; gap: 5px; }
+.cheque-allocation-row > span small { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.cheque-allocation-row > div { display: grid; grid-template-columns: minmax(110px, 1fr) auto; gap: 7px; }
+.cheque-allocation-row button { min-height: 40px; border: 1px solid var(--brand-primary); border-radius: 8px; background: transparent; color: var(--brand-primary); padding: 0 10px; font-size: 10px; font-weight: 800; cursor: pointer; }
+.cheque-allocation-row button:disabled { opacity: .45; cursor: not-allowed; }
 .cheque-allocation-list small { color: var(--text-secondary); }
 .cheque-allocation-list input { width: 100%; }
 @media (max-width: 1100px) { .cheque-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 650px) { .cheques-page { padding: 16px; } .cheque-kpis, .cheque-allocation-summary { grid-template-columns: 1fr; } .cheques-toolbar { align-items: stretch; } .cheques-toolbar select, .cheques-toolbar input { width: 100%; margin-inline-start: 0; } .cheque-allocation-list label { grid-template-columns: 1fr; } }
+@media (max-width: 650px) { .cheques-page { padding: 16px; } .cheque-kpis, .cheque-allocation-summary, .cheque-allocation-row { grid-template-columns: 1fr; } .cheques-toolbar { align-items: stretch; } .cheques-toolbar select, .cheques-toolbar input { width: 100%; margin-inline-start: 0; } }
 
   .cogs-page { display: grid; gap: 16px; padding: 28px; }
   .cogs-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }

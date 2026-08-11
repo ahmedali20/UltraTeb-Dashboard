@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
 
   if (values.payment_method === "CHEQUE") {
     const customerName = String(body.customerName ?? "").trim();
+    const chequeDate = String(body.chequeDate ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(chequeDate)) return NextResponse.json({ error: "Cheque date is required." }, { status: 400 });
     const rawAllocations: Record<string, unknown>[] = Array.isArray(body.allocations) ? body.allocations : [];
     const allocations: { invoiceId: string; amount: number }[] = rawAllocations
       .map((item: Record<string, unknown>) => ({
@@ -77,8 +79,9 @@ export async function POST(request: NextRequest) {
     const { data: cheque, error: chequeError } = await supabase.from("customer_cheques").insert({
       customer_code: customerCode,
       customer_name: customerName,
+      collection_date: values.collection_date,
       cheque_no: values.reference_no,
-      cheque_date: values.collection_date,
+      cheque_date: chequeDate,
       amount: values.amount,
       cheque_status: "IN_TREASURY",
       cheque_status_date: values.collection_date,
