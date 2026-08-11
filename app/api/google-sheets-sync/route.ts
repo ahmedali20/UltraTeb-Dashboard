@@ -655,7 +655,7 @@ async function syncInvoices() {
         .select("customer_code, customer_name, sales_rep_name"),
       supabase
         .from("sales_view")
-        .select("id, invoice_no, customer_code, customer_name, document_type"),
+        .select("id, invoice_no, sales_date, customer_code, customer_name, document_type"),
     ]);
 
   if (customersError) throw new Error(customersError.message);
@@ -671,6 +671,7 @@ async function syncInvoices() {
   let deleted = 0;
   let deletionSkipped = false;
   let deletionSkipReason = "";
+  let protectedOutside2026 = 0;
   let invalidRepValuesIgnored = 0;
   let cleanedCustomers = 0;
   let cleanedCustomerReps = 0;
@@ -896,7 +897,8 @@ async function syncInvoices() {
     const existingMatches = (priorSales ?? []).filter(
       (sale) =>
         String(sale.invoice_no).trim() === invoiceNo &&
-        (sale.document_type ?? "INVOICE") === documentType
+        (sale.document_type ?? "INVOICE") === documentType &&
+        String(sale.sales_date ?? "").slice(0, 4) === salesDate.slice(0, 4)
     );
     const existing = existingMatches[0];
     const query = existing
@@ -937,8 +939,9 @@ async function syncInvoices() {
   }
 
   /*
-   * Google Sheets is the source of truth for sales records. Only remove records
-   * that disappeared from the sheet after a completely valid sync.
+   * Google Sheets is the source of truth only for 2026 sales records. Manual
+   * invoices outside 2026 must remain untouched by synchronization deletion.
+   * Only remove 2026 records that disappeared after a completely valid sync.
    */
   if (failed.length > 0 || skippedIncomplete > 0) {
     deletionSkipped = true;
@@ -948,8 +951,12 @@ async function syncInvoices() {
     deletionSkipped = true;
     deletionSkipReason = "Deletion skipped because the sheets contain no valid records.";
   } else {
+    protectedOutside2026 = (priorSales ?? []).filter(
+      (sale) => String(sale.sales_date ?? "").slice(0, 4) !== "2026"
+    ).length;
     const staleIds = (priorSales ?? [])
       .filter((sale) => {
+        if (String(sale.sales_date ?? "").slice(0, 4) !== "2026") return false;
         const existingType = sale.document_type ?? "INVOICE";
         const existingInvoiceNo = String(sale.invoice_no ?? "").trim();
         return !syncedDocumentKeys.has(`${existingType}:${existingInvoiceNo}`);
@@ -1067,6 +1074,7 @@ async function syncInvoices() {
     debitNotes,
     cogs: cogsSync,
     deleted,
+    protectedOutside2026,
     deletionSkipped,
     deletionSkipReason,
     invalidRepValuesIgnored,
