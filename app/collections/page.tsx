@@ -14,7 +14,7 @@ export const revalidate = 0;
 
 export default async function CollectionsPage() {
   const session = await getCurrentDashboardUser();
-  let invoiceQuery = supabase.from("sales_view").select("id, invoice_no, customer_code, customer_name, sales_date, due_date, total_sales, sales_rep").eq("document_type", "INVOICE").order("sales_date", { ascending: false });
+  let invoiceQuery = supabase.from("sales_view").select("id, invoice_no, customer_code, customer_name, sales_date, due_date, sales_item_total, total_sales, sales_rep").eq("document_type", "INVOICE").order("sales_date", { ascending: false });
   if (session?.salesRepName) invoiceQuery = invoiceQuery.eq("sales_rep", session.salesRepName);
   if (!canViewPre2026Sales(session)) invoiceQuery = invoiceQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   const { data: invoices, error: invoicesError } = await invoiceQuery;
