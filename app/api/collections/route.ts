@@ -54,8 +54,15 @@ export async function POST(request: NextRequest) {
 
   if (values.payment_method === "CHEQUE") {
     const customerName = String(body.customerName ?? "").trim();
-    const rawAllocations = Array.isArray(body.allocations) ? body.allocations : [];
-    const allocations = rawAllocations.map((item: Record<string, unknown>) => ({ invoiceId: String(item.invoiceId ?? "").trim(), amount: Number(item.amount ?? 0) })).filter((item) => item.invoiceId && Number.isFinite(item.amount) && item.amount > 0);
+    const rawAllocations: Record<string, unknown>[] = Array.isArray(body.allocations) ? body.allocations : [];
+    const allocations: { invoiceId: string; amount: number }[] = rawAllocations
+      .map((item: Record<string, unknown>) => ({
+        invoiceId: String(item.invoiceId ?? "").trim(),
+        amount: Number(item.amount ?? 0),
+      }))
+      .filter((item: { invoiceId: string; amount: number }) =>
+        Boolean(item.invoiceId) && Number.isFinite(item.amount) && item.amount > 0
+      );
     const allocatedTotal = allocations.reduce((sum, item) => sum + item.amount, 0);
     if (!customerName || !allocations.length) return NextResponse.json({ error: "Customer and at least one invoice allocation are required." }, { status: 400 });
     if (Math.abs(allocatedTotal - values.amount) > 0.01) return NextResponse.json({ error: "Total invoice allocations must equal the cheque amount." }, { status: 400 });
