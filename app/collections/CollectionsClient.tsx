@@ -24,6 +24,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
   const [customerFilter, setCustomerFilter] = useState("All");
   const invoiceMap = useMemo(() => new Map(invoices.map((invoice) => [String(invoice.id), invoice])), [invoices]);
   const customers = useMemo(() => Array.from(new Set(invoices.map((invoice) => invoice.customer_name))).sort(), [invoices]);
+  const historyCustomers = useMemo(() => Array.from(new Set(records.map((record) => record.customer_name))).sort(), [records]);
   const customerInvoices = useMemo(() => invoices.filter((invoice) => invoice.customer_name === form.customerName), [invoices, form.customerName]);
   const whtByInvoice = useMemo(() => {
     const map = initialWht.reduce((result, item) => {

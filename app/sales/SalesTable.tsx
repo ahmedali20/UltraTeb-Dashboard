@@ -404,7 +404,9 @@ export default function SalesTable({
                   json.failed?.length ? `، وفشل ${json.failed.length}` : ""
                 }`
               : `Uploaded ${json.inserted} invoices successfully${
-                  json.failed?.length ? `, ${json.failed.length} failed` : ""
+                  json.failed?.length
+                    ? `, ${json.failed.length} failed. First error: invoice ${json.failed[0]?.row?.invoice_no || "unknown"} - ${json.failed[0]?.error}`
+                    : ""
                 }`
           );
           setBulkFile(null);
@@ -690,7 +692,9 @@ export default function SalesTable({
     if (res.ok) {
       setBulkStatus(
         `Uploaded ${json.inserted} invoices successfully${
-          json.failed?.length ? `, ${json.failed.length} failed` : ""
+          json.failed?.length
+            ? `, ${json.failed.length} failed. First error: invoice ${json.failed[0]?.row?.invoice_no || "unknown"} - ${json.failed[0]?.error}`
+            : ""
         }`
       );
       setBulkFile(null);

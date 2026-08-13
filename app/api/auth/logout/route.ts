@@ -1,6 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { writeAuditLog } from "../../../../lib/audit-log";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  await writeAuditLog(request, {
+    action: "LOGOUT",
+    entityType: "AUTH",
+    description: "User signed out.",
+  });
   const response = NextResponse.json({ success: true });
   response.cookies.set("ultra_teb_session", "", {
     httpOnly: true,
@@ -11,4 +17,3 @@ export async function POST() {
   });
   return response;
 }
-
