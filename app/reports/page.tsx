@@ -11,15 +11,46 @@ const supabase = createClient(
 
 export const revalidate = 0;
 
+const REPORT_SALES_PAGE_SIZE = 1000;
+const REPORT_SALES_COLUMNS =
+  "id, invoice_no, sales_date, month, customer_name, sales_rep, sales_item_total, tax, total_sales, document_type, original_invoice_no, note_reason, due_date";
+
+async function fetchAllReportSales(
+  canViewHistoricalSales: boolean,
+  repName: string | null
+) {
+  const rows: any[] = [];
+
+  for (let from = 0; ; from += REPORT_SALES_PAGE_SIZE) {
+    let query = supabase
+      .from("sales_view")
+      .select(REPORT_SALES_COLUMNS)
+      .order("sales_date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + REPORT_SALES_PAGE_SIZE - 1);
+
+    if (!canViewHistoricalSales) {
+      query = query.gte("sales_date", NON_ADMIN_SALES_START_DATE);
+    }
+    if (repName) query = query.eq("sales_rep", repName);
+
+    const { data, error } = await query;
+    if (error) return { data: null, error };
+
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < REPORT_SALES_PAGE_SIZE) break;
+  }
+
+  return { data: rows, error: null };
+}
+
 export default async function ReportsPage() {
   const session = await getCurrentDashboardUser();
   const repName = session?.salesRepName ?? null;
-  let salesQuery = supabase.from("sales_view").select("id, invoice_no, sales_date, month, customer_name, sales_rep, sales_item_total, tax, total_sales, document_type, original_invoice_no, note_reason, due_date").order("sales_date", { ascending: true });
   let repsQuery = supabase.from("sales_reps").select("id, name, bonus_type, bonus_percentage, secondary_bonus_percentage, fixed_monthly_bonus, monthly_salary");
   let deductionsQuery = supabase.from("sales_rep_salary_deductions").select("id, sales_rep_id, month, amount, reason");
-  if (!canViewPre2026Sales(session)) salesQuery = salesQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   if (repName) {
-    salesQuery = salesQuery.eq("sales_rep", repName);
     repsQuery = repsQuery.eq("name", repName);
     if (session?.salesRepId) deductionsQuery = deductionsQuery.eq("sales_rep_id", session.salesRepId);
   }
@@ -28,7 +59,7 @@ export default async function ReportsPage() {
     { data: bonusReps, error: bonusRepsError },
     { data: salaryDeductions, error: salaryDeductionsError },
   ] = await Promise.all([
-    salesQuery,
+    fetchAllReportSales(canViewPre2026Sales(session), repName),
     repsQuery,
     deductionsQuery,
   ]);
