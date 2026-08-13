@@ -48,7 +48,17 @@ export async function POST(request: NextRequest) {
     action: "BULK_UPLOAD_SALES",
     entityType: "SALES",
     description: `Bulk upload completed: ${inserted} inserted, ${failed.length} failed.`,
-    metadata: { inserted, failed: failed.length },
+    metadata: {
+      inserted,
+      failedCount: failed.length,
+      failedRows: failed.map(({ row, error }) => ({
+        invoiceNo: String(row?.invoice_no ?? "").trim() || null,
+        salesDate: row?.sales_date ?? null,
+        customerName: row?.customer_name ?? null,
+        error,
+      })),
+    },
+    success: failed.length === 0,
   });
   return NextResponse.json({ inserted, failed });
 }
