@@ -45,14 +45,23 @@ export default async function ChequesPage() {
     new Set(visibleAllocations.map((allocation) => allocation.cheque_id)),
   );
 
-  const result = chequeIds.length
+  // Admins must also see orphaned cheques whose cheque row was saved but whose
+  // allocation insert did not complete. Other users continue to see only
+  // cheques connected to invoices they are permitted to view.
+  const result = session?.role === "admin"
     ? await supabase
         .from("customer_cheques")
         .select("*")
-        .in("id", chequeIds)
         .order("cheque_status_date", { ascending: false })
         .order("id", { ascending: false })
-    : { data: [], error: null };
+    : chequeIds.length
+      ? await supabase
+          .from("customer_cheques")
+          .select("*")
+          .in("id", chequeIds)
+          .order("cheque_status_date", { ascending: false })
+          .order("id", { ascending: false })
+      : { data: [], error: null };
 
   const allocationsByCheque = visibleAllocations.reduce((map, allocation) => {
     const list = map.get(allocation.cheque_id) ?? [];
