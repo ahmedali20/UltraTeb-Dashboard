@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       invoices.push({ invoice, amount: allocation.amount });
     }
     const customerCode = invoices[0].invoice.customer_code;
-    const { data: cheque, error: chequeError } = await supabase.from("customer_cheques").insert({
+    const chequePayload = {
       customer_code: customerCode,
       customer_name: customerName,
       collection_date: values.collection_date,
@@ -89,12 +89,64 @@ export async function POST(request: NextRequest) {
       cheque_status: "IN_TREASURY",
       cheque_status_date: values.collection_date,
       notes: values.notes,
-    }).select("*").single();
-    if (chequeError) return NextResponse.json({ error: chequeError.message }, { status: 400 });
+    };
+    const { data: existingCheque, error: existingChequeError } = await supabase
+      .from("customer_cheques")
+      .select("*")
+      .eq("customer_code", customerCode)
+      .eq("cheque_no", values.reference_no)
+      .maybeSingle();
+    if (existingChequeError) return NextResponse.json({ error: existingChequeError.message }, { status: 400 });
+
+    let cheque = existingCheque;
+    let createdCheque = false;
+    if (!cheque) {
+      const { data, error: chequeError } = await supabase
+        .from("customer_cheques")
+        .insert(chequePayload)
+        .select("*")
+        .single();
+      if (chequeError) return NextResponse.json({ error: chequeError.message }, { status: 400 });
+      cheque = data;
+      createdCheque = true;
+    } else {
+      const sameCheque =
+        Math.abs(Number(cheque.amount) - values.amount) <= 0.01 &&
+        cheque.cheque_date === chequeDate &&
+        cheque.collection_date === values.collection_date &&
+        String(cheque.bank_name ?? "").trim().toLowerCase() === bankName.toLowerCase();
+      if (!sameCheque) {
+        return NextResponse.json({
+          error: `Cheque ${values.reference_no} already exists for this customer with different details. Open it from the Cheques page instead of creating it again.`,
+        }, { status: 409 });
+      }
+    }
+
+    const { data: existingAllocations, error: existingAllocationError } = await supabase
+      .from("cheque_allocations")
+      .select("*")
+      .eq("cheque_id", cheque.id);
+    if (existingAllocationError) return NextResponse.json({ error: existingAllocationError.message }, { status: 400 });
     const allocationPayload = invoices.map(({ invoice, amount }) => ({ cheque_id: cheque.id, invoice_id: String(invoice.id), invoice_no: String(invoice.invoice_no), allocated_amount: amount }));
+    const requestedSignature = allocationPayload
+      .map((item) => `${item.invoice_id}:${Number(item.allocated_amount).toFixed(2)}`)
+      .sort()
+      .join("|");
+    const existingSignature = (existingAllocations ?? [])
+      .map((item) => `${String(item.invoice_id)}:${Number(item.allocated_amount).toFixed(2)}`)
+      .sort()
+      .join("|");
+    if (existingSignature && existingSignature === requestedSignature) {
+      return NextResponse.json({ data: { cheque, allocations: existingAllocations }, duplicate: true });
+    }
+    if (existingSignature) {
+      return NextResponse.json({
+        error: `Cheque ${values.reference_no} already exists and has invoice allocations. Open it from the Cheques page to review it.`,
+      }, { status: 409 });
+    }
     const { data: createdAllocations, error: allocationError } = await supabase.from("cheque_allocations").insert(allocationPayload).select("*");
     if (allocationError) {
-      await supabase.from("customer_cheques").delete().eq("id", cheque.id);
+      if (createdCheque) await supabase.from("customer_cheques").delete().eq("id", cheque.id);
       return NextResponse.json({ error: allocationError.message }, { status: 400 });
     }
     await writeAuditLog(request, { action: "CREATE_CHEQUE", entityType: "CHEQUE", entityId: cheque.id, description: `Recorded cheque ${cheque.cheque_no} allocated to ${createdAllocations?.length ?? 0} invoices.`, metadata: { cheque, allocations: createdAllocations } });
