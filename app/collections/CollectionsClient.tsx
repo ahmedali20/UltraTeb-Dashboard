@@ -45,10 +45,16 @@ export default function CollectionsClient({ invoices, initialCollections, initia
     invoices.forEach((invoice) => map.set(String(invoice.id), (map.get(String(invoice.id)) ?? 0) + (whtByInvoice.get(String(invoice.invoice_no)) ?? 0)));
     return map;
   }, [records, initialChequeAllocations, invoices, whtByInvoice]);
+  const invoicesReservedByCheque = useMemo(() => new Set(
+    initialChequeAllocations
+      .filter((allocation) => allocation.cheque && !["REFUSED", "RETURNED_TO_CUSTOMER"].includes(allocation.cheque.cheque_status))
+      .map((allocation) => String(allocation.invoice_id))
+  ), [initialChequeAllocations]);
   const allocatableCustomerInvoices = useMemo(() => customerInvoices.filter((invoice) => {
+    if (invoicesReservedByCheque.has(String(invoice.id))) return false;
     const remaining = Number(invoice.total_sales) - (settledByInvoice.get(String(invoice.id)) ?? 0);
     return remaining > 0.005;
-  }), [customerInvoices, settledByInvoice]);
+  }), [customerInvoices, settledByInvoice, invoicesReservedByCheque]);
   const filtered = useMemo(() => records.filter((record) => (customerFilter === "All" || record.customer_name === customerFilter) && (!search.trim() || `${record.invoice_no} ${record.customer_name} ${record.reference_no ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()))), [records, customerFilter, search]);
   const allocatedTotal = Object.values(allocations).reduce((sum, value) => sum + (Number(value) || 0), 0);
   const selectedInvoice = invoiceMap.get(form.invoiceId);
