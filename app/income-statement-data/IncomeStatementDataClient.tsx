@@ -40,17 +40,24 @@ export default function IncomeStatementDataClient({ initialEntries }: { initialE
   const [form, setForm] = useState<Form>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [addingCategory, setAddingCategory] = useState(false);
 
   const filtered = useMemo(() => entries.filter((entry) => entry.entry_month === month), [entries, month]);
   const totals = useMemo(() => filtered.reduce((result, entry) => ({ ...result, [entry.statement_section]: (result[entry.statement_section] || 0) + Number(entry.amount || 0) }), {} as Partial<Record<Section, number>>), [filtered]);
+  const availableCategories = useMemo(() => Array.from(new Set([
+    ...categorySuggestions[form.statementSection],
+    ...entries.filter((entry) => entry.statement_section === form.statementSection).map((entry) => entry.category.trim()).filter(Boolean),
+  ])).sort((a, b) => a.localeCompare(b)), [entries, form.statementSection]);
 
   function startEdit(entry: Entry) {
     setEditingId(entry.id);
+    setAddingCategory(false);
     setForm({ entryMonth: entry.entry_month, statementSection: entry.statement_section, category: entry.category, description: entry.description ?? "", amount: String(entry.amount) });
   }
 
   function resetForm() {
     setEditingId(null);
+    setAddingCategory(false);
     setForm({ ...emptyForm, entryMonth: month });
   }
 
@@ -64,6 +71,7 @@ export default function IncomeStatementDataClient({ initialEntries }: { initialE
     setEntries((current) => editingId ? current.map((entry) => entry.id === editingId ? result.data : entry) : [result.data, ...current]);
     setMonth(result.data.entry_month);
     setEditingId(null);
+    setAddingCategory(false);
     setForm({ ...emptyForm, entryMonth: result.data.entry_month });
   }
 
@@ -83,8 +91,8 @@ export default function IncomeStatementDataClient({ initialEntries }: { initialE
 
       <section className="is-entry-form">
         <label>Month<input type="month" value={form.entryMonth} onChange={(event) => setForm({ ...form, entryMonth: event.target.value })} /></label>
-        <label>Statement Section<select value={form.statementSection} onChange={(event) => setForm({ ...form, statementSection: event.target.value as Section, category: "" })}>{Object.entries(sectionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label>Category<input list="is-categories" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} placeholder="Select or write a category" /><datalist id="is-categories">{categorySuggestions[form.statementSection].map((category) => <option key={category} value={category} />)}</datalist></label>
+        <label>Statement Section<select value={form.statementSection} onChange={(event) => { setForm({ ...form, statementSection: event.target.value as Section, category: "" }); setAddingCategory(false); }}>{Object.entries(sectionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label className="is-category-field"><span>Category</span><div className="is-category-control">{addingCategory ? <input autoFocus value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} placeholder="Write the new category name" /> : <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option value="">Select category</option>{availableCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select>}<button type="button" onClick={() => { setAddingCategory((value) => !value); setForm({ ...form, category: "" }); }}>{addingCategory ? "Use Existing" : "+ New Category"}</button></div><small>{addingCategory ? "The category will be saved when you add this monthly entry." : "Categories previously used in this section are available here."}</small></label>
         <label>Amount (EGP)<input type="number" min="0" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>
         <label className="is-description">Description<input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Optional reference or explanation" /></label>
         <div className="is-form-actions"><button className="primary" onClick={save} disabled={saving}>{saving ? "Saving..." : editingId ? "Save Changes" : "Add Monthly Entry"}</button>{editingId && <button onClick={resetForm}>Cancel</button>}</div>
