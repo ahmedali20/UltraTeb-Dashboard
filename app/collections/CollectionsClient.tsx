@@ -7,7 +7,7 @@ import Footer from "../Footer";
 type Invoice = { id: string | number; invoice_no: string; customer_name: string; sales_date: string; due_date: string | null; sales_item_total: number; total_sales: number; sales_rep: string | null };
 type Collection = { id: number; invoice_id: string; invoice_no: string; customer_name: string; collection_date: string; amount: number; transfer_fees: number; cash_fraction: number; wht_deducted_amount: number; payment_method: string; reference_no: string | null; notes: string | null };
 type WhtCollection = { invoice_no: string; wht_amount: number; collected_amount: number };
-type ChequeAllocation = { id: number; cheque_id: number; invoice_id: string; invoice_no: string; allocated_amount: number; wht_deducted_amount: number; cheque: { id: number; cheque_no: string; collection_date: string; cheque_date: string; cheque_status: string; cheque_status_date: string; customer_name: string; amount: number; notes: string | null } | null };
+type ChequeAllocation = { id: number; cheque_id: number; invoice_id: string; invoice_no: string; allocated_amount: number; cash_fraction: number; wht_deducted_amount: number; cheque: { id: number; cheque_no: string; collection_date: string; cheque_date: string; cheque_status: string; cheque_status_date: string; customer_name: string; amount: number; notes: string | null } | null };
 const today = new Date().toISOString().slice(0, 10);
 const emptyForm = { customerName: "", invoiceId: "", collectionDate: today, chequeDate: today, bankName: "", amount: "", transferFees: "", cashFraction: "", paymentMethod: "CHEQUE", referenceNo: "", notes: "" };
 const money = (value: number) => Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -55,7 +55,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
     });
     initialChequeAllocations.forEach((allocation) => {
       if (allocation.cheque?.cheque_status === "COLLECTED") {
-        payments.set(allocation.invoice_id, (payments.get(allocation.invoice_id) ?? 0) + Number(allocation.allocated_amount || 0));
+        payments.set(allocation.invoice_id, (payments.get(allocation.invoice_id) ?? 0) + Number(allocation.allocated_amount || 0) + Number(allocation.cash_fraction || 0));
         deductions.set(allocation.invoice_id, (deductions.get(allocation.invoice_id) ?? 0) + Number(allocation.wht_deducted_amount || 0));
       }
     });

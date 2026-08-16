@@ -81,7 +81,7 @@ export default async function CollectionsPage() {
     ? await fetchInBatches(invoiceIds, (batch) =>
         supabase
           .from("cheque_allocations")
-          .select("id, cheque_id, invoice_id, invoice_no, allocated_amount, wht_deducted_amount")
+          .select("id, cheque_id, invoice_id, invoice_no, allocated_amount, cash_fraction, wht_deducted_amount")
           .in("invoice_id", batch)
       )
     : { data: [], error: null };
