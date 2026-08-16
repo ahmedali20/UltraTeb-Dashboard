@@ -32,6 +32,12 @@ alter table public.invoice_collections
   check (transfer_fees >= 0);
 
 alter table public.invoice_collections
+  add column if not exists cash_fraction numeric(14,2) not null default 0
+  check (cash_fraction >= 0),
+  add column if not exists wht_deducted_amount numeric(14,2) not null default 0
+  check (wht_deducted_amount >= 0);
+
+alter table public.invoice_collections
   add column if not exists cheque_status text,
   add column if not exists cheque_status_date date;
 
@@ -97,6 +103,7 @@ create table if not exists public.cheque_allocations (
   invoice_id text not null,
   invoice_no text not null,
   allocated_amount numeric(14,2) not null check (allocated_amount > 0),
+  wht_deducted_amount numeric(14,2) not null default 0 check (wht_deducted_amount >= 0),
   created_at timestamptz not null default now(),
   unique (cheque_id, invoice_id)
 );
@@ -108,6 +115,10 @@ create index if not exists cheque_allocations_cheque_idx on public.cheque_alloca
 
 alter table public.customer_cheques enable row level security;
 alter table public.cheque_allocations enable row level security;
+
+alter table public.cheque_allocations
+  add column if not exists wht_deducted_amount numeric(14,2) not null default 0
+  check (wht_deducted_amount >= 0);
 
 alter table public.customer_cheques add column if not exists collection_date date;
 alter table public.customer_cheques add column if not exists bank_name text not null default '';
