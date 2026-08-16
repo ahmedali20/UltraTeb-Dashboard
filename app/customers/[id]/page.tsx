@@ -61,7 +61,8 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
     const expectedWht = Math.max(deductedWht.get(String(invoice.id)) ?? 0, recordedWht?.expected ?? 0);
     const collectedWht = recordedWht?.collected ?? 0;
     const customerPayments = payments.get(String(invoice.id)) ?? 0;
-    return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, remaining_wht: Math.max(0, expectedWht - collectedWht), remaining_money: Math.max(0, Number(invoice.total_sales || 0) - expectedWht - customerPayments - (cashFractions.get(String(invoice.id)) ?? 0)) };
+    const cashFraction = cashFractions.get(String(invoice.id)) ?? 0;
+    return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, cash_fraction: cashFraction, remaining_wht: Math.max(0, expectedWht - collectedWht), remaining_money: Math.max(0, Number(invoice.total_sales || 0) - expectedWht - customerPayments - cashFraction) };
   });
   return <CustomerBalanceClient customer={customer} invoices={rows} />;
 }
