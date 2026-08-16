@@ -23,7 +23,7 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
   const invoiceIds = (invoices ?? []).map((item) => String(item.id));
   const invoiceNumbers = Array.from(new Set((invoices ?? []).map((item) => String(item.invoice_no))));
   const [collectionsResult, allocationsResult, whtResult] = await Promise.all([
-    invoiceIds.length ? supabase.from("invoice_collections").select("invoice_id, amount, wht_deducted_amount").in("invoice_id", invoiceIds).neq("payment_method", "CHEQUE") : Promise.resolve({ data: [], error: null }),
+    invoiceIds.length ? supabase.from("invoice_collections").select("invoice_id, amount, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds).neq("payment_method", "CHEQUE") : Promise.resolve({ data: [], error: null }),
     invoiceIds.length ? supabase.from("cheque_allocations").select("invoice_id, cheque_id, allocated_amount, wht_deducted_amount").in("invoice_id", invoiceIds) : Promise.resolve({ data: [], error: null }),
     invoiceNumbers.length ? supabase.from("wht_collections").select("invoice_no, invoice_date, wht_amount, collected_amount").in("invoice_no", invoiceNumbers) : Promise.resolve({ data: [], error: null }),
   ]);
@@ -34,8 +34,10 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
 
   const payments = new Map<string, number>();
   const deductedWht = new Map<string, number>();
+  const cashFractions = new Map<string, number>();
   (collectionsResult.data ?? []).forEach((item: any) => {
     payments.set(String(item.invoice_id), (payments.get(String(item.invoice_id)) ?? 0) + Number(item.amount || 0));
+    cashFractions.set(String(item.invoice_id), (cashFractions.get(String(item.invoice_id)) ?? 0) + Number(item.cash_fraction || 0));
     deductedWht.set(String(item.invoice_id), (deductedWht.get(String(item.invoice_id)) ?? 0) + Number(item.wht_deducted_amount || 0));
   });
   const chequeStatus = new Map((chequesResult.data ?? []).map((item: any) => [String(item.id), item.cheque_status]));
@@ -59,7 +61,7 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
     const expectedWht = Math.max(deductedWht.get(String(invoice.id)) ?? 0, recordedWht?.expected ?? 0);
     const collectedWht = recordedWht?.collected ?? 0;
     const customerPayments = payments.get(String(invoice.id)) ?? 0;
-    return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, remaining_wht: Math.max(0, expectedWht - collectedWht), remaining_money: Math.max(0, Number(invoice.total_sales || 0) - expectedWht - customerPayments) };
+    return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, remaining_wht: Math.max(0, expectedWht - collectedWht), remaining_money: Math.max(0, Number(invoice.total_sales || 0) - expectedWht - customerPayments - (cashFractions.get(String(invoice.id)) ?? 0)) };
   });
   return <CustomerBalanceClient customer={customer} invoices={rows} />;
 }
