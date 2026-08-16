@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import { getCurrentDashboardUser } from "../../../lib/current-dashboard-user";
+import { hasDashboardPermission } from "../../../lib/dashboard-permissions";
 import { canViewPre2026Sales, NON_ADMIN_SALES_START_DATE } from "../../../lib/sales-visibility";
 import ChequeDetailsClient from "./ChequeDetailsClient";
 
@@ -23,5 +24,5 @@ export default async function ChequeDetailsPage({ params }: { params: { id: stri
   if (invoiceError || (invoices ?? []).length !== invoiceIds.length) notFound();
   const invoiceMap = new Map((invoices ?? []).map((invoice) => [String(invoice.id), invoice]));
   const rows = allocations.map((allocation) => ({ ...allocation, invoice: invoiceMap.get(String(allocation.invoice_id)) }));
-  return <ChequeDetailsClient cheque={cheque} allocations={rows} />;
+  return <ChequeDetailsClient cheque={cheque} allocations={rows} canEdit={Boolean(session && hasDashboardPermission(session, "cheques", "edit"))} />;
 }
