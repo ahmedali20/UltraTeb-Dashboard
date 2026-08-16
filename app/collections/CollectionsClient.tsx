@@ -67,16 +67,16 @@ export default function CollectionsClient({ invoices, initialCollections, initia
     });
     return map;
   }, [records, initialChequeAllocations, invoices, recordedWhtByInvoice]);
-  const invoicesReservedByCheque = useMemo(() => new Set(
+  const invoicesReservedByPendingCheque = useMemo(() => new Set(
     initialChequeAllocations
-      .filter((allocation) => allocation.cheque && !["REFUSED", "RETURNED_TO_CUSTOMER"].includes(allocation.cheque.cheque_status))
+      .filter((allocation) => allocation.cheque && allocation.cheque.cheque_status !== "COLLECTED" && !["REFUSED", "RETURNED_TO_CUSTOMER"].includes(allocation.cheque.cheque_status))
       .map((allocation) => String(allocation.invoice_id))
   ), [initialChequeAllocations]);
   const allocatableCustomerInvoices = useMemo(() => customerInvoices.filter((invoice) => {
-    if (invoicesReservedByCheque.has(String(invoice.id))) return false;
+    if (invoicesReservedByPendingCheque.has(String(invoice.id))) return false;
     const remaining = Number(invoice.total_sales) - (settledByInvoice.get(String(invoice.id)) ?? 0);
     return remaining > 0.005;
-  }), [customerInvoices, settledByInvoice, invoicesReservedByCheque]);
+  }), [customerInvoices, settledByInvoice, invoicesReservedByPendingCheque]);
   const selectableCustomerInvoices = useMemo(() => editingId
     ? customerInvoices.filter((invoice) => String(invoice.id) === form.invoiceId)
     : allocatableCustomerInvoices,
