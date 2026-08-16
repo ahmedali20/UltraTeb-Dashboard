@@ -24,7 +24,7 @@ function collectionValues(body: Record<string, unknown>) {
   const whtDeductedAmount = Number(body.whtDeductedAmount ?? 0);
   return {
     collection_date: String(body.collectionDate ?? "").trim(),
-    amount: bankAmount + transferFees + cashFraction,
+    amount: bankAmount + transferFees,
     transfer_fees: transferFees,
     cash_fraction: cashFraction,
     wht_deducted_amount: whtDeductedAmount,
