@@ -31,6 +31,7 @@ type SaleRow = {
 type CustomerOption = {
   customer_code: string;
   customer_name: string;
+  customer_official_name?: string | null;
   sales_rep_name: string | null;
   payment_terms_days: number | null;
 };
@@ -42,6 +43,9 @@ type BulkInvoiceRow = {
   customer_name?: string;
   sales_item_total?: string;
   tax?: string;
+  document_type?: "INVOICE" | "CR_NOTE" | "DR_NOTE";
+  original_invoice_no?: string;
+  note_reason?: string;
   _sourceCustomer: string;
   _sourceCustomerName: string;
   _confirmed: boolean;
@@ -67,7 +71,7 @@ const translations = {
     add: "Add Invoice",
     bulkTitle: "Bulk Upload (CSV)",
     bulkHint:
-      "CSV columns: invoice_no, sales_date, customer_name, sales_item_total, tax",
+      "CSV columns: invoice_no, sales_date, customer_name, sales_item_total, tax, document_type, original_invoice_no, note_reason",
     chooseFile: "Choose CSV File",
     upload: "Upload",
     uploading: "Uploading...",
@@ -479,6 +483,16 @@ export default function SalesTable({
     return String(value ?? "").trim().toLocaleLowerCase();
   }
 
+  function normalizeBulkDocumentType(value: unknown) {
+    const normalized = String(value ?? "")
+      .trim()
+      .toUpperCase()
+      .replace(/[\s-]+/g, "_");
+    if (["CR", "CR_NOTE", "CREDIT_NOTE"].includes(normalized)) return "CR_NOTE";
+    if (["DR", "DR_NOTE", "DEBIT_NOTE"].includes(normalized)) return "DR_NOTE";
+    return "INVOICE";
+  }
+
   function handleBulkFileChange(file: File | null) {
     setBulkFile(file);
     setBulkRows([]);
@@ -509,6 +523,8 @@ export default function SalesTable({
               row.customer_name,
               row.sales_item_total,
               row.tax,
+              row.document_type,
+              row.original_invoice_no,
             ].some((value) => String(value ?? "").trim())
           )
           .map((row, index) => {
@@ -533,8 +549,8 @@ export default function SalesTable({
               ) ??
               customerOptions.find(
                 (customer) =>
-                  normalizeCustomerValue(customer.customer_name) ===
-                  normalizedName
+                  normalizeCustomerValue(customer.customer_name) === normalizedName ||
+                  normalizeCustomerValue(customer.customer_official_name) === normalizedName
               );
 
             return {
@@ -544,6 +560,13 @@ export default function SalesTable({
               customer_name: matchedCustomer?.customer_name ?? "",
               sales_item_total: String(row.sales_item_total ?? "").trim(),
               tax: String(row.tax ?? "").trim(),
+              document_type: normalizeBulkDocumentType(
+                row.document_type ?? row.type
+              ),
+              original_invoice_no: String(
+                row.original_invoice_no ?? row.sales_invoice_no ?? ""
+              ).trim(),
+              note_reason: String(row.note_reason ?? "").trim(),
               _sourceCustomer: sourceName || "-",
               _sourceCustomerName: sourceName,
               _confirmed: false,
@@ -582,7 +605,8 @@ export default function SalesTable({
     return customerOptions.filter(
       (customer) =>
         customer.customer_code === selectedCode ||
-        normalizeCustomerValue(customer.customer_name).includes(search)
+        normalizeCustomerValue(customer.customer_name).includes(search) ||
+        normalizeCustomerValue(customer.customer_official_name).includes(search)
     );
   }
 
@@ -1142,6 +1166,8 @@ export default function SalesTable({
                       {lang === "ar" ? "رقم الصف" : "CSV row"}
                     </th>
                     <th>{t.invoiceNo}</th>
+                    <th>{lang === "ar" ? "نوع المستند" : "Document Type"}</th>
+                    <th>{lang === "ar" ? "الفاتورة الأصلية" : "Original Invoice"}</th>
                     <th>{t.date}</th>
                     <th>
                       {lang === "ar" ? "العميل في الملف" : "Customer in CSV"}
@@ -1160,6 +1186,14 @@ export default function SalesTable({
                     <tr key={`${row._rowNumber}-${row.invoice_no}`}>
                       <td>{row._rowNumber}</td>
                       <td>{row.invoice_no || `Row ${row._rowNumber}`}</td>
+                      <td>
+                        {row.document_type === "CR_NOTE"
+                          ? "CR Note"
+                          : row.document_type === "DR_NOTE"
+                            ? "DR Note"
+                            : "Invoice"}
+                      </td>
+                      <td>{row.original_invoice_no || "-"}</td>
                       <td>{row.sales_date || "-"}</td>
                       <td>{row._sourceCustomer}</td>
                       <td>

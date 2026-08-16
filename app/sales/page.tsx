@@ -46,7 +46,7 @@ async function fetchAllSales(
 export default async function SalesPage() {
   const session = await getCurrentDashboardUser();
   const repName = session?.salesRepName ?? null;
-  let customersQuery = supabaseServer.from("customers").select("customer_code, customer_name, sales_rep_name, payment_terms_days").order("customer_code", { ascending: true });
+  let customersQuery = supabaseServer.from("customers").select("customer_code, customer_name, customer_official_name, sales_rep_name, payment_terms_days").order("customer_code", { ascending: true });
   let repsQuery = supabaseServer.from("sales_reps").select("name").order("name", { ascending: true });
   if (repName) {
     customersQuery = customersQuery.eq("sales_rep_name", repName);
