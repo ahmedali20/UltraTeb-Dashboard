@@ -13,7 +13,7 @@ export default async function ChequeDetailsPage({ params }: { params: { id: stri
   if (!Number.isSafeInteger(chequeId) || chequeId <= 0) notFound();
   const { data: cheque } = await supabase.from("customer_cheques").select("*").eq("id", chequeId).maybeSingle();
   if (!cheque) notFound();
-  const { data: allocations, error: allocationError } = await supabase.from("cheque_allocations").select("id, invoice_id, invoice_no, allocated_amount").eq("cheque_id", chequeId).order("id");
+  const { data: allocations, error: allocationError } = await supabase.from("cheque_allocations").select("id, invoice_id, invoice_no, allocated_amount, wht_deducted_amount").eq("cheque_id", chequeId).order("id");
   if (allocationError || !allocations?.length) notFound();
   const invoiceIds = allocations.map((allocation) => String(allocation.invoice_id));
   let invoiceQuery = supabase.from("sales_view").select("id, invoice_no, sales_date, due_date, customer_name, total_sales, sales_rep").in("id", invoiceIds).eq("document_type", "INVOICE");
