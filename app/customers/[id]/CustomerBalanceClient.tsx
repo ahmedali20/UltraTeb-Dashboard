@@ -38,27 +38,37 @@ export default function CustomerBalanceClient({ customer, invoices }: { customer
       brandedPages.add(page);
       const width = doc.internal.pageSize.getWidth();
       const height = doc.internal.pageSize.getHeight();
-      if (header) doc.addImage(header, "PNG", 14, 9, 64, 19, undefined, "FAST");
-      if (logo) { doc.saveGraphicsState(); doc.setGState(new (doc as any).GState({ opacity: 0.04 })); doc.addImage(logo, "PNG", 72, 94, 78, 112, undefined, "FAST"); doc.restoreGraphicsState(); }
-      doc.setDrawColor(76, 127, 184); doc.setLineWidth(0.8); doc.line(15, 37, width - 15, 37);
-      if (footer) doc.addImage(footer, "PNG", 10, height - 49, 190, 46.4, undefined, "FAST");
-      doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(90, 90, 105); doc.text(`Page ${page}`, width / 2, height - 8, { align: "center" });
+      if (header) doc.addImage(header, "PNG", 14, 8, 64, 19, undefined, "FAST");
+      if (logo) { doc.saveGraphicsState(); doc.setGState(new (doc as any).GState({ opacity: 0.025 })); doc.addImage(logo, "PNG", 78, 104, 54, 78, undefined, "FAST"); doc.restoreGraphicsState(); }
+      doc.setDrawColor(...purple); doc.setLineWidth(0.65); doc.line(15, 35, width - 15, 35);
+      if (footer) doc.addImage(footer, "PNG", 16, height - 39, 178, 36.4, undefined, "FAST");
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(90, 90, 105); doc.text(`Page ${page}`, width / 2, height - 6, { align: "center" });
     }
     drawBrand();
-    doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(...purple); doc.text("Invoice Balance Statement", 105, 50, { align: "center" });
-    doc.setFontSize(10); doc.setTextColor(40, 45, 58); doc.text(customer.customer_official_name || customer.customer_name, 15, 59);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 195, 59, { align: "right" });
+    const pdfCustomerName = /[^\u0000-\u024f]/.test(customer.customer_official_name || "") ? customer.customer_name : (customer.customer_official_name || customer.customer_name);
+    const reportTotals = filtered.reduce((sum, item) => ({ total: sum.total + Number(item.total_sales), payments: sum.payments + item.customer_payments, fractions: sum.fractions + item.cash_fraction, wht: sum.wht + item.expected_wht, collectedWht: sum.collectedWht + item.collected_wht, moneyDue: sum.moneyDue + item.remaining_money, whtDue: sum.whtDue + item.remaining_wht }), { total: 0, payments: 0, fractions: 0, wht: 0, collectedWht: 0, moneyDue: 0, whtDue: 0 });
+    doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor(...purple); doc.text("CUSTOMER BALANCE STATEMENT", 15, 48);
+    doc.setFontSize(11); doc.setTextColor(35, 40, 52); doc.text(pdfCustomerName || "Customer", 15, 57);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(95, 100, 112); doc.text(`Statement date: ${new Date().toLocaleDateString("en-GB")}`, 195, 48, { align: "right" });
+    doc.text(`${filtered.length} invoice${filtered.length === 1 ? "" : "s"} shown`, 195, 57, { align: "right" });
+    const cards = [["INVOICE TOTAL", reportTotals.total], ["PAYMENTS", reportTotals.payments], ["FRACTIONS", reportTotals.fractions], ["WHT DEDUCTED", reportTotals.wht], ["MONEY DUE", reportTotals.moneyDue], ["WHT DUE", reportTotals.whtDue]] as const;
+    cards.forEach(([label, value], index) => {
+      const x = 15 + (index % 3) * 61; const y = 64 + Math.floor(index / 3) * 16; const emphasized = index >= 4;
+      doc.setFillColor(emphasized ? 245 : 249, emphasized ? 240 : 249, emphasized ? 252 : 251); doc.setDrawColor(emphasized ? 190 : 224, emphasized ? 168 : 224, emphasized ? 225 : 230); doc.roundedRect(x, y, 57, 12.5, 1.5, 1.5, "FD");
+      doc.setFont("helvetica", "normal"); doc.setFontSize(6.2); doc.setTextColor(100, 104, 116); doc.text(label, x + 3, y + 4.2);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(emphasized ? purple[0] : 35, emphasized ? purple[1] : 40, emphasized ? purple[2] : 52); doc.text(`EGP ${money(value)}`, x + 3, y + 9.5);
+    });
     autoTable(doc, {
-      startY: 66,
-      head: [["Invoice", "Date", "Due", "Invoice Total", "Payments", "Fraction", "WHT Deducted", "WHT Collected", "Money Due", "WHT Due", "Status"]],
-      body: filtered.map((invoice) => { const moneyOpen = invoice.remaining_money > 0.005; const whtPending = !moneyOpen && invoice.remaining_wht > 0.005; const overdue = moneyOpen && Boolean(invoice.due_date && invoice.due_date < today); return [invoice.invoice_no, dateLabel(invoice.sales_date), dateLabel(invoice.due_date), money(invoice.total_sales), money(invoice.customer_payments), money(invoice.cash_fraction), money(invoice.expected_wht), money(invoice.collected_wht), money(invoice.remaining_money), money(invoice.remaining_wht), overdue ? "Overdue" : moneyOpen ? "Open" : whtPending ? "WHT Pending" : "Paid"]; }),
-      foot: [["TOTAL", "", "", money(filtered.reduce((sum, item) => sum + item.total_sales, 0)), money(filtered.reduce((sum, item) => sum + item.customer_payments, 0)), money(filtered.reduce((sum, item) => sum + item.cash_fraction, 0)), money(filtered.reduce((sum, item) => sum + item.expected_wht, 0)), money(filtered.reduce((sum, item) => sum + item.collected_wht, 0)), money(filtered.reduce((sum, item) => sum + item.remaining_money, 0)), money(filtered.reduce((sum, item) => sum + item.remaining_wht, 0)), ""]],
-      margin: { top: 42, right: 10, bottom: 53, left: 10 },
-      styles: { font: "helvetica", fontSize: 5.3, cellPadding: 1.3, lineColor: [218, 221, 228], lineWidth: 0.12, textColor: [35, 40, 52], overflow: "linebreak" },
+      startY: 100,
+      head: [["Invoice", "Invoice / Due Date", "Invoice Total", "Payments / Fraction", "WHT Deducted / Collected", "Money Due", "WHT Due", "Status"]],
+      body: filtered.map((invoice) => { const moneyOpen = invoice.remaining_money > 0.005; const whtPending = !moneyOpen && invoice.remaining_wht > 0.005; const overdue = moneyOpen && Boolean(invoice.due_date && invoice.due_date < today); return [invoice.invoice_no, `${dateLabel(invoice.sales_date)}\n${dateLabel(invoice.due_date)}`, money(invoice.total_sales), `${money(invoice.customer_payments)}\n${money(invoice.cash_fraction)}`, `${money(invoice.expected_wht)}\n${money(invoice.collected_wht)}`, money(invoice.remaining_money), money(invoice.remaining_wht), overdue ? "OVERDUE" : moneyOpen ? "OPEN" : whtPending ? "WHT PENDING" : "PAID"]; }),
+      foot: [["TOTAL", "", money(reportTotals.total), `${money(reportTotals.payments)}\n${money(reportTotals.fractions)}`, `${money(reportTotals.wht)}\n${money(reportTotals.collectedWht)}`, money(reportTotals.moneyDue), money(reportTotals.whtDue), ""]],
+      margin: { top: 42, right: 15, bottom: 43, left: 15 },
+      styles: { font: "helvetica", fontSize: 7, cellPadding: 2.1, lineColor: [218, 221, 228], lineWidth: 0.12, textColor: [35, 40, 52], overflow: "linebreak", valign: "middle" },
       headStyles: { fillColor: purple, textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
       footStyles: { fillColor: [239, 234, 247], textColor: purple, fontStyle: "bold" },
       alternateRowStyles: { fillColor: [248, 249, 251] },
-      columnStyles: { 0: { cellWidth: 13 }, 1: { cellWidth: 15 }, 2: { cellWidth: 15 }, 3: { cellWidth: 20, halign: "right" }, 4: { cellWidth: 18, halign: "right" }, 5: { cellWidth: 14, halign: "right" }, 6: { cellWidth: 17, halign: "right" }, 7: { cellWidth: 17, halign: "right" }, 8: { cellWidth: 17, halign: "right" }, 9: { cellWidth: 15, halign: "right" }, 10: { cellWidth: 15 } },
+      columnStyles: { 0: { cellWidth: 17, fontStyle: "bold" }, 1: { cellWidth: 25 }, 2: { cellWidth: 26, halign: "right" }, 3: { cellWidth: 28, halign: "right" }, 4: { cellWidth: 30, halign: "right" }, 5: { cellWidth: 22, halign: "right", fontStyle: "bold" }, 6: { cellWidth: 20, halign: "right", fontStyle: "bold" }, 7: { cellWidth: 17, halign: "center", fontStyle: "bold", fontSize: 6.2 } },
       didDrawPage: drawBrand,
     });
     const safeName = (customer.customer_name || "customer").replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, "-").replace(/^-|-$/g, "");
