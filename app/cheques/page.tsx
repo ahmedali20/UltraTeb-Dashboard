@@ -36,7 +36,7 @@ export default async function ChequesPage() {
   // PostgREST URL, which caused Supabase to return "Bad Request".
   const allocationResult = await supabase
     .from("cheque_allocations")
-    .select("id, cheque_id, invoice_id, invoice_no, allocated_amount");
+    .select("id, cheque_id, invoice_id, invoice_no, allocated_amount, wht_deducted_amount");
 
   const visibleAllocations = (allocationResult.data ?? []).filter((allocation) =>
     visibleInvoiceIds.has(String(allocation.invoice_id)),
