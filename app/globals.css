@@ -3295,6 +3295,9 @@
 .collection-invoice-preview strong { color: var(--text-primary); font-size: 14px; }
 .collection-form-actions { display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); margin-top: 14px; padding-top: 14px; }
 .collection-form-actions button { min-width: 150px; min-height: 40px; }
+.collection-transfer-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--border-color); border-radius: 10px; margin-top: 14px; background: var(--border-color); }
+.collection-transfer-summary span { display: grid; gap: 5px; background: var(--surface-muted); color: var(--text-secondary); padding: 12px; font-size: 11px; }
+.collection-transfer-summary strong { color: var(--text-primary); font-size: 14px; }
 .collections-toolbar > div { display: flex; align-items: baseline; gap: 10px; }
 .collections-toolbar h2 { margin: 0; }
 .collections-toolbar span { color: var(--text-secondary); font-size: 11px; }
@@ -3315,7 +3318,7 @@
 .invoice-collection-table th:last-child, .invoice-collection-table td:last-child { text-align: end; }
 .invoice-status--paid { border-color: #10b981 !important; color: #10b981 !important; }
 @media (max-width: 950px) { .collection-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 650px) { .collections-page { padding: 16px; } .collections-hero { align-items: stretch; flex-direction: column; } .collection-form-grid, .collection-invoice-preview { grid-template-columns: 1fr; } .collection-invoice-field, .collection-notes-field { grid-column: span 1; } .collections-toolbar { align-items: stretch; } .collections-toolbar select, .collections-toolbar input { width: 100%; margin-inline-start: 0; } }
+@media (max-width: 650px) { .collections-page { padding: 16px; } .collections-hero { align-items: stretch; flex-direction: column; } .collection-form-grid, .collection-invoice-preview, .collection-transfer-summary { grid-template-columns: 1fr; } .collection-invoice-field, .collection-notes-field { grid-column: span 1; } .collections-toolbar { align-items: stretch; } .collections-toolbar select, .collections-toolbar input { width: 100%; margin-inline-start: 0; } }
 
 /* Cheque treasury workflow */
 .cheques-page { display: grid; gap: 18px; padding: 28px; }
