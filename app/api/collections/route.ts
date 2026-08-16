@@ -47,11 +47,76 @@ function validationError(values: ReturnType<typeof collectionValues>) {
 }
 
 async function permittedInvoice(invoiceId: string, salesRepName: string | null, isAdmin: boolean) {
-  let query = supabase.from("sales_view").select("id, invoice_no, customer_code, customer_name, sales_rep, document_type").eq("id", invoiceId).eq("document_type", "INVOICE");
+  let query = supabase.from("sales_view").select("id, invoice_no, customer_code, customer_name, sales_rep, document_type, total_sales").eq("id", invoiceId).eq("document_type", "INVOICE");
   if (salesRepName) query = query.eq("sales_rep", salesRepName);
   if (!isAdmin) query = query.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   const { data } = await query.maybeSingle();
   return data;
+}
+
+async function settledInvoiceAmount(invoice: any, excludeCollectionId?: number) {
+  let collectionsQuery = supabase
+    .from("invoice_collections")
+    .select("id, amount, cash_fraction, wht_deducted_amount")
+    .eq("invoice_id", String(invoice.id))
+    .neq("payment_method", "CHEQUE");
+  if (excludeCollectionId) collectionsQuery = collectionsQuery.neq("id", excludeCollectionId);
+
+  const [collectionsResult, allocationsResult, recordedWhtResult] = await Promise.all([
+    collectionsQuery,
+    supabase
+      .from("cheque_allocations")
+      .select("cheque_id, allocated_amount, wht_deducted_amount")
+      .eq("invoice_id", String(invoice.id)),
+    supabase
+      .from("wht_collections")
+      .select("wht_amount")
+      .eq("invoice_no", String(invoice.invoice_no)),
+  ]);
+  if (collectionsResult.error) throw collectionsResult.error;
+  if (allocationsResult.error) throw allocationsResult.error;
+  if (recordedWhtResult.error) throw recordedWhtResult.error;
+
+  const chequeIds = Array.from(new Set((allocationsResult.data ?? []).map((item) => String(item.cheque_id))));
+  const collectedChequeIds = new Set<string>();
+  if (chequeIds.length) {
+    const { data, error } = await supabase
+      .from("customer_cheques")
+      .select("id")
+      .in("id", chequeIds)
+      .eq("cheque_status", "COLLECTED");
+    if (error) throw error;
+    (data ?? []).forEach((item) => collectedChequeIds.add(String(item.id)));
+  }
+
+  let payments = 0;
+  let deductedWht = 0;
+  (collectionsResult.data ?? []).forEach((item) => {
+    payments += Number(item.amount || 0) + Number(item.cash_fraction || 0);
+    deductedWht += Number(item.wht_deducted_amount || 0);
+  });
+  (allocationsResult.data ?? []).forEach((item) => {
+    if (!collectedChequeIds.has(String(item.cheque_id))) return;
+    payments += Number(item.allocated_amount || 0);
+    deductedWht += Number(item.wht_deducted_amount || 0);
+  });
+  const recordedWht = (recordedWhtResult.data ?? []).reduce(
+    (sum, item) => sum + Number(item.wht_amount || 0),
+    0
+  );
+  return payments + Math.max(deductedWht, recordedWht);
+}
+
+async function addAutomaticFraction(invoice: any, values: ReturnType<typeof collectionValues>, excludeCollectionId?: number) {
+  const alreadySettled = await settledInvoiceAmount(invoice, excludeCollectionId);
+  const remaining = Math.round(
+    (Number(invoice.total_sales || 0) - alreadySettled - values.amount -
+      values.cash_fraction - values.wht_deducted_amount) * 100
+  ) / 100;
+  if (remaining > 0 && remaining < 1) {
+    values.cash_fraction = Math.round((values.cash_fraction + remaining) * 100) / 100;
+  }
+  return values;
 }
 
 async function existingWhtDeduction(invoiceId: string, excludeCollectionId?: number) {
@@ -190,6 +255,7 @@ export async function POST(request: NextRequest) {
   if (values.wht_deducted_amount > 0 && await existingWhtDeduction(invoiceId) > 0.005) {
     return NextResponse.json({ error: `WHT was already deducted for invoice ${invoice.invoice_no}.` }, { status: 409 });
   }
+  await addAutomaticFraction(invoice, values);
   const { data, error } = await supabase.from("invoice_collections").insert({
     ...values,
     cheque_status: null,
@@ -219,6 +285,9 @@ export async function PATCH(request: NextRequest) {
   if (values.wht_deducted_amount > 0 && await existingWhtDeduction(String(before.invoice_id), id) > 0.005) {
     return NextResponse.json({ error: `WHT was already deducted for invoice ${before.invoice_no}.` }, { status: 409 });
   }
+  const invoice = await permittedInvoice(String(before.invoice_id), session.salesRepName, session.role === "admin");
+  if (!invoice) return NextResponse.json({ error: "Invoice not found or unavailable to this user." }, { status: 404 });
+  await addAutomaticFraction(invoice, values, id);
   const { data, error } = await supabase.from("invoice_collections").update({
     ...values,
     cheque_status: null,
