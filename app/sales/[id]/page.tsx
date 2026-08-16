@@ -28,7 +28,7 @@ export default async function InvoiceDetailsPage({ params }: { params: { id: str
     whtQuery = whtQuery.gte("invoice_date", NON_ADMIN_SALES_START_DATE);
   }
   const allocationResult = canViewCollections
-    ? await supabase.from("cheque_allocations").select("id, cheque_id, invoice_id, invoice_no, allocated_amount, wht_deducted_amount").eq("invoice_id", String(invoice.id))
+    ? await supabase.from("cheque_allocations").select("id, cheque_id, invoice_id, invoice_no, allocated_amount, cash_fraction, wht_deducted_amount").eq("invoice_id", String(invoice.id))
     : { data: [], error: null };
   const chequeIds = Array.from(new Set((allocationResult.data ?? []).map((allocation) => allocation.cheque_id)));
   const linkedChequesResult = chequeIds.length

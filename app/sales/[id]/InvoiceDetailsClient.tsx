@@ -9,7 +9,7 @@ type Note = { id: string; invoice_no: string; sales_date: string; document_type:
 type Cogs = { id: number; invoice_no: string; document_type: "INVOICE" | "CR_NOTE" | "DR_NOTE"; cogs_subtotal: number; cogs_vat: number; total: number };
 type Wht = { id: number; wht_amount: number; collected_amount: number; collection_date: string | null };
 type Collection = { id: number; collection_date: string; amount: number; transfer_fees: number; cash_fraction: number; wht_deducted_amount: number; payment_method: string; cheque_status: string | null; cheque_status_date: string | null; reference_no: string | null; notes: string | null };
-type ChequeAllocation = { id: number; allocated_amount: number; wht_deducted_amount: number; cheque: { id: number; cheque_no: string; cheque_date: string; amount: number; cheque_status: string; cheque_status_date: string; notes: string | null } | null };
+type ChequeAllocation = { id: number; allocated_amount: number; cash_fraction: number; wht_deducted_amount: number; cheque: { id: number; cheque_no: string; cheque_date: string; amount: number; cheque_status: string; cheque_status_date: string; notes: string | null } | null };
 
 const money = (value: number) => `EGP ${Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const dateLabel = (value: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -28,7 +28,7 @@ export default function InvoiceDetailsClient({ invoice, notes, customer, wht, co
   const whtTotal = wht.reduce((sum, item) => sum + Number(item.wht_amount || 0), 0);
   const whtCollected = wht.reduce((sum, item) => sum + Number(item.collected_amount || 0), 0);
   const customerCollectionsTotal = collections.reduce((sum, item) => sum + Number(item.amount || 0), 0) + chequeAllocations.reduce((sum, allocation) => sum + (allocation.cheque?.cheque_status === "COLLECTED" ? Number(allocation.allocated_amount || 0) : 0), 0);
-  const cashFractionTotal = collections.reduce((sum, item) => sum + Number(item.cash_fraction || 0), 0);
+  const cashFractionTotal = collections.reduce((sum, item) => sum + Number(item.cash_fraction || 0), 0) + chequeAllocations.reduce((sum, allocation) => sum + (allocation.cheque?.cheque_status === "COLLECTED" ? Number(allocation.cash_fraction || 0) : 0), 0);
   const storedDeductedWht = collections.reduce((sum, item) => sum + Number(item.wht_deducted_amount || 0), 0) + chequeAllocations.reduce((sum, allocation) => sum + (allocation.cheque?.cheque_status === "COLLECTED" ? Number(allocation.wht_deducted_amount || 0) : 0), 0);
   const deductedWhtTotal = Math.max(storedDeductedWht, whtTotal);
   const collectedTotal = customerCollectionsTotal + cashFractionTotal + deductedWhtTotal;
