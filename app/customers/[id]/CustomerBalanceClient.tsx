@@ -11,7 +11,7 @@ type BalanceFilter = "ALL" | "OPEN" | "PAID" | "WHT_PENDING" | "OVERDUE";
 const money = (value: number) => Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateLabel = (value: string | null) => value ? new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replaceAll(" ", "-") : "—";
 
-export default function CustomerBalanceClient({ customer, invoices }: { customer: Customer; invoices: Invoice[] }) {
+export default function CustomerBalanceClient({ customer, invoices, unallocatedChequeBalance }: { customer: Customer; invoices: Invoice[]; unallocatedChequeBalance: number }) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<BalanceFilter>("ALL");
@@ -81,11 +81,11 @@ export default function CustomerBalanceClient({ customer, invoices }: { customer
       <a className="invoice-details-back" href="/customers">← Back to Customers</a>
       <section className="customer-balance-hero">
         <div><p>ACCOUNTS RECEIVABLE</p><h1>{customer.customer_name}</h1><strong>{customer.customer_official_name || customer.customer_name}</strong><span>{customer.sales_rep_name || "No sales representative"} · Payment terms: {customer.payment_terms_days ?? 0} days</span></div>
-        <div className="customer-balance-hero-total"><span>Total Outstanding</span><strong>EGP {money(totals.remainingMoney + totals.remainingWht)}</strong><small>{invoices.length} invoices</small></div>
+        <div className="customer-balance-hero-total"><span>Net Customer Balance</span><strong>EGP {money(Math.max(0, totals.remainingMoney - unallocatedChequeBalance) + totals.remainingWht)}</strong><small>{invoices.length} invoices · after unallocated cheques</small></div>
       </section>
 
       <section className="customer-balance-groups">
-        <div className="customer-balance-group"><div className="customer-balance-group-title"><span>Customer Payments</span><small>Cash, transfer and collected cheques</small></div><div className="customer-balance-cards"><article><span>Invoice Total</span><strong>EGP {money(totals.total)}</strong></article><article><span>Payments Received</span><strong>EGP {money(totals.payments)}</strong></article><article><span>Cash Fraction Write-offs</span><strong>EGP {money(totals.fractions)}</strong></article><article className="is-outstanding"><span>Remaining Money</span><strong>EGP {money(totals.remainingMoney)}</strong></article></div></div>
+        <div className="customer-balance-group"><div className="customer-balance-group-title"><span>Customer Payments</span><small>Cash, transfer and collected cheques</small></div><div className="customer-balance-cards"><article><span>Invoice Total</span><strong>EGP {money(totals.total)}</strong></article><article><span>Payments Received</span><strong>EGP {money(totals.payments)}</strong></article><article><span>Cash Fraction Write-offs</span><strong>EGP {money(totals.fractions)}</strong></article><article className={unallocatedChequeBalance > 0 ? "is-positive" : unallocatedChequeBalance < 0 ? "is-negative" : ""}><span>Unallocated Cheque Balance</span><strong>EGP {money(unallocatedChequeBalance)}</strong></article><article className="is-outstanding"><span>Net Remaining Money</span><strong>EGP {money(Math.max(0, totals.remainingMoney - unallocatedChequeBalance))}</strong></article></div></div>
         <div className="customer-balance-group"><div className="customer-balance-group-title"><span>Withholding Tax</span><small>Expected and collected certificates</small></div><div className="customer-balance-cards"><article><span>Expected WHT</span><strong>EGP {money(totals.expectedWht)}</strong></article><article><span>Collected WHT</span><strong>EGP {money(totals.collectedWht)}</strong></article><article className="is-wht"><span>Remaining WHT</span><strong>EGP {money(totals.remainingWht)}</strong></article></div></div>
       </section>
 

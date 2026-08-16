@@ -27,9 +27,14 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
     invoiceIds.length ? supabase.from("cheque_allocations").select("invoice_id, cheque_id, allocated_amount, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds) : Promise.resolve({ data: [], error: null }),
     invoiceNumbers.length ? supabase.from("wht_collections").select("invoice_no, invoice_date, wht_amount, collected_amount").in("invoice_no", invoiceNumbers) : Promise.resolve({ data: [], error: null }),
   ]);
+  const customerChequesResult = await supabase.from("customer_cheques").select("id, amount, cheque_status").eq("customer_code", customer.customer_code);
+  const customerChequeIds = (customerChequesResult.data ?? []).map((item: any) => String(item.id));
+  const allCustomerAllocationsResult = customerChequeIds.length
+    ? await supabase.from("cheque_allocations").select("cheque_id, allocated_amount").in("cheque_id", customerChequeIds)
+    : { data: [], error: null };
   const chequeIds = Array.from(new Set((allocationsResult.data ?? []).map((item: any) => String(item.cheque_id))));
   const chequesResult = chequeIds.length ? await supabase.from("customer_cheques").select("id, cheque_status").in("id", chequeIds) : { data: [], error: null };
-  const error = collectionsResult.error || allocationsResult.error || whtResult.error || chequesResult.error;
+  const error = collectionsResult.error || allocationsResult.error || whtResult.error || chequesResult.error || customerChequesResult.error || allCustomerAllocationsResult.error;
   if (error) return <main style={{ padding: 32, color: "#dc2626" }}>{error.message}</main>;
 
   const payments = new Map<string, number>();
@@ -65,5 +70,8 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
     const cashFraction = cashFractions.get(String(invoice.id)) ?? 0;
     return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, cash_fraction: cashFraction, remaining_wht: Math.max(0, expectedWht - collectedWht), remaining_money: Math.max(0, Number(invoice.total_sales || 0) - expectedWht - customerPayments - cashFraction) };
   });
-  return <CustomerBalanceClient customer={customer} invoices={rows} />;
+  const allocationsByCheque = new Map<string, number>();
+  (allCustomerAllocationsResult.data ?? []).forEach((item: any) => allocationsByCheque.set(String(item.cheque_id), (allocationsByCheque.get(String(item.cheque_id)) ?? 0) + Number(item.allocated_amount || 0)));
+  const unallocatedChequeBalance = (customerChequesResult.data ?? []).reduce((sum: number, cheque: any) => cheque.cheque_status === "COLLECTED" ? sum + Math.max(0, Number(cheque.amount || 0) - (allocationsByCheque.get(String(cheque.id)) ?? 0)) : sum, 0);
+  return <CustomerBalanceClient customer={customer} invoices={rows} unallocatedChequeBalance={unallocatedChequeBalance} />;
 }
