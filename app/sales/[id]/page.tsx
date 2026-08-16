@@ -42,7 +42,7 @@ export default async function InvoiceDetailsPage({ params }: { params: { id: str
     supabase.from("customers").select("customer_official_name, payment_terms_days").eq("customer_code", invoice.customer_code).maybeSingle(),
     whtQuery,
     canViewCollections
-      ? supabase.from("invoice_collections").select("id, collection_date, amount, payment_method, cheque_status, cheque_status_date, reference_no, notes").eq("invoice_id", String(invoice.id)).neq("payment_method", "CHEQUE").order("collection_date", { ascending: false }).order("id", { ascending: false })
+      ? supabase.from("invoice_collections").select("*").eq("invoice_id", String(invoice.id)).neq("payment_method", "CHEQUE").order("collection_date", { ascending: false }).order("id", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
   ];
   if (session?.role === "admin") {
