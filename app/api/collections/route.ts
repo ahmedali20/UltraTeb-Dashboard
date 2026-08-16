@@ -17,10 +17,14 @@ async function editableSession(request: NextRequest) {
 }
 
 function collectionValues(body: Record<string, unknown>) {
+  const paymentMethod = String(body.paymentMethod ?? "BANK_TRANSFER").trim().toUpperCase();
+  const bankAmount = Number(body.amount ?? 0);
+  const transferFees = paymentMethod === "BANK_TRANSFER" ? Number(body.transferFees ?? 0) : 0;
   return {
     collection_date: String(body.collectionDate ?? "").trim(),
-    amount: Number(body.amount ?? 0),
-    payment_method: String(body.paymentMethod ?? "BANK_TRANSFER").trim().toUpperCase(),
+    amount: bankAmount + transferFees,
+    transfer_fees: transferFees,
+    payment_method: paymentMethod,
     reference_no: String(body.referenceNo ?? "").trim() || null,
     notes: String(body.notes ?? "").trim() || null,
     updated_at: new Date().toISOString(),
@@ -30,6 +34,7 @@ function collectionValues(body: Record<string, unknown>) {
 function validationError(values: ReturnType<typeof collectionValues>) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(values.collection_date)) return "Collection date is required.";
   if (!Number.isFinite(values.amount) || values.amount <= 0) return "Collected amount must be greater than zero.";
+  if (!Number.isFinite(values.transfer_fees) || values.transfer_fees < 0) return "Transfer fees must be zero or greater.";
   if (!["CASH", "BANK_TRANSFER", "CHEQUE", "OTHER"].includes(values.payment_method)) return "Invalid payment method.";
   if (values.payment_method === "CHEQUE" && !values.reference_no) return "Cheque number is required.";
   return null;
