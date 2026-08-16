@@ -66,7 +66,7 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionId?: number) 
     collectionsQuery,
     supabase
       .from("cheque_allocations")
-      .select("cheque_id, allocated_amount, wht_deducted_amount")
+      .select("cheque_id, allocated_amount, cash_fraction, wht_deducted_amount")
       .eq("invoice_id", String(invoice.id)),
     supabase
       .from("wht_collections")
@@ -97,7 +97,7 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionId?: number) 
   });
   (allocationsResult.data ?? []).forEach((item) => {
     if (!collectedChequeIds.has(String(item.cheque_id))) return;
-    payments += Number(item.allocated_amount || 0);
+    payments += Number(item.allocated_amount || 0) + Number(item.cash_fraction || 0);
     deductedWht += Number(item.wht_deducted_amount || 0);
   });
   const recordedWht = (recordedWhtResult.data ?? []).reduce(
@@ -164,14 +164,19 @@ export async function POST(request: NextRequest) {
     if (!customerName || !allocations.length) return NextResponse.json({ error: "Customer and at least one invoice allocation are required." }, { status: 400 });
     if (Math.abs(allocatedTotal - values.amount) > 0.01) return NextResponse.json({ error: "Total invoice allocations must equal the cheque amount." }, { status: 400 });
 
-    const invoices: { invoice: any; amount: number; whtDeductedAmount: number }[] = [];
+    const invoices: { invoice: any; amount: number; cashFraction: number; whtDeductedAmount: number }[] = [];
     for (const allocation of allocations) {
       const invoice = await permittedInvoice(allocation.invoiceId, session.salesRepName, session.role === "admin");
       if (!invoice || invoice.customer_name !== customerName) return NextResponse.json({ error: "Every allocated invoice must belong to the selected customer and be available to this user." }, { status: 400 });
       if (allocation.whtDeductedAmount > 0 && await existingWhtDeduction(allocation.invoiceId) > 0.005) {
         return NextResponse.json({ error: `WHT was already deducted for invoice ${invoice.invoice_no}.` }, { status: 409 });
       }
-      invoices.push({ invoice, amount: allocation.amount, whtDeductedAmount: allocation.whtDeductedAmount });
+      const alreadySettled = await settledInvoiceAmount(invoice);
+      const remainingAfterCheque = Math.round(
+        (Number(invoice.total_sales || 0) - alreadySettled - allocation.amount - allocation.whtDeductedAmount) * 100
+      ) / 100;
+      const cashFraction = remainingAfterCheque > 0 && remainingAfterCheque < 1 ? remainingAfterCheque : 0;
+      invoices.push({ invoice, amount: allocation.amount, cashFraction, whtDeductedAmount: allocation.whtDeductedAmount });
     }
     const customerCode = invoices[0].invoice.customer_code;
     const chequePayload = {
@@ -223,13 +228,13 @@ export async function POST(request: NextRequest) {
       .select("*")
       .eq("cheque_id", cheque.id);
     if (existingAllocationError) return NextResponse.json({ error: existingAllocationError.message }, { status: 400 });
-    const allocationPayload = invoices.map(({ invoice, amount, whtDeductedAmount }) => ({ cheque_id: cheque.id, invoice_id: String(invoice.id), invoice_no: String(invoice.invoice_no), allocated_amount: amount, wht_deducted_amount: whtDeductedAmount }));
+    const allocationPayload = invoices.map(({ invoice, amount, cashFraction, whtDeductedAmount }) => ({ cheque_id: cheque.id, invoice_id: String(invoice.id), invoice_no: String(invoice.invoice_no), allocated_amount: amount, cash_fraction: cashFraction, wht_deducted_amount: whtDeductedAmount }));
     const requestedSignature = allocationPayload
-      .map((item) => `${item.invoice_id}:${Number(item.allocated_amount).toFixed(2)}:${Number(item.wht_deducted_amount).toFixed(2)}`)
+      .map((item) => `${item.invoice_id}:${Number(item.allocated_amount).toFixed(2)}:${Number(item.cash_fraction).toFixed(2)}:${Number(item.wht_deducted_amount).toFixed(2)}`)
       .sort()
       .join("|");
     const existingSignature = (existingAllocations ?? [])
-      .map((item) => `${String(item.invoice_id)}:${Number(item.allocated_amount).toFixed(2)}:${Number(item.wht_deducted_amount || 0).toFixed(2)}`)
+      .map((item) => `${String(item.invoice_id)}:${Number(item.allocated_amount).toFixed(2)}:${Number(item.cash_fraction || 0).toFixed(2)}:${Number(item.wht_deducted_amount || 0).toFixed(2)}`)
       .sort()
       .join("|");
     if (existingSignature && existingSignature === requestedSignature) {
