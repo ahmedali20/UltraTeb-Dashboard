@@ -43,7 +43,8 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
   const chequeStatus = new Map((chequesResult.data ?? []).map((item: any) => [String(item.id), item.cheque_status]));
   (allocationsResult.data ?? []).forEach((item: any) => {
     if (chequeStatus.get(String(item.cheque_id)) === "COLLECTED") {
-      payments.set(String(item.invoice_id), (payments.get(String(item.invoice_id)) ?? 0) + Number(item.allocated_amount || 0) + Number(item.cash_fraction || 0));
+      payments.set(String(item.invoice_id), (payments.get(String(item.invoice_id)) ?? 0) + Number(item.allocated_amount || 0));
+      cashFractions.set(String(item.invoice_id), (cashFractions.get(String(item.invoice_id)) ?? 0) + Number(item.cash_fraction || 0));
       deductedWht.set(String(item.invoice_id), (deductedWht.get(String(item.invoice_id)) ?? 0) + Number(item.wht_deducted_amount || 0));
     }
   });
