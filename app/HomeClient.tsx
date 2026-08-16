@@ -8,6 +8,7 @@ const currentMonthParts = new Intl.DateTimeFormat("en-US", {
   timeZone: "Africa/Cairo", year: "numeric", month: "2-digit",
 }).formatToParts(new Date());
 const currentMonthKey = `${currentMonthParts.find((part) => part.type === "year")?.value}-${currentMonthParts.find((part) => part.type === "month")?.value}`;
+const currentYearKey = currentMonthKey.slice(0, 4);
 
 type DashboardSale = {
   id: string;
@@ -58,10 +59,14 @@ const text = {
     noChange: "No change",
     month: "Month",
     allMonths: "All Months",
+    year: "Year",
+    allYears: "All Years",
   },
   ar: {
     month: "الشهر",
     allMonths: "كل الشهور",
+    year: "السنة",
+    allYears: "كل السنوات",
     invoiceSales: "فواتير المبيعات",
     creditNotes: "الإشعارات الدائنة",
     debitNotes: "الإشعارات المدينة",
@@ -111,6 +116,7 @@ function normalizeSalesRep(value: string | null, fallback: string) {
 export default function HomeClient({ sales, customerCount }: HomeClientProps) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [selectedRep, setSelectedRep] = useState("All");
+  const [selectedYear, setSelectedYear] = useState(currentYearKey);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const t = text[lang];
   const dir = lang === "ar" ? "rtl" : "ltr";
@@ -131,16 +137,19 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
           [currentMonthKey, ...sales
             .map((sale) => sale.sales_date?.slice(0, 7))
             .filter((month): month is string => Boolean(month))]
+            .filter((month) => selectedYear === "All" || month.startsWith(`${selectedYear}-`))
         )
       ).sort((a, b) => b.localeCompare(a)),
-    [sales]
+    [sales, selectedYear]
   );
+  const availableYears = useMemo(() => Array.from(new Set([currentYearKey, ...sales.map((sale) => sale.sales_date?.slice(0, 4)).filter((year): year is string => Boolean(year))])).sort((a, b) => b.localeCompare(a)), [sales]);
   const salesForSelectedRep = sales.filter(
     (sale) =>
       selectedRep === "All" ||
       normalizeSalesRep(sale.sales_rep, t.unassigned) === selectedRep
   );
-  const filteredSales = salesForSelectedRep.filter(
+  const salesForSelectedRepAndYear = salesForSelectedRep.filter((sale) => selectedYear === "All" || sale.sales_date?.startsWith(`${selectedYear}-`));
+  const filteredSales = salesForSelectedRepAndYear.filter(
     (sale) =>
       (selectedMonth === "All" ||
         sale.sales_date?.slice(0, 7) === selectedMonth)
@@ -179,7 +188,7 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
   const periodComparison = useMemo(() => {
     const monthKeys = Array.from(
       new Set(
-        salesForSelectedRep
+        salesForSelectedRepAndYear
           .map((sale) => sale.sales_date?.slice(0, 7))
           .filter(Boolean)
       )
@@ -227,6 +236,8 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
     };
   }, [
     salesForSelectedRep,
+    salesForSelectedRepAndYear,
+    selectedYear,
     selectedMonth,
     lang,
     t.vsPrevious,
@@ -387,6 +398,20 @@ export default function HomeClient({ sales, customerCount }: HomeClientProps) {
               {allSalesReps.map((rep) => (
                 <option key={rep} value={rep}>{rep}</option>
               ))}
+            </select>
+          </label>
+          <label>
+            {t.year}
+            <select
+              value={selectedYear}
+              onChange={(event) => {
+                const year = event.target.value;
+                setSelectedYear(year);
+                setSelectedMonth(year === currentYearKey ? currentMonthKey : "All");
+              }}
+            >
+              <option value="All">{t.allYears}</option>
+              {availableYears.map((year) => <option key={year} value={year}>{year}</option>)}
             </select>
           </label>
           <label>
