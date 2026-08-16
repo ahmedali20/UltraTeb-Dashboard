@@ -23,8 +23,8 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
   const invoiceIds = (invoices ?? []).map((item) => String(item.id));
   const invoiceNumbers = Array.from(new Set((invoices ?? []).map((item) => String(item.invoice_no))));
   const [collectionsResult, allocationsResult, whtResult] = await Promise.all([
-    invoiceIds.length ? supabase.from("invoice_collections").select("invoice_id, amount").in("invoice_id", invoiceIds).neq("payment_method", "CHEQUE") : Promise.resolve({ data: [], error: null }),
-    invoiceIds.length ? supabase.from("cheque_allocations").select("invoice_id, cheque_id, allocated_amount").in("invoice_id", invoiceIds) : Promise.resolve({ data: [], error: null }),
+    invoiceIds.length ? supabase.from("invoice_collections").select("invoice_id, amount, wht_deducted_amount").in("invoice_id", invoiceIds).neq("payment_method", "CHEQUE") : Promise.resolve({ data: [], error: null }),
+    invoiceIds.length ? supabase.from("cheque_allocations").select("invoice_id, cheque_id, allocated_amount, wht_deducted_amount").in("invoice_id", invoiceIds) : Promise.resolve({ data: [], error: null }),
     invoiceNumbers.length ? supabase.from("wht_collections").select("invoice_no, invoice_date, wht_amount, collected_amount").in("invoice_no", invoiceNumbers) : Promise.resolve({ data: [], error: null }),
   ]);
   const chequeIds = Array.from(new Set((allocationsResult.data ?? []).map((item: any) => String(item.cheque_id))));
@@ -33,10 +33,17 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
   if (error) return <main style={{ padding: 32, color: "#dc2626" }}>{error.message}</main>;
 
   const payments = new Map<string, number>();
-  (collectionsResult.data ?? []).forEach((item: any) => payments.set(String(item.invoice_id), (payments.get(String(item.invoice_id)) ?? 0) + Number(item.amount || 0)));
+  const deductedWht = new Map<string, number>();
+  (collectionsResult.data ?? []).forEach((item: any) => {
+    payments.set(String(item.invoice_id), (payments.get(String(item.invoice_id)) ?? 0) + Number(item.amount || 0));
+    deductedWht.set(String(item.invoice_id), (deductedWht.get(String(item.invoice_id)) ?? 0) + Number(item.wht_deducted_amount || 0));
+  });
   const chequeStatus = new Map((chequesResult.data ?? []).map((item: any) => [String(item.id), item.cheque_status]));
   (allocationsResult.data ?? []).forEach((item: any) => {
-    if (chequeStatus.get(String(item.cheque_id)) === "COLLECTED") payments.set(String(item.invoice_id), (payments.get(String(item.invoice_id)) ?? 0) + Number(item.allocated_amount || 0));
+    if (chequeStatus.get(String(item.cheque_id)) === "COLLECTED") {
+      payments.set(String(item.invoice_id), (payments.get(String(item.invoice_id)) ?? 0) + Number(item.allocated_amount || 0));
+      deductedWht.set(String(item.invoice_id), (deductedWht.get(String(item.invoice_id)) ?? 0) + Number(item.wht_deducted_amount || 0));
+    }
   });
   const wht = new Map<string, { expected: number; collected: number }>();
   (whtResult.data ?? []).forEach((item: any) => {
@@ -49,7 +56,7 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
   const rows = (invoices ?? []).map((invoice: any) => {
     const key = `${String(invoice.invoice_no)}|${String(invoice.sales_date).slice(0, 10)}`;
     const recordedWht = wht.get(key);
-    const expectedWht = recordedWht?.expected ?? Math.round(Number(invoice.sales_item_total || 0) * 0.01 * 100) / 100;
+    const expectedWht = Math.max(deductedWht.get(String(invoice.id)) ?? 0, recordedWht?.expected ?? 0);
     const collectedWht = recordedWht?.collected ?? 0;
     const customerPayments = payments.get(String(invoice.id)) ?? 0;
     return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, remaining_wht: Math.max(0, expectedWht - collectedWht), remaining_money: Math.max(0, Number(invoice.total_sales || 0) - expectedWht - customerPayments) };
