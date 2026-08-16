@@ -29,12 +29,35 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
+    const rawDocumentType = String(row.document_type ?? "")
+      .trim()
+      .toUpperCase()
+      .replace(/[\s-]+/g, "_");
+    const documentType = ["CR", "CR_NOTE", "CREDIT_NOTE"].includes(rawDocumentType)
+      ? "CR_NOTE"
+      : ["DR", "DR_NOTE", "DEBIT_NOTE"].includes(rawDocumentType)
+        ? "DR_NOTE"
+        : "INVOICE";
+    const originalInvoiceNo = String(row.original_invoice_no ?? "").trim();
+    const noteReason = String(row.note_reason ?? "").trim();
+    if (documentType !== "INVOICE" && (!originalInvoiceNo || !noteReason)) {
+      failed.push({
+        row,
+        error: "Original invoice number and reason are required for credit/debit notes.",
+      });
+      continue;
+    }
+    const sign = documentType === "CR_NOTE" ? -1 : 1;
+
     const { error } = await supabaseServer.from("sales").insert({
       invoice_no: String(row.invoice_no).trim(),
       sales_date: row.sales_date,
       customer_code: String(row.customer_code).trim(),
-      sales_item_total: Number(row.sales_item_total) || 0,
-      tax: Number(row.tax) || 0,
+      sales_item_total: sign * Math.abs(Number(row.sales_item_total) || 0),
+      tax: sign * Math.abs(Number(row.tax) || 0),
+      document_type: documentType,
+      original_invoice_no: documentType === "INVOICE" ? null : originalInvoiceNo,
+      note_reason: documentType === "INVOICE" ? null : noteReason,
     });
 
     if (error) {
