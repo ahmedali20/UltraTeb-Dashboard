@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Header from "../Header";
 import Footer from "../Footer";
 
-type Allocation = { id: number; invoice_id: string; invoice_no: string; allocated_amount: number; wht_deducted_amount: number };
+type Allocation = { id: number; invoice_id: string; invoice_no: string; allocated_amount: number; cash_fraction: number; wht_deducted_amount: number };
 type Cheque = { id: number; customer_name: string; collection_date: string; cheque_date: string; bank_name: string; amount: number; cheque_no: string; notes: string | null; cheque_status: string; cheque_status_date: string; allocations: Allocation[] };
 const workflow = ["IN_TREASURY", "UNDER_COLLECTION", "COLLECTED", "REFUSED", "RETURNED_TO_CUSTOMER"] as const;
 const labels: Record<string, string> = { IN_TREASURY: "In Treasury", UNDER_COLLECTION: "Under Collection", COLLECTED: "Collected", REFUSED: "Refused", RETURNED_TO_CUSTOMER: "Returned to Customer" };
