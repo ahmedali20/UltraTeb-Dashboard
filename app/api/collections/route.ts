@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
       );
     const allocatedTotal = allocations.reduce((sum, item) => sum + item.amount, 0);
     if (!customerName || !allocations.length) return NextResponse.json({ error: "Customer and at least one invoice allocation are required." }, { status: 400 });
-    if (Math.abs(allocatedTotal - values.amount) > 0.01) return NextResponse.json({ error: "Total invoice allocations must equal the cheque amount." }, { status: 400 });
+    if (allocatedTotal > values.amount + 0.01) return NextResponse.json({ error: "Total invoice allocations cannot exceed the cheque amount." }, { status: 400 });
 
     const invoices: { invoice: any; amount: number; cashFraction: number; whtDeductedAmount: number }[] = [];
     for (const allocation of allocations) {
