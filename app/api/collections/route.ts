@@ -54,6 +54,22 @@ async function permittedInvoice(invoiceId: string, salesRepName: string | null, 
   return data;
 }
 
+async function existingWhtDeduction(invoiceId: string, excludeCollectionId?: number) {
+  let collectionsQuery = supabase
+    .from("invoice_collections")
+    .select("wht_deducted_amount")
+    .eq("invoice_id", invoiceId);
+  if (excludeCollectionId) collectionsQuery = collectionsQuery.neq("id", excludeCollectionId);
+  const [collectionsResult, allocationsResult] = await Promise.all([
+    collectionsQuery,
+    supabase.from("cheque_allocations").select("wht_deducted_amount").eq("invoice_id", invoiceId),
+  ]);
+  if (collectionsResult.error) throw collectionsResult.error;
+  if (allocationsResult.error) throw allocationsResult.error;
+  return [...(collectionsResult.data ?? []), ...(allocationsResult.data ?? [])]
+    .reduce((sum, item) => sum + Number(item.wht_deducted_amount || 0), 0);
+}
+
 export async function POST(request: NextRequest) {
   const session = await editableSession(request);
   if (!session) return NextResponse.json({ error: "Collections edit permission required." }, { status: 403 });
@@ -87,6 +103,9 @@ export async function POST(request: NextRequest) {
     for (const allocation of allocations) {
       const invoice = await permittedInvoice(allocation.invoiceId, session.salesRepName, session.role === "admin");
       if (!invoice || invoice.customer_name !== customerName) return NextResponse.json({ error: "Every allocated invoice must belong to the selected customer and be available to this user." }, { status: 400 });
+      if (allocation.whtDeductedAmount > 0 && await existingWhtDeduction(allocation.invoiceId) > 0.005) {
+        return NextResponse.json({ error: `WHT was already deducted for invoice ${invoice.invoice_no}.` }, { status: 409 });
+      }
       invoices.push({ invoice, amount: allocation.amount, whtDeductedAmount: allocation.whtDeductedAmount });
     }
     const customerCode = invoices[0].invoice.customer_code;
@@ -168,6 +187,9 @@ export async function POST(request: NextRequest) {
   if (!invoiceId) return NextResponse.json({ error: "Please choose an invoice." }, { status: 400 });
   const invoice = await permittedInvoice(invoiceId, session.salesRepName, session.role === "admin");
   if (!invoice) return NextResponse.json({ error: "Invoice not found or unavailable to this user." }, { status: 404 });
+  if (values.wht_deducted_amount > 0 && await existingWhtDeduction(invoiceId) > 0.005) {
+    return NextResponse.json({ error: `WHT was already deducted for invoice ${invoice.invoice_no}.` }, { status: 409 });
+  }
   const { data, error } = await supabase.from("invoice_collections").insert({
     ...values,
     cheque_status: null,
@@ -194,6 +216,9 @@ export async function PATCH(request: NextRequest) {
   if (values.payment_method === "CHEQUE") return NextResponse.json({ error: "Create and manage cheques through the cheque workflow." }, { status: 400 });
   const { data: before } = await supabase.from("invoice_collections").select("*").eq("id", id).maybeSingle();
   if (!before || !(await permittedInvoice(String(before.invoice_id), session.salesRepName, session.role === "admin"))) return NextResponse.json({ error: "Collection not found or unavailable to this user." }, { status: 404 });
+  if (values.wht_deducted_amount > 0 && await existingWhtDeduction(String(before.invoice_id), id) > 0.005) {
+    return NextResponse.json({ error: `WHT was already deducted for invoice ${before.invoice_no}.` }, { status: 409 });
+  }
   const { data, error } = await supabase.from("invoice_collections").update({
     ...values,
     cheque_status: null,
