@@ -190,6 +190,7 @@ export default function SalesTable({
   const [recordYearFilter, setRecordYearFilter] = useState("All");
   const [recordMonthFilter, setRecordMonthFilter] = useState(currentRecordsMonth);
   const [recordCustomerFilter, setRecordCustomerFilter] = useState("All");
+  const [recordTypeFilter, setRecordTypeFilter] = useState("All");
   const [recordPage, setRecordPage] = useState(1);
   const [recordSort, setRecordSort] = useState<
     "invoice" | "date" | "customer" | "total"
@@ -249,21 +250,22 @@ export default function SalesTable({
     return recordSortDirection === "asc" ? comparison : -comparison;
   });
   const recordReps = Array.from(
-    new Set(sales.filter((sale) => (recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`)) && (recordMonthFilter === "All" || sale.month === recordMonthFilter) && (recordCustomerFilter === "All" || sale.customer_name === recordCustomerFilter)).map((sale) => normalizeSalesRep(sale.sales_rep)))
+    new Set(sales.filter((sale) => (recordTypeFilter === "All" || (sale.document_type ?? "INVOICE") === recordTypeFilter) && (recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`)) && (recordMonthFilter === "All" || sale.month === recordMonthFilter) && (recordCustomerFilter === "All" || sale.customer_name === recordCustomerFilter)).map((sale) => normalizeSalesRep(sale.sales_rep)))
   ).sort();
   const recordMonths = Array.from(
-    new Set(sales.filter((sale) => recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`)).map((sale) => sale.month).filter(Boolean))
+    new Set(sales.filter((sale) => (recordTypeFilter === "All" || (sale.document_type ?? "INVOICE") === recordTypeFilter) && (recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`))).map((sale) => sale.month).filter(Boolean))
   ).sort((a, b) => b.localeCompare(a));
   const recordYears = Array.from(
     new Set(sales.map((sale) => String(sale.sales_date || "").slice(0, 4)).filter(Boolean))
   ).sort((a, b) => b.localeCompare(a));
   const recordCustomers = Array.from(
-    new Set(sales.filter((sale) => (recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`)) && (recordMonthFilter === "All" || sale.month === recordMonthFilter) && (recordRepFilter === "All" || normalizeSalesRep(sale.sales_rep) === recordRepFilter)).map((sale) => sale.customer_name).filter(Boolean))
+    new Set(sales.filter((sale) => (recordTypeFilter === "All" || (sale.document_type ?? "INVOICE") === recordTypeFilter) && (recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`)) && (recordMonthFilter === "All" || sale.month === recordMonthFilter) && (recordRepFilter === "All" || normalizeSalesRep(sale.sales_rep) === recordRepFilter)).map((sale) => sale.customer_name).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b));
   const displayedSales = sortedSales.filter(
     (sale) =>
       (recordRepFilter === "All" ||
         normalizeSalesRep(sale.sales_rep) === recordRepFilter) &&
+      (recordTypeFilter === "All" || (sale.document_type ?? "INVOICE") === recordTypeFilter) &&
       (recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`)) &&
       (recordMonthFilter === "All" || sale.month === recordMonthFilter) &&
       (recordCustomerFilter === "All" ||
@@ -293,6 +295,7 @@ export default function SalesTable({
     recordYearFilter,
     recordMonthFilter,
     recordCustomerFilter,
+    recordTypeFilter,
     recordSort,
     recordSortDirection,
   ]);
@@ -1364,6 +1367,15 @@ export default function SalesTable({
             )}
           </span>
         </div>
+        <label>
+          {lang === "ar" ? "نوع المستند" : "Document Type"}
+          <select value={recordTypeFilter} onChange={(event) => setRecordTypeFilter(event.target.value)}>
+            <option value="All">{lang === "ar" ? "كل الأنواع" : "All Types"}</option>
+            <option value="INVOICE">{lang === "ar" ? "فاتورة" : "Invoice"}</option>
+            <option value="CR_NOTE">{lang === "ar" ? "إشعار دائن" : "Credit Note"}</option>
+            <option value="DR_NOTE">{lang === "ar" ? "إشعار مدين" : "Debit Note"}</option>
+          </select>
+        </label>
         <label>
           {lang === "ar" ? "الشهر" : "Month"}
           <select
