@@ -20,10 +20,14 @@ function collectionValues(body: Record<string, unknown>) {
   const paymentMethod = String(body.paymentMethod ?? "BANK_TRANSFER").trim().toUpperCase();
   const bankAmount = Number(body.amount ?? 0);
   const transferFees = paymentMethod === "BANK_TRANSFER" ? Number(body.transferFees ?? 0) : 0;
+  const cashFraction = paymentMethod === "CASH" ? Number(body.cashFraction ?? 0) : 0;
+  const whtDeductedAmount = Number(body.whtDeductedAmount ?? 0);
   return {
     collection_date: String(body.collectionDate ?? "").trim(),
-    amount: bankAmount + transferFees,
+    amount: bankAmount + transferFees + cashFraction,
     transfer_fees: transferFees,
+    cash_fraction: cashFraction,
+    wht_deducted_amount: whtDeductedAmount,
     payment_method: paymentMethod,
     reference_no: String(body.referenceNo ?? "").trim() || null,
     notes: String(body.notes ?? "").trim() || null,
@@ -35,6 +39,8 @@ function validationError(values: ReturnType<typeof collectionValues>) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(values.collection_date)) return "Collection date is required.";
   if (!Number.isFinite(values.amount) || values.amount <= 0) return "Collected amount must be greater than zero.";
   if (!Number.isFinite(values.transfer_fees) || values.transfer_fees < 0) return "Transfer fees must be zero or greater.";
+  if (!Number.isFinite(values.cash_fraction) || values.cash_fraction < 0) return "Cash fraction must be zero or greater.";
+  if (!Number.isFinite(values.wht_deducted_amount) || values.wht_deducted_amount < 0) return "WHT deducted amount must be zero or greater.";
   if (!["CASH", "BANK_TRANSFER", "CHEQUE", "OTHER"].includes(values.payment_method)) return "Invalid payment method.";
   if (values.payment_method === "CHEQUE" && !values.reference_no) return "Cheque number is required.";
   return null;
@@ -64,23 +70,24 @@ export async function POST(request: NextRequest) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(chequeDate)) return NextResponse.json({ error: "Cheque date is required." }, { status: 400 });
     if (!bankName) return NextResponse.json({ error: "Bank name is required." }, { status: 400 });
     const rawAllocations: Record<string, unknown>[] = Array.isArray(body.allocations) ? body.allocations : [];
-    const allocations: { invoiceId: string; amount: number }[] = rawAllocations
+    const allocations: { invoiceId: string; amount: number; whtDeductedAmount: number }[] = rawAllocations
       .map((item: Record<string, unknown>) => ({
         invoiceId: String(item.invoiceId ?? "").trim(),
         amount: Number(item.amount ?? 0),
+        whtDeductedAmount: Number(item.whtDeductedAmount ?? 0),
       }))
-      .filter((item: { invoiceId: string; amount: number }) =>
-        Boolean(item.invoiceId) && Number.isFinite(item.amount) && item.amount > 0
+      .filter((item: { invoiceId: string; amount: number; whtDeductedAmount: number }) =>
+        Boolean(item.invoiceId) && Number.isFinite(item.amount) && item.amount > 0 && Number.isFinite(item.whtDeductedAmount) && item.whtDeductedAmount >= 0
       );
     const allocatedTotal = allocations.reduce((sum, item) => sum + item.amount, 0);
     if (!customerName || !allocations.length) return NextResponse.json({ error: "Customer and at least one invoice allocation are required." }, { status: 400 });
     if (Math.abs(allocatedTotal - values.amount) > 0.01) return NextResponse.json({ error: "Total invoice allocations must equal the cheque amount." }, { status: 400 });
 
-    const invoices: { invoice: any; amount: number }[] = [];
+    const invoices: { invoice: any; amount: number; whtDeductedAmount: number }[] = [];
     for (const allocation of allocations) {
       const invoice = await permittedInvoice(allocation.invoiceId, session.salesRepName, session.role === "admin");
       if (!invoice || invoice.customer_name !== customerName) return NextResponse.json({ error: "Every allocated invoice must belong to the selected customer and be available to this user." }, { status: 400 });
-      invoices.push({ invoice, amount: allocation.amount });
+      invoices.push({ invoice, amount: allocation.amount, whtDeductedAmount: allocation.whtDeductedAmount });
     }
     const customerCode = invoices[0].invoice.customer_code;
     const chequePayload = {
@@ -132,13 +139,13 @@ export async function POST(request: NextRequest) {
       .select("*")
       .eq("cheque_id", cheque.id);
     if (existingAllocationError) return NextResponse.json({ error: existingAllocationError.message }, { status: 400 });
-    const allocationPayload = invoices.map(({ invoice, amount }) => ({ cheque_id: cheque.id, invoice_id: String(invoice.id), invoice_no: String(invoice.invoice_no), allocated_amount: amount }));
+    const allocationPayload = invoices.map(({ invoice, amount, whtDeductedAmount }) => ({ cheque_id: cheque.id, invoice_id: String(invoice.id), invoice_no: String(invoice.invoice_no), allocated_amount: amount, wht_deducted_amount: whtDeductedAmount }));
     const requestedSignature = allocationPayload
-      .map((item) => `${item.invoice_id}:${Number(item.allocated_amount).toFixed(2)}`)
+      .map((item) => `${item.invoice_id}:${Number(item.allocated_amount).toFixed(2)}:${Number(item.wht_deducted_amount).toFixed(2)}`)
       .sort()
       .join("|");
     const existingSignature = (existingAllocations ?? [])
-      .map((item) => `${String(item.invoice_id)}:${Number(item.allocated_amount).toFixed(2)}`)
+      .map((item) => `${String(item.invoice_id)}:${Number(item.allocated_amount).toFixed(2)}:${Number(item.wht_deducted_amount || 0).toFixed(2)}`)
       .sort()
       .join("|");
     if (existingSignature && existingSignature === requestedSignature) {
