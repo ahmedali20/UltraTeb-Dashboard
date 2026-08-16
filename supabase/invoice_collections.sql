@@ -120,6 +120,55 @@ alter table public.cheque_allocations
   add column if not exists wht_deducted_amount numeric(14,2) not null default 0
   check (wht_deducted_amount >= 0);
 
+alter table public.cheque_allocations
+  add column if not exists cash_fraction numeric(14,2) not null default 0
+  check (cash_fraction >= 0);
+
+-- Close historical sub-pound balances on invoices whose final settlement was
+-- a collected cheque. The fraction is stored separately and never increases
+-- the cheque amount or the customer's cash payment.
+with direct_settlement as (
+  select invoice_id,
+    coalesce(sum(amount + cash_fraction), 0) as payments,
+    coalesce(sum(wht_deducted_amount), 0) as deducted_wht
+  from public.invoice_collections
+  where payment_method <> 'CHEQUE'
+  group by invoice_id
+), collected_cheque_settlement as (
+  select allocation.invoice_id,
+    coalesce(sum(allocation.allocated_amount + allocation.cash_fraction), 0) as payments,
+    coalesce(sum(allocation.wht_deducted_amount), 0) as deducted_wht,
+    max(allocation.id) as final_allocation_id
+  from public.cheque_allocations allocation
+  join public.customer_cheques cheque on cheque.id = allocation.cheque_id
+  where cheque.cheque_status = 'COLLECTED'
+  group by allocation.invoice_id
+), recorded_wht as (
+  select invoice_no, coalesce(sum(wht_amount), 0) as amount
+  from public.wht_collections
+  group by invoice_no
+), residuals as (
+  select cheque.final_allocation_id,
+    round((sale.total_sales
+      - coalesce(direct.payments, 0)
+      - coalesce(cheque.payments, 0)
+      - greatest(
+          coalesce(direct.deducted_wht, 0) + coalesce(cheque.deducted_wht, 0),
+          coalesce(wht.amount, 0)
+        ))::numeric, 2) as remaining
+  from public.sales_view sale
+  join collected_cheque_settlement cheque on cheque.invoice_id = sale.id::text
+  left join direct_settlement direct on direct.invoice_id = sale.id::text
+  left join recorded_wht wht on wht.invoice_no = sale.invoice_no::text
+  where sale.document_type = 'INVOICE'
+)
+update public.cheque_allocations allocation
+set cash_fraction = allocation.cash_fraction + residual.remaining
+from residuals residual
+where allocation.id = residual.final_allocation_id
+  and residual.remaining > 0
+  and residual.remaining < 1;
+
 alter table public.customer_cheques add column if not exists collection_date date;
 alter table public.customer_cheques add column if not exists bank_name text not null default '';
 update public.customer_cheques set collection_date = coalesce(collection_date, cheque_date) where collection_date is null;
