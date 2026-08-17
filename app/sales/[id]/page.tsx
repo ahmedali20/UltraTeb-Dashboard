@@ -22,7 +22,7 @@ export default async function InvoiceDetailsPage({ params }: { params: { id: str
   if (error || !invoice) notFound();
   const canViewCollections = Boolean(session && hasDashboardPermission(session, "collections", "view"));
   let notesQuery = supabase.from("sales_view").select("id, invoice_no, sales_date, document_type, original_invoice_no, note_reason, sales_item_total, tax, total_sales").eq("original_invoice_no", invoice.invoice_no).in("document_type", ["CR_NOTE", "DR_NOTE"]).order("sales_date");
-  let whtQuery = supabase.from("wht_collections").select("id, wht_amount, collected_amount, collection_date").eq("invoice_no", invoice.invoice_no).order("collection_date", { ascending: false });
+  let whtQuery = supabase.from("wht_collections").select("id, wht_amount, collected_amount, collection_date").eq("document_type", "INVOICE").eq("invoice_no", invoice.invoice_no).order("collection_date", { ascending: false });
   if (!canViewPre2026Sales(session)) {
     notesQuery = notesQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
     whtQuery = whtQuery.gte("invoice_date", NON_ADMIN_SALES_START_DATE);
