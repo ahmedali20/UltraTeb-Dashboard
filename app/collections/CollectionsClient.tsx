@@ -67,16 +67,24 @@ export default function CollectionsClient({ invoices, initialCollections, initia
     });
     return map;
   }, [records, initialChequeAllocations, invoices, recordedWhtByInvoice]);
-  const invoicesReservedByPendingCheque = useMemo(() => new Set(
-    initialChequeAllocations
-      .filter((allocation) => allocation.cheque && allocation.cheque.cheque_status !== "COLLECTED" && !["REFUSED", "RETURNED_TO_CUSTOMER"].includes(allocation.cheque.cheque_status))
-      .map((allocation) => String(allocation.invoice_id))
-  ), [initialChequeAllocations]);
-  const allocatableCustomerInvoices = useMemo(() => customerInvoices.filter((invoice) => {
-    if (invoicesReservedByPendingCheque.has(String(invoice.id))) return false;
-    const remaining = Number(invoice.total_sales) - (settledByInvoice.get(String(invoice.id)) ?? 0);
-    return remaining > 0.005;
-  }), [customerInvoices, settledByInvoice, invoicesReservedByPendingCheque]);
+  const reservedByPendingCheque = useMemo(() => {
+    const map = new Map<string, number>();
+    initialChequeAllocations.forEach((allocation) => {
+      if (!allocation.cheque || allocation.cheque.cheque_status === "COLLECTED" || ["REFUSED", "RETURNED_TO_CUSTOMER"].includes(allocation.cheque.cheque_status)) return;
+      const invoiceId = String(allocation.invoice_id);
+      const reserved = Number(allocation.allocated_amount || 0) + Number(allocation.cash_fraction || 0) + Number(allocation.wht_deducted_amount || 0);
+      map.set(invoiceId, (map.get(invoiceId) ?? 0) + reserved);
+    });
+    return map;
+  }, [initialChequeAllocations]);
+  const availableInvoiceBalance = (invoice: Invoice) => Math.max(0,
+    Number(invoice.total_sales) -
+    (settledByInvoice.get(String(invoice.id)) ?? 0) -
+    (reservedByPendingCheque.get(String(invoice.id)) ?? 0)
+  );
+  const allocatableCustomerInvoices = customerInvoices.filter((invoice) => {
+    return availableInvoiceBalance(invoice) > 0.005;
+  });
   const selectableCustomerInvoices = useMemo(() => editingId
     ? customerInvoices.filter((invoice) => String(invoice.id) === form.invoiceId)
     : allocatableCustomerInvoices,
@@ -132,7 +140,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
       if (chequeRemaining <= 0) break;
       const invoiceId = String(invoice.id);
       const wht = whtDeductions[invoiceId] ? (whtByInvoice.get(String(invoice.invoice_no)) ?? 0) : 0;
-      const invoiceRemaining = Math.max(0, Number(invoice.total_sales) - (settledByInvoice.get(invoiceId) ?? 0) - wht);
+      const invoiceRemaining = Math.max(0, availableInvoiceBalance(invoice) - wht);
       const allocation = Math.min(invoiceRemaining, chequeRemaining);
       if (allocation > 0) {
         next[invoiceId] = allocation.toFixed(2);
@@ -179,7 +187,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
         {form.paymentMethod === "CHEQUE" && form.customerName && <div className="cheque-allocation-panel">
           <div className="cheque-allocation-summary"><span>Cheque Amount <strong>EGP {money(Number(form.amount))}</strong></span><span>Allocated <strong>EGP {money(allocatedTotal)}</strong></span><span className={Math.abs(allocatedTotal - Number(form.amount)) <= .01 ? "balanced" : "unbalanced"}>Unallocated <strong>EGP {money(Number(form.amount) - allocatedTotal)}</strong></span></div>
           <div className="cheque-allocation-tools"><button type="button" disabled={!Number(form.amount)} onClick={autoAllocateCheque}>Auto Allocate Cheque</button><span>Allocate all or part of the cheque. Any unused amount stays as an unallocated customer balance.</span></div>
-          <div className="cheque-allocation-list">{allocatableCustomerInvoices.map((invoice) => { const invoiceId = String(invoice.id); const wht = whtByInvoice.get(String(invoice.invoice_no)) ?? 0; const whtAlreadyApplied = (deductedWhtByInvoice.get(invoiceId) ?? 0) > 0.005; const remaining = Number(invoice.total_sales) - (settledByInvoice.get(invoiceId) ?? 0); const cashRemaining = Math.max(0, remaining - (whtDeductions[invoiceId] && !whtAlreadyApplied ? wht : 0)); return <div className="cheque-allocation-row" key={invoiceId}><span><strong>Invoice {invoice.invoice_no} · {dateLabel(invoice.sales_date)}</strong><small><b>Invoice Total:</b> EGP {money(invoice.total_sales)} <b>Possible WHT:</b> EGP {money(wht)} <b>Remaining:</b> EGP {money(remaining)}</small><label className="collection-wht-option"><input type="checkbox" disabled={whtAlreadyApplied} checked={!whtAlreadyApplied && Boolean(whtDeductions[invoiceId])} onChange={(event) => setWhtDeductions((current) => ({ ...current, [invoiceId]: event.target.checked }))} /> {whtAlreadyApplied ? "WHT already deducted" : "Customer deducted WHT"}</label></span><div><input type="number" min="0" max={cashRemaining} step="0.01" placeholder="Write amount" value={allocations[invoiceId] ?? ""} onChange={(event) => setAllocations((current) => ({ ...current, [invoiceId]: event.target.value }))} /><button type="button" onClick={() => setAllocations((current) => ({ ...current, [invoiceId]: cashRemaining.toFixed(2) }))}>Use Full Remaining</button></div></div>; })}{!allocatableCustomerInvoices.length && <p className="collection-empty">This customer has no invoices with a remaining money balance.</p>}</div>
+          <div className="cheque-allocation-list">{allocatableCustomerInvoices.map((invoice) => { const invoiceId = String(invoice.id); const wht = whtByInvoice.get(String(invoice.invoice_no)) ?? 0; const whtAlreadyApplied = (deductedWhtByInvoice.get(invoiceId) ?? 0) > 0.005; const remaining = availableInvoiceBalance(invoice); const cashRemaining = Math.max(0, remaining - (whtDeductions[invoiceId] && !whtAlreadyApplied ? wht : 0)); return <div className="cheque-allocation-row" key={invoiceId}><span><strong>Invoice {invoice.invoice_no} · {dateLabel(invoice.sales_date)}</strong><small><b>Invoice Total:</b> EGP {money(invoice.total_sales)} <b>Possible WHT:</b> EGP {money(wht)} <b>Remaining:</b> EGP {money(remaining)}</small><label className="collection-wht-option"><input type="checkbox" disabled={whtAlreadyApplied} checked={!whtAlreadyApplied && Boolean(whtDeductions[invoiceId])} onChange={(event) => setWhtDeductions((current) => ({ ...current, [invoiceId]: event.target.checked }))} /> {whtAlreadyApplied ? "WHT already deducted" : "Customer deducted WHT"}</label></span><div><input type="number" min="0" max={cashRemaining} step="0.01" placeholder="Write amount" value={allocations[invoiceId] ?? ""} onChange={(event) => setAllocations((current) => ({ ...current, [invoiceId]: event.target.value }))} /><button type="button" onClick={() => setAllocations((current) => ({ ...current, [invoiceId]: cashRemaining.toFixed(2) }))}>Use Full Remaining</button></div></div>; })}{!allocatableCustomerInvoices.length && <p className="collection-empty">This customer has no invoices with a remaining money balance.</p>}</div>
         </div>}
         {selectedInvoice && form.paymentMethod !== "CHEQUE" && <><label className="collection-wht-option collection-wht-option--single"><input type="checkbox" disabled={Boolean(selectedWhtAlreadyApplied)} checked={!selectedWhtAlreadyApplied && applyWht} onChange={(event) => setApplyWht(event.target.checked)} /> {selectedWhtAlreadyApplied ? "WHT already deducted for this invoice" : `Customer deducted WHT (EGP ${money(whtByInvoice.get(String(selectedInvoice.invoice_no)) ?? 0)})`}</label><div className="collection-invoice-preview"><span>Invoice Total <strong>EGP {money(selectedInvoice.total_sales)}</strong></span><span>Total Settled After Save <strong>EGP {money((settledByInvoice.get(String(selectedInvoice.id)) ?? 0) + collectedTotal + selectedWhtAmount + automaticFraction)}</strong></span>{automaticFraction > 0 && <span>Automatic Fraction <strong>EGP {money(automaticFraction)}</strong></span>}<span>Remaining After Save <strong>EGP {money(automaticFraction > 0 ? 0 : remainingBeforeAutoFraction)}</strong></span></div></>}
         <div className="collection-form-actions"><button className="primary" onClick={save} disabled={saving || (form.paymentMethod === "CHEQUE" ? !chequeValid : !form.invoiceId || !form.amount)}>{saving ? "Saving…" : editingId ? "Save Changes" : form.paymentMethod === "CHEQUE" ? "Add Cheque" : "Add Collection"}</button></div>
