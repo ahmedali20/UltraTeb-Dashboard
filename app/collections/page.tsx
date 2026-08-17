@@ -102,6 +102,7 @@ export default async function CollectionsPage() {
         let query = supabase
           .from("wht_collections")
           .select("invoice_no, wht_amount, collected_amount")
+          .eq("document_type", "INVOICE")
           .in("invoice_no", batch);
         if (!canViewPre2026Sales(session)) {
           query = query.gte("invoice_date", NON_ADMIN_SALES_START_DATE);
