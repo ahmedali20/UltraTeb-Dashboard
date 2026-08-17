@@ -81,7 +81,7 @@ export default function CustomerBalanceClient({ customer, invoices, unallocatedC
       <a className="invoice-details-back" href="/customers">← Back to Customers</a>
       <section className="customer-balance-hero">
         <div><p>ACCOUNTS RECEIVABLE</p><h1>{customer.customer_name}</h1><strong>{customer.customer_official_name || customer.customer_name}</strong><span>{customer.sales_rep_name || "No sales representative"} · Payment terms: {customer.payment_terms_days ?? 0} days</span></div>
-        <div className="customer-balance-hero-total"><span>Net Customer Balance</span><strong>EGP {money(Math.max(0, totals.remainingMoney - unallocatedChequeBalance) + totals.remainingWht)}</strong><small>{invoices.length} invoices · after unallocated cheques</small></div>
+        <div className="customer-balance-hero-total"><span>Net Customer Balance</span><strong>EGP {money(Math.max(0, totals.remainingMoney - unallocatedChequeBalance))}</strong><small>Cash balance only · WHT shown separately below</small></div>
       </section>
 
       <section className="customer-balance-groups">
