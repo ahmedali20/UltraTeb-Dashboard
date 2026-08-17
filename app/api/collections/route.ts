@@ -47,11 +47,29 @@ function validationError(values: ReturnType<typeof collectionValues>) {
 }
 
 async function permittedInvoice(invoiceId: string, salesRepName: string | null, isAdmin: boolean) {
-  let query = supabase.from("sales_view").select("id, invoice_no, customer_code, customer_name, sales_rep, document_type, total_sales").eq("id", invoiceId).eq("document_type", "INVOICE");
+  let query = supabase.from("sales_view").select("id, invoice_no, customer_code, customer_name, sales_rep, sales_date, document_type, sales_item_total, total_sales").eq("id", invoiceId).eq("document_type", "INVOICE");
   if (salesRepName) query = query.eq("sales_rep", salesRepName);
   if (!isAdmin) query = query.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   const { data } = await query.maybeSingle();
-  return data;
+  if (!data) return null;
+  const { data: notes } = await supabase
+    .from("sales_view")
+    .select("sales_item_total, total_sales, sales_date, document_type")
+    .eq("customer_code", data.customer_code)
+    .eq("original_invoice_no", String(data.invoice_no))
+    .in("document_type", ["CR_NOTE", "DR_NOTE"])
+    .gte("sales_date", data.sales_date);
+  const adjustments = (notes ?? []).reduce((sum, note) => ({
+    salesItemTotal: sum.salesItemTotal + Number(note.sales_item_total || 0),
+    totalSales: sum.totalSales + Number(note.total_sales || 0),
+    wht: sum.wht + Math.round(Number(note.sales_item_total || 0)) / 100,
+  }), { salesItemTotal: 0, totalSales: 0, wht: 0 });
+  return {
+    ...data,
+    sales_item_total: Number(data.sales_item_total || 0) + adjustments.salesItemTotal,
+    total_sales: Number(data.total_sales || 0) + adjustments.totalSales,
+    note_wht_adjustment: adjustments.wht,
+  };
 }
 
 async function settledInvoiceAmount(invoice: any, excludeCollectionId?: number) {
@@ -108,7 +126,8 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionId?: number) 
     (sum, item) => sum + Number(item.wht_amount || 0),
     0
   );
-  return payments + Math.max(deductedWht, recordedWht);
+  const recordedWhtWithNotes = Math.max(0, recordedWht + Number(invoice.note_wht_adjustment || 0));
+  return payments + Math.max(deductedWht, recordedWhtWithNotes);
 }
 
 async function addAutomaticFraction(invoice: any, values: ReturnType<typeof collectionValues>, excludeCollectionId?: number) {
