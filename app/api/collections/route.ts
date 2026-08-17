@@ -71,6 +71,7 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionId?: number) 
     supabase
       .from("wht_collections")
       .select("wht_amount")
+      .eq("document_type", "INVOICE")
       .eq("invoice_no", String(invoice.invoice_no)),
   ]);
   if (collectionsResult.error) throw collectionsResult.error;
