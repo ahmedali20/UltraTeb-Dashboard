@@ -24,8 +24,8 @@ async function fetchAllInvoices(
   for (let from = 0; ; from += DATA_PAGE_SIZE) {
     let query = supabase
       .from("sales_view")
-      .select("id, invoice_no, customer_code, customer_name, sales_date, due_date, sales_item_total, total_sales, sales_rep")
-      .eq("document_type", "INVOICE")
+      .select("id, invoice_no, original_invoice_no, document_type, customer_code, customer_name, sales_date, due_date, sales_item_total, total_sales, sales_rep")
+      .in("document_type", ["INVOICE", "CR_NOTE", "DR_NOTE"])
       .order("sales_date", { ascending: false })
       .order("id", { ascending: false })
       .range(from, from + DATA_PAGE_SIZE - 1);
@@ -43,7 +43,32 @@ async function fetchAllInvoices(
     if (batch.length < DATA_PAGE_SIZE) break;
   }
 
-  return { data: rows, error: null };
+  const invoices = rows.filter((row) => row.document_type === "INVOICE").map((row) => ({
+    ...row,
+    base_sales_item_total: Number(row.sales_item_total || 0),
+    base_total_sales: Number(row.total_sales || 0),
+    note_wht_adjustment: 0,
+  }));
+  const invoicesByCustomerAndNumber = new Map<string, any[]>();
+  invoices.forEach((invoice) => {
+    const key = `${invoice.customer_code}|${String(invoice.invoice_no).trim()}`;
+    const matches = invoicesByCustomerAndNumber.get(key) ?? [];
+    matches.push(invoice);
+    invoicesByCustomerAndNumber.set(key, matches);
+  });
+  invoicesByCustomerAndNumber.forEach((matches) => matches.sort((a, b) => String(a.sales_date).localeCompare(String(b.sales_date))));
+  rows.filter((row) => row.document_type === "CR_NOTE" || row.document_type === "DR_NOTE").forEach((note) => {
+    const originalInvoiceNo = String(note.original_invoice_no ?? "").trim();
+    if (!originalInvoiceNo) return;
+    const matches = invoicesByCustomerAndNumber.get(`${note.customer_code}|${originalInvoiceNo}`) ?? [];
+    const eligible = matches.filter((invoice) => String(invoice.sales_date) <= String(note.sales_date));
+    const invoice = eligible.at(-1) ?? matches.at(-1);
+    if (!invoice) return;
+    invoice.sales_item_total = Number(invoice.sales_item_total || 0) + Number(note.sales_item_total || 0);
+    invoice.total_sales = Number(invoice.total_sales || 0) + Number(note.total_sales || 0);
+    invoice.note_wht_adjustment += Math.round(Number(note.sales_item_total || 0)) / 100;
+  });
+  return { data: invoices, error: null };
 }
 
 async function fetchInBatches(

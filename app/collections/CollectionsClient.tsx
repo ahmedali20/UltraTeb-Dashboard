@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "../Header";
 import Footer from "../Footer";
 
-type Invoice = { id: string | number; invoice_no: string; customer_name: string; sales_date: string; due_date: string | null; sales_item_total: number; total_sales: number; sales_rep: string | null };
+type Invoice = { id: string | number; invoice_no: string; customer_name: string; sales_date: string; due_date: string | null; sales_item_total: number; total_sales: number; base_sales_item_total?: number; base_total_sales?: number; note_wht_adjustment?: number; sales_rep: string | null };
 type Collection = { id: number; invoice_id: string; invoice_no: string; customer_name: string; collection_date: string; amount: number; transfer_fees: number; cash_fraction: number; wht_deducted_amount: number; payment_method: string; reference_no: string | null; notes: string | null };
 type WhtCollection = { invoice_no: string; wht_amount: number; collected_amount: number };
 type ChequeAllocation = { id: number; cheque_id: number; invoice_id: string; invoice_no: string; allocated_amount: number; cash_fraction: number; wht_deducted_amount: number; cheque: { id: number; cheque_no: string; collection_date: string; cheque_date: string; cheque_status: string; cheque_status_date: string; customer_name: string; amount: number; notes: string | null } | null };
@@ -33,10 +33,12 @@ export default function CollectionsClient({ invoices, initialCollections, initia
       return result.set(invoiceNo, (result.get(invoiceNo) ?? 0) + Number(item.wht_amount || 0));
     }, new Map<string, number>()), [initialWht]);
   const whtByInvoice = useMemo(() => {
-    const map = new Map(recordedWhtByInvoice);
+    const map = new Map<string, number>();
     invoices.forEach((invoice) => {
       const invoiceNo = String(invoice.invoice_no ?? "").trim();
-      if (!map.has(invoiceNo)) map.set(invoiceNo, Math.round(Number(invoice.sales_item_total || 0) * 0.01 * 100) / 100);
+      const recorded = recordedWhtByInvoice.get(invoiceNo);
+      const calculated = Math.round(Number(invoice.sales_item_total || 0)) / 100;
+      map.set(invoiceNo, recorded == null ? calculated : Math.max(0, recorded + Number(invoice.note_wht_adjustment || 0)));
     });
     return map;
   }, [recordedWhtByInvoice, invoices]);
