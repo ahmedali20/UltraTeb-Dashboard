@@ -14,18 +14,17 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
   const { data: customer } = await customerQuery.maybeSingle();
   if (!customer) notFound();
 
-  let invoiceQuery = supabase.from("sales_view").select("id, invoice_no, sales_date, due_date, sales_item_total, total_sales, sales_rep").eq("customer_code", customer.customer_code).eq("document_type", "INVOICE").order("sales_date", { ascending: false });
+  let invoiceQuery = supabase.from("sales_view").select("id, invoice_no, sales_date, due_date, sales_item_total, total_sales, sales_rep, document_type").eq("customer_code", customer.customer_code).in("document_type", ["INVOICE", "DR_NOTE"]).order("sales_date", { ascending: false });
   if (session?.salesRepName) invoiceQuery = invoiceQuery.eq("sales_rep", session.salesRepName);
   if (!canViewPre2026Sales(session)) invoiceQuery = invoiceQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   const { data: invoices, error: invoiceError } = await invoiceQuery;
   if (invoiceError) return <main style={{ padding: 32, color: "#dc2626" }}>{invoiceError.message}</main>;
 
   const invoiceIds = (invoices ?? []).map((item) => String(item.id));
-  const invoiceNumbers = Array.from(new Set((invoices ?? []).map((item) => String(item.invoice_no))));
   const [collectionsResult, allocationsResult, whtResult] = await Promise.all([
     invoiceIds.length ? supabase.from("invoice_collections").select("invoice_id, amount, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds).neq("payment_method", "CHEQUE") : Promise.resolve({ data: [], error: null }),
     invoiceIds.length ? supabase.from("cheque_allocations").select("invoice_id, cheque_id, allocated_amount, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds) : Promise.resolve({ data: [], error: null }),
-    invoiceNumbers.length ? supabase.from("wht_collections").select("invoice_no, invoice_date, wht_amount, collected_amount").eq("document_type", "INVOICE").in("invoice_no", invoiceNumbers) : Promise.resolve({ data: [], error: null }),
+    supabase.from("wht_collections").select("sales_id, document_type, invoice_no, invoice_date, wht_amount, collected_amount").eq("customer_name", customer.customer_name),
   ]);
   const customerChequesResult = await supabase.from("customer_cheques").select("id, amount, cheque_status").eq("customer_code", customer.customer_code);
   const customerChequeIds = (customerChequesResult.data ?? []).map((item: any) => String(item.id));
@@ -55,16 +54,17 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
   });
   const wht = new Map<string, { expected: number; collected: number }>();
   (whtResult.data ?? []).forEach((item: any) => {
-    const key = `${String(item.invoice_no)}|${String(item.invoice_date ?? "").slice(0, 10)}`;
+    const key = item.sales_id ? String(item.sales_id) : `${item.document_type ?? "INVOICE"}|${String(item.invoice_no)}|${String(item.invoice_date ?? "").slice(0, 10)}`;
     const current = wht.get(key) ?? { expected: 0, collected: 0 };
     current.expected += Number(item.wht_amount || 0);
     current.collected += Number(item.collected_amount || 0);
     wht.set(key, current);
   });
   const rows = (invoices ?? []).map((invoice: any) => {
-    const key = `${String(invoice.invoice_no)}|${String(invoice.sales_date).slice(0, 10)}`;
-    const recordedWht = wht.get(key);
-    const expectedWht = Math.max(deductedWht.get(String(invoice.id)) ?? 0, recordedWht?.expected ?? 0);
+    const legacyWhtKey = `${invoice.document_type}|${String(invoice.invoice_no)}|${String(invoice.sales_date).slice(0, 10)}`;
+    const recordedWht = wht.get(String(invoice.id)) ?? wht.get(legacyWhtKey);
+    const automaticDebitNoteWht = invoice.document_type === "DR_NOTE" ? Math.round(Number(invoice.sales_item_total || 0)) / 100 : 0;
+    const expectedWht = Math.max(deductedWht.get(String(invoice.id)) ?? 0, recordedWht?.expected ?? 0, automaticDebitNoteWht);
     const collectedWht = recordedWht?.collected ?? 0;
     const customerPayments = payments.get(String(invoice.id)) ?? 0;
     const cashFraction = cashFractions.get(String(invoice.id)) ?? 0;
