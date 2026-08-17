@@ -25,7 +25,7 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
   const [collectionsResult, allocationsResult, whtResult] = await Promise.all([
     invoiceIds.length ? supabase.from("invoice_collections").select("invoice_id, amount, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds).neq("payment_method", "CHEQUE") : Promise.resolve({ data: [], error: null }),
     invoiceIds.length ? supabase.from("cheque_allocations").select("invoice_id, cheque_id, allocated_amount, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds) : Promise.resolve({ data: [], error: null }),
-    invoiceNumbers.length ? supabase.from("wht_collections").select("invoice_no, invoice_date, wht_amount, collected_amount").in("invoice_no", invoiceNumbers) : Promise.resolve({ data: [], error: null }),
+    invoiceNumbers.length ? supabase.from("wht_collections").select("invoice_no, invoice_date, wht_amount, collected_amount").eq("document_type", "INVOICE").in("invoice_no", invoiceNumbers) : Promise.resolve({ data: [], error: null }),
   ]);
   const customerChequesResult = await supabase.from("customer_cheques").select("id, amount, cheque_status").eq("customer_code", customer.customer_code);
   const customerChequeIds = (customerChequesResult.data ?? []).map((item: any) => String(item.id));
