@@ -78,15 +78,18 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionId?: number) 
   if (recordedWhtResult.error) throw recordedWhtResult.error;
 
   const chequeIds = Array.from(new Set((allocationsResult.data ?? []).map((item) => String(item.cheque_id))));
-  const collectedChequeIds = new Set<string>();
+  const activeChequeIds = new Set<string>();
   if (chequeIds.length) {
     const { data, error } = await supabase
       .from("customer_cheques")
-      .select("id")
-      .in("id", chequeIds)
-      .eq("cheque_status", "COLLECTED");
+      .select("id, cheque_status")
+      .in("id", chequeIds);
     if (error) throw error;
-    (data ?? []).forEach((item) => collectedChequeIds.add(String(item.id)));
+    (data ?? []).forEach((item) => {
+      if (!["REFUSED", "RETURNED_TO_CUSTOMER"].includes(String(item.cheque_status))) {
+        activeChequeIds.add(String(item.id));
+      }
+    });
   }
 
   let payments = 0;
@@ -96,7 +99,7 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionId?: number) 
     deductedWht += Number(item.wht_deducted_amount || 0);
   });
   (allocationsResult.data ?? []).forEach((item) => {
-    if (!collectedChequeIds.has(String(item.cheque_id))) return;
+    if (!activeChequeIds.has(String(item.cheque_id))) return;
     payments += Number(item.allocated_amount || 0) + Number(item.cash_fraction || 0);
     deductedWht += Number(item.wht_deducted_amount || 0);
   });
