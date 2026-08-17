@@ -36,15 +36,24 @@ async function fetchAllWht(canViewHistorical: boolean) {
   return { data: rows, error: null };
 }
 
+async function fetchWhtGroups(canViewHistorical: boolean) {
+  let query = supabase.from("wht_collection_groups").select("id, customer_name, collected_amount, allocated_amount, unallocated_amount, collection_date").order("collection_date", { ascending: false });
+  if (!canViewHistorical) query = query.gte("collection_date", NON_ADMIN_SALES_START_DATE);
+  const { data, error } = await query;
+  if (error && ["42P01", "PGRST205"].includes(String(error.code))) return { data: [], error: null };
+  return { data: data ?? [], error };
+}
+
 export default async function WhtPage() {
   const session = await getCurrentDashboardUser();
   const canViewHistorical = canViewPre2026Sales(session);
-  const [{ data: customers, error: customersError }, recordsResult, invoicesResult] = await Promise.all([
+  const [{ data: customers, error: customersError }, recordsResult, invoicesResult, groupsResult] = await Promise.all([
     supabase.from("customers").select("customer_name").order("customer_name"),
     fetchAllWht(canViewHistorical),
     fetchAllInvoices(canViewHistorical, session?.salesRepName ?? null),
+    fetchWhtGroups(canViewHistorical),
   ]);
-  const error = customersError || recordsResult.error || invoicesResult.error;
+  const error = customersError || recordsResult.error || invoicesResult.error || groupsResult.error;
   if (error) return <main style={{ padding: 32, color: "#dc2626" }}>{error.message}</main>;
 
   const invoices = invoicesResult.data ?? [];
@@ -54,10 +63,14 @@ export default async function WhtPage() {
   const visibleCustomerNames = session?.salesRepName
     ? new Set(invoices.map((invoice: any) => invoice.customer_name))
     : null;
+  const visibleGroups = visibleCustomerNames
+    ? (groupsResult.data ?? []).filter((group: any) => visibleCustomerNames.has(group.customer_name))
+    : groupsResult.data ?? [];
 
   return <WhtClient
     customers={Array.from(new Set((customers ?? []).map((item) => item.customer_name).filter((name) => Boolean(name) && (!visibleCustomerNames || visibleCustomerNames.has(name))))) as string[]}
     initialRecords={visibleRecords}
     invoices={invoices}
+    initialGroups={visibleGroups}
   />;
 }

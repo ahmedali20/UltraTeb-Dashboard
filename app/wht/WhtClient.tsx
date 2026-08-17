@@ -27,6 +27,15 @@ type InvoiceSuggestion = {
   tax: number;
 };
 
+type WhtCollectionGroup = {
+  id: string;
+  customer_name: string;
+  collected_amount: number;
+  allocated_amount: number;
+  unallocated_amount: number;
+  collection_date: string;
+};
+
 const emptyForm = {
   customerName: "",
   invoiceNo: "",
@@ -40,7 +49,7 @@ const emptyForm = {
 const money = (value: number) => Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const displayDate = (value: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replaceAll(" ", "-") : "-";
 
-export default function WhtClient({ customers, initialRecords, invoices }: { customers: string[]; initialRecords: WhtRecord[]; invoices: InvoiceSuggestion[] }) {
+export default function WhtClient({ customers, initialRecords, invoices, initialGroups }: { customers: string[]; initialRecords: WhtRecord[]; invoices: InvoiceSuggestion[]; initialGroups: WhtCollectionGroup[] }) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [records, setRecords] = useState(initialRecords);
   const [form, setForm] = useState(emptyForm);
@@ -61,7 +70,10 @@ export default function WhtClient({ customers, initialRecords, invoices }: { cus
     (customerFilter === "All" || item.customer_name === customerFilter) &&
     (!search.trim() || item.invoice_no.toLowerCase().includes(search.trim().toLowerCase()))
   ), [records, customerFilter, search]);
-  const recordCustomers = useMemo(() => Array.from(new Set(records.map((item) => item.customer_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [records]);
+  const recordCustomers = useMemo(() => Array.from(new Set([...records.map((item) => item.customer_name), ...initialGroups.map((item) => item.customer_name)].filter(Boolean))).sort((a, b) => a.localeCompare(b)), [records, initialGroups]);
+  const customerUnallocatedWht = useMemo(() => initialGroups
+    .filter((item) => customerFilter === "All" || item.customer_name === customerFilter)
+    .reduce((sum, item) => sum + Number(item.unallocated_amount || 0), 0), [initialGroups, customerFilter]);
   const totals = useMemo(() => filtered.reduce((sum, item) => ({
     subtotal: sum.subtotal + Number(item.subtotal || 0),
     tax: sum.tax + Number(item.tax || 0),
@@ -266,6 +278,7 @@ export default function WhtClient({ customers, initialRecords, invoices }: { cus
           <article><span>Invoice Total</span><strong>{money(totals.total)}</strong></article>
           <article><span>Calculated WHT</span><strong>{money(totals.wht)}</strong></article>
           <article><span>Collected WHT</span><strong>{money(totals.collected)}</strong></article>
+          <article><span>Customer Unallocated WHT</span><strong>{money(customerUnallocatedWht)}</strong></article>
           <article><span>Remaining WHT</span><strong>{money(totals.wht - totals.collected)}</strong></article>
         </section>
 
