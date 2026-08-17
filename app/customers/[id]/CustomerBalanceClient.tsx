@@ -6,15 +6,20 @@ import Footer from "../../Footer";
 
 type Customer = { customer_name: string; customer_official_name: string | null; sales_rep_name: string | null; payment_terms_days: number | null };
 type Invoice = { id: string | number; invoice_no: string; original_invoice_no?: string | null; sales_date: string; due_date: string | null; document_type: "INVOICE" | "CR_NOTE" | "DR_NOTE"; total_sales: number; expected_wht: number; collected_wht: number; customer_payments: number; cash_fraction: number; remaining_wht: number; remaining_money: number };
+type UnallocatedCheque = { id: number; cheque_no: string; bank_name: string | null; cheque_date: string | null; amount: number; unallocated_amount: number };
 type BalanceFilter = "ALL" | "OPEN" | "PAID" | "WHT_PENDING" | "OVERDUE";
 
 const money = (value: number) => Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateLabel = (value: string | null) => value ? new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replaceAll(" ", "-") : "—";
 
-export default function CustomerBalanceClient({ customer, invoices, unallocatedChequeBalance }: { customer: Customer; invoices: Invoice[]; unallocatedChequeBalance: number }) {
+export default function CustomerBalanceClient({ customer, invoices, unallocatedChequeBalance, unallocatedCheques }: { customer: Customer; invoices: Invoice[]; unallocatedChequeBalance: number; unallocatedCheques: UnallocatedCheque[] }) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<BalanceFilter>("ALL");
+  const [showAllocator, setShowAllocator] = useState(false);
+  const [allocationForm, setAllocationForm] = useState({ chequeId: "", invoiceId: "", amount: "" });
+  const [allocationSaving, setAllocationSaving] = useState(false);
+  const [allocationMessage, setAllocationMessage] = useState("");
   const today = new Date().toISOString().slice(0, 10);
   const totals = useMemo(() => invoices.reduce((sum, item) => ({ total: sum.total + Number(item.total_sales), payments: sum.payments + item.customer_payments, fractions: sum.fractions + item.cash_fraction, expectedWht: sum.expectedWht + item.expected_wht, collectedWht: sum.collectedWht + item.collected_wht, remainingMoney: sum.remainingMoney + item.remaining_money, remainingWht: sum.remainingWht + item.remaining_wht }), { total: 0, payments: 0, fractions: 0, expectedWht: 0, collectedWht: 0, remainingMoney: 0, remainingWht: 0 }), [invoices]);
   const filtered = useMemo(() => invoices.filter((invoice) => {
@@ -24,6 +29,23 @@ export default function CustomerBalanceClient({ customer, invoices, unallocatedC
     const matchesFilter = filter === "ALL" || (filter === "OPEN" && moneyOpen) || (filter === "PAID" && !moneyOpen) || (filter === "WHT_PENDING" && whtPending) || (filter === "OVERDUE" && isOverdue);
     return matchesFilter && (!search.trim() || String(invoice.invoice_no).toLowerCase().includes(search.trim().toLowerCase()));
   }), [invoices, filter, search, today]);
+  const allocationInvoices = useMemo(() => invoices.filter((item) => item.document_type === "INVOICE").map((invoice) => {
+    const linkedNotes = invoices.filter((item) => item.document_type !== "INVOICE" && String(item.original_invoice_no || "") === String(invoice.invoice_no));
+    return linkedNotes.reduce((result, note) => ({ ...result, remaining_money: result.remaining_money + note.remaining_money }), { ...invoice });
+  }).filter((invoice) => invoice.remaining_money > 0.005), [invoices]);
+  const selectedCheque = unallocatedCheques.find((cheque) => String(cheque.id) === allocationForm.chequeId);
+  const selectedAllocationInvoice = allocationInvoices.find((invoice) => String(invoice.id) === allocationForm.invoiceId);
+
+  async function allocateUnallocatedCheque() {
+    setAllocationMessage("");
+    setAllocationSaving(true);
+    try {
+      const response = await fetch("/api/cheques/allocate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chequeId: Number(allocationForm.chequeId), invoiceId: allocationForm.invoiceId, amount: Number(allocationForm.amount) }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) return setAllocationMessage(result.error || "Unable to allocate cheque balance.");
+      window.location.reload();
+    } finally { setAllocationSaving(false); }
+  }
 
   async function downloadPdf() {
     const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
@@ -85,9 +107,20 @@ export default function CustomerBalanceClient({ customer, invoices, unallocatedC
       </section>
 
       <section className="customer-balance-groups">
-        <div className="customer-balance-group"><div className="customer-balance-group-title"><span>Customer Payments</span><small>Cash, transfer and collected cheques</small></div><div className="customer-balance-cards"><article><span>Invoice Total</span><strong>EGP {money(totals.total)}</strong></article><article><span>Payments Received</span><strong>EGP {money(totals.payments)}</strong></article><article><span>Cash Fraction Write-offs</span><strong>EGP {money(totals.fractions)}</strong></article><article className={unallocatedChequeBalance > 0 ? "is-positive" : unallocatedChequeBalance < 0 ? "is-negative" : ""}><span>Unallocated Cheque Balance</span><strong>EGP {money(unallocatedChequeBalance)}</strong></article><article className="is-outstanding"><span>Net Remaining Money</span><strong>EGP {money(Math.max(0, totals.remainingMoney - unallocatedChequeBalance))}</strong></article></div></div>
+        <div className="customer-balance-group"><div className="customer-balance-group-title"><span>Customer Payments</span><small>Cash, transfer and collected cheques</small></div><div className="customer-balance-cards"><article><span>Invoice Total</span><strong>EGP {money(totals.total)}</strong></article><article><span>Payments Received</span><strong>EGP {money(totals.payments)}</strong></article><article><span>Cash Fraction Write-offs</span><strong>EGP {money(totals.fractions)}</strong></article><article className={`${unallocatedChequeBalance > 0 ? "is-positive" : unallocatedChequeBalance < 0 ? "is-negative" : ""} unallocated-balance-card`} role="button" tabIndex={0} onClick={() => setShowAllocator((value) => !value)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setShowAllocator((value) => !value); }}><span>Unallocated Cheque Balance</span><strong>EGP {money(unallocatedChequeBalance)}</strong><small>Click to allocate</small></article><article className="is-outstanding"><span>Net Remaining Money</span><strong>EGP {money(Math.max(0, totals.remainingMoney - unallocatedChequeBalance))}</strong></article></div></div>
         <div className="customer-balance-group"><div className="customer-balance-group-title"><span>Withholding Tax</span><small>Expected and collected certificates</small></div><div className="customer-balance-cards"><article><span>Expected WHT</span><strong>EGP {money(totals.expectedWht)}</strong></article><article><span>Collected WHT</span><strong>EGP {money(totals.collectedWht)}</strong></article><article className="is-wht"><span>Remaining WHT</span><strong>EGP {money(totals.remainingWht)}</strong></article></div></div>
       </section>
+
+      {showAllocator && <section className="unallocated-allocation-panel">
+        <div className="unallocated-allocation-heading"><div><p>CHEQUE ALLOCATION</p><h2>Allocate Unallocated Balance</h2><span>Select a cheque and an unpaid invoice for {customer.customer_name}.</span></div><button type="button" onClick={() => setShowAllocator(false)}>Close</button></div>
+        {!unallocatedCheques.length ? <p className="collection-empty">There is no unallocated cheque balance.</p> : <div className="unallocated-allocation-grid">
+          <label><span>Cheque</span><select value={allocationForm.chequeId} onChange={(event) => setAllocationForm({ chequeId: event.target.value, invoiceId: "", amount: "" })}><option value="">Select cheque</option>{unallocatedCheques.map((cheque) => <option key={cheque.id} value={cheque.id}>{cheque.cheque_no} · {cheque.bank_name || "Bank not recorded"} · Available EGP {money(cheque.unallocated_amount)}</option>)}</select></label>
+          <label><span>Invoice</span><select value={allocationForm.invoiceId} disabled={!allocationForm.chequeId} onChange={(event) => { const invoice = allocationInvoices.find((item) => String(item.id) === event.target.value); setAllocationForm((current) => ({ ...current, invoiceId: event.target.value, amount: invoice ? Math.min(invoice.remaining_money, selectedCheque?.unallocated_amount || 0).toFixed(2) : "" })); }}><option value="">Select invoice</option>{allocationInvoices.map((invoice) => <option key={String(invoice.id)} value={String(invoice.id)}>Invoice {invoice.invoice_no} · Remaining EGP {money(invoice.remaining_money)}</option>)}</select></label>
+          <label><span>Allocation Amount</span><input type="number" min="0.01" step="0.01" max={Math.min(selectedCheque?.unallocated_amount || 0, selectedAllocationInvoice?.remaining_money || 0)} value={allocationForm.amount} onChange={(event) => setAllocationForm((current) => ({ ...current, amount: event.target.value }))} /></label>
+          <button className="primary" type="button" disabled={allocationSaving || !selectedCheque || !selectedAllocationInvoice || Number(allocationForm.amount) <= 0 || Number(allocationForm.amount) > Math.min(selectedCheque.unallocated_amount, selectedAllocationInvoice.remaining_money) + .01} onClick={allocateUnallocatedCheque}>{allocationSaving ? "Allocating…" : "Allocate Balance"}</button>
+        </div>}
+        {allocationMessage && <p className="collection-form-error">{allocationMessage}</p>}
+      </section>}
 
       <section className="customer-balance-table-card">
         <div className="customer-balance-toolbar"><div><h2>Invoice Balance Statement</h2><span>{filtered.length} of {invoices.length} invoices</span></div><div className="customer-balance-actions"><div className="customer-balance-filters"><select value={filter} onChange={(event) => setFilter(event.target.value as BalanceFilter)}><option value="ALL">All Invoices</option><option value="OPEN">Open Money Balances</option><option value="OVERDUE">Overdue Money</option><option value="PAID">Paid Invoices</option><option value="WHT_PENDING">Paid – WHT Pending</option></select><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search invoice number" /></div><button className="primary customer-balance-pdf" type="button" onClick={downloadPdf}>Download PDF</button></div></div>
