@@ -5,7 +5,7 @@ import Header from "../../Header";
 import Footer from "../../Footer";
 
 type Customer = { customer_name: string; customer_official_name: string | null; sales_rep_name: string | null; payment_terms_days: number | null };
-type Invoice = { id: string | number; invoice_no: string; sales_date: string; due_date: string | null; total_sales: number; expected_wht: number; collected_wht: number; customer_payments: number; cash_fraction: number; remaining_wht: number; remaining_money: number };
+type Invoice = { id: string | number; invoice_no: string; sales_date: string; due_date: string | null; document_type: "INVOICE" | "DR_NOTE"; total_sales: number; expected_wht: number; collected_wht: number; customer_payments: number; cash_fraction: number; remaining_wht: number; remaining_money: number };
 type BalanceFilter = "ALL" | "OPEN" | "PAID" | "WHT_PENDING" | "OVERDUE";
 
 const money = (value: number) => Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -50,7 +50,7 @@ export default function CustomerBalanceClient({ customer, invoices, unallocatedC
     doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor(...purple); doc.text("CUSTOMER BALANCE STATEMENT", 15, 48);
     doc.setFontSize(11); doc.setTextColor(35, 40, 52); doc.text(pdfCustomerName || "Customer", 15, 57);
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(95, 100, 112); doc.text(`Statement date: ${new Date().toLocaleDateString("en-GB")}`, 195, 48, { align: "right" });
-    doc.text(`${filtered.length} invoice${filtered.length === 1 ? "" : "s"} shown`, 195, 57, { align: "right" });
+    doc.text(`${filtered.length} document${filtered.length === 1 ? "" : "s"} shown`, 195, 57, { align: "right" });
     const cards = [["INVOICE TOTAL", reportTotals.total], ["PAYMENTS", reportTotals.payments], ["FRACTIONS", reportTotals.fractions], ["WHT DEDUCTED", reportTotals.wht], ["MONEY DUE", reportTotals.moneyDue], ["WHT DUE", reportTotals.whtDue]] as const;
     cards.forEach(([label, value], index) => {
       const x = 15 + (index % 3) * 61; const y = 64 + Math.floor(index / 3) * 16; const emphasized = index >= 4;
@@ -60,8 +60,8 @@ export default function CustomerBalanceClient({ customer, invoices, unallocatedC
     });
     autoTable(doc, {
       startY: 100,
-      head: [["Invoice", "Invoice / Due Date", "Invoice Total", "Payments / Fraction", "WHT Deducted / Collected", "Money Due", "WHT Due", "Status"]],
-      body: filtered.map((invoice) => { const moneyOpen = invoice.remaining_money > 0.005; const whtPending = !moneyOpen && invoice.remaining_wht > 0.005; const overdue = moneyOpen && Boolean(invoice.due_date && invoice.due_date < today); return [invoice.invoice_no, `${dateLabel(invoice.sales_date)}\n${dateLabel(invoice.due_date)}`, money(invoice.total_sales), `${money(invoice.customer_payments)}\n${money(invoice.cash_fraction)}`, `${money(invoice.expected_wht)}\n${money(invoice.collected_wht)}`, money(invoice.remaining_money), money(invoice.remaining_wht), overdue ? "OVERDUE" : moneyOpen ? "OPEN" : whtPending ? "WHT PENDING" : "PAID"]; }),
+      head: [["Document", "Date / Due Date", "Document Total", "Payments / Fraction", "WHT Deducted / Collected", "Money Due", "WHT Due", "Status"]],
+      body: filtered.map((invoice) => { const moneyOpen = invoice.remaining_money > 0.005; const whtPending = !moneyOpen && invoice.remaining_wht > 0.005; const overdue = moneyOpen && Boolean(invoice.due_date && invoice.due_date < today); return [`${invoice.document_type === "DR_NOTE" ? "DR" : "INV"} ${invoice.invoice_no}`, `${dateLabel(invoice.sales_date)}\n${dateLabel(invoice.due_date)}`, money(invoice.total_sales), `${money(invoice.customer_payments)}\n${money(invoice.cash_fraction)}`, `${money(invoice.expected_wht)}\n${money(invoice.collected_wht)}`, money(invoice.remaining_money), money(invoice.remaining_wht), overdue ? "OVERDUE" : moneyOpen ? "OPEN" : whtPending ? "WHT PENDING" : "PAID"]; }),
       foot: [["TOTAL", "", money(reportTotals.total), `${money(reportTotals.payments)}\n${money(reportTotals.fractions)}`, `${money(reportTotals.wht)}\n${money(reportTotals.collectedWht)}`, money(reportTotals.moneyDue), money(reportTotals.whtDue), ""]],
       margin: { top: 42, right: 15, bottom: 43, left: 15 },
       styles: { font: "helvetica", fontSize: 7, cellPadding: 2.1, lineColor: [218, 221, 228], lineWidth: 0.12, textColor: [35, 40, 52], overflow: "linebreak", valign: "middle" },
