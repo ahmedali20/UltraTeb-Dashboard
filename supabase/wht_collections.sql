@@ -26,6 +26,11 @@ create index if not exists wht_collections_date_idx
 alter table public.wht_collections enable row level security;
 alter table public.wht_collections add column if not exists wht_group_id text;
 alter table public.wht_collections add column if not exists certificate_no text;
+alter table public.wht_collections add column if not exists sales_id text;
+alter table public.wht_collections add column if not exists document_type text not null default 'INVOICE';
+alter table public.wht_collections drop constraint if exists wht_collections_document_type_check;
+alter table public.wht_collections add constraint wht_collections_document_type_check check (document_type in ('INVOICE', 'DR_NOTE'));
+create unique index if not exists wht_collections_sales_id_unique on public.wht_collections (sales_id) where sales_id is not null;
 create index if not exists wht_collections_group_idx on public.wht_collections (wht_group_id);
 create index if not exists wht_collections_certificate_idx on public.wht_collections (certificate_no);
 
