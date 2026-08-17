@@ -14,7 +14,7 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
   const { data: customer } = await customerQuery.maybeSingle();
   if (!customer) notFound();
 
-  let invoiceQuery = supabase.from("sales_view").select("id, invoice_no, sales_date, due_date, sales_item_total, total_sales, sales_rep, document_type").eq("customer_code", customer.customer_code).in("document_type", ["INVOICE", "DR_NOTE"]).order("sales_date", { ascending: false });
+  let invoiceQuery = supabase.from("sales_view").select("id, invoice_no, original_invoice_no, sales_date, due_date, sales_item_total, total_sales, sales_rep, document_type").eq("customer_code", customer.customer_code).in("document_type", ["INVOICE", "CR_NOTE", "DR_NOTE"]).order("sales_date", { ascending: false });
   if (session?.salesRepName) invoiceQuery = invoiceQuery.eq("sales_rep", session.salesRepName);
   if (!canViewPre2026Sales(session)) invoiceQuery = invoiceQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   const { data: invoices, error: invoiceError } = await invoiceQuery;
@@ -63,12 +63,15 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
   const rows = (invoices ?? []).map((invoice: any) => {
     const legacyWhtKey = `${invoice.document_type}|${String(invoice.invoice_no)}|${String(invoice.sales_date).slice(0, 10)}`;
     const recordedWht = wht.get(String(invoice.id)) ?? wht.get(legacyWhtKey);
-    const automaticDebitNoteWht = invoice.document_type === "DR_NOTE" ? Math.round(Number(invoice.sales_item_total || 0)) / 100 : 0;
-    const expectedWht = Math.max(deductedWht.get(String(invoice.id)) ?? 0, recordedWht?.expected ?? 0, automaticDebitNoteWht);
+    const automaticDocumentWht = Math.round(Number(invoice.sales_item_total || 0)) / 100;
+    const recordedOrDeductedWht = Math.max(deductedWht.get(String(invoice.id)) ?? 0, recordedWht?.expected ?? 0);
+    const expectedWht = invoice.document_type === "CR_NOTE" ? automaticDocumentWht : Math.max(recordedOrDeductedWht, automaticDocumentWht);
     const collectedWht = recordedWht?.collected ?? 0;
     const customerPayments = payments.get(String(invoice.id)) ?? 0;
     const cashFraction = cashFractions.get(String(invoice.id)) ?? 0;
-    return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, cash_fraction: cashFraction, remaining_wht: Math.max(0, expectedWht - collectedWht), remaining_money: Math.max(0, Number(invoice.total_sales || 0) - expectedWht - customerPayments - cashFraction) };
+    const remainingWht = expectedWht - collectedWht;
+    const remainingMoney = Number(invoice.total_sales || 0) - expectedWht - customerPayments - cashFraction;
+    return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, cash_fraction: cashFraction, remaining_wht: invoice.document_type === "CR_NOTE" ? remainingWht : Math.max(0, remainingWht), remaining_money: invoice.document_type === "CR_NOTE" ? remainingMoney : Math.max(0, remainingMoney) };
   });
   const allocationsByCheque = new Map<string, number>();
   (allCustomerAllocationsResult.data ?? []).forEach((item: any) => allocationsByCheque.set(String(item.cheque_id), (allocationsByCheque.get(String(item.cheque_id)) ?? 0) + Number(item.allocated_amount || 0)));
