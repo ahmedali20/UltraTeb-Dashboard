@@ -17,14 +17,17 @@ type WhtRecord = {
   wht_amount: number;
   collected_amount: number;
   collection_date: string | null;
+  document_type?: "INVOICE" | "DR_NOTE";
 };
 
 type InvoiceSuggestion = {
+  id: string;
   invoice_no: string;
   customer_name: string;
   sales_date: string;
   sales_item_total: number;
   tax: number;
+  document_type: "INVOICE" | "DR_NOTE";
 };
 
 type WhtCollectionGroup = {
@@ -87,7 +90,7 @@ export default function WhtClient({ customers, initialRecords, invoices, initial
   }
 
   function updateInvoiceNumber(value: string) {
-    const match = invoiceSuggestions.find((item) => String(item.invoice_no) === value.trim());
+    const match = invoiceSuggestions.find((item) => item.document_type === "INVOICE" && String(item.invoice_no) === value.trim());
     setForm((current) => ({
       ...current,
       invoiceNo: value,
@@ -261,7 +264,7 @@ export default function WhtClient({ customers, initialRecords, invoices, initial
           <div className="wht-section-heading"><div><p>{editingId ? "EDIT RECORD" : "NEW RECORD"}</p><h2>{editingId ? "Edit WHT Collection" : "Add WHT Collection"}</h2></div><strong>WHT Rate: 1%</strong></div>
           <div className="wht-form-grid">
             <label>Customer Name<select value={form.customerName} onChange={(e) => update("customerName", e.target.value)}><option value="">Select customer</option>{customers.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
-            <label>Invoice No.<input list="wht-invoice-suggestions" value={form.invoiceNo} onChange={(e) => updateInvoiceNumber(e.target.value)} placeholder="Type an old invoice or select an existing one" /><datalist id="wht-invoice-suggestions">{invoiceSuggestions.map((item, index) => <option key={`${item.invoice_no}-${item.customer_name}-${index}`} value={item.invoice_no}>{item.customer_name} · {displayDate(item.sales_date)}</option>)}</datalist><small>Manual invoice numbers are allowed.</small></label>
+            <label>Invoice No.<input list="wht-invoice-suggestions" value={form.invoiceNo} onChange={(e) => updateInvoiceNumber(e.target.value)} placeholder="Type an old invoice or select an existing one" /><datalist id="wht-invoice-suggestions">{invoiceSuggestions.filter((item) => item.document_type === "INVOICE").map((item, index) => <option key={`${item.invoice_no}-${item.customer_name}-${index}`} value={item.invoice_no}>{item.customer_name} · {displayDate(item.sales_date)}</option>)}</datalist><small>Manual invoice numbers are allowed. Use Multi-Invoice WHT for debit notes.</small></label>
             <label>Invoice Date<input type="date" value={form.invoiceDate} onChange={(e) => update("invoiceDate", e.target.value)} /></label>
             <label>Subtotal<input type="number" min="0" step="0.01" value={form.subtotal} onChange={(e) => update("subtotal", e.target.value)} /></label>
             <label>TAX<input type="number" min="0" step="0.01" value={form.tax} onChange={(e) => update("tax", e.target.value)} /></label>
@@ -284,7 +287,7 @@ export default function WhtClient({ customers, initialRecords, invoices, initial
 
         <section className="wht-table-card">
           <div className="wht-toolbar"><h2>WHT Records</h2><select value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}><option value="All">All Customers</option>{recordCustomers.map((name) => <option key={name}>{name}</option>)}</select><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search invoice number" /></div>
-          <div className="table-scroll"><table><thead><tr><th>Customer</th><th>Invoice No.</th><th>Date</th><th>Subtotal</th><th>TAX</th><th>Total</th><th>WHT</th><th>Collected</th><th>Remaining</th><th>Collection Date</th><th>Actions</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}><td>{item.customer_name}</td><td>{item.invoice_no}</td><td>{displayDate(item.invoice_date)}</td><td>{money(item.subtotal)}</td><td>{money(item.tax)}</td><td>{money(item.total)}</td><td>{money(item.wht_amount)}</td><td>{money(item.collected_amount)}</td><td>{money(item.wht_amount - item.collected_amount)}</td><td>{displayDate(item.collection_date)}</td><td><div className="wht-row-actions"><button onClick={() => edit(item)}>Edit</button><button className="danger" onClick={() => remove(item.id)}>Delete</button></div></td></tr>)}</tbody></table>{filtered.length === 0 && <p className="empty-state">No WHT records found.</p>}</div>
+          <div className="table-scroll"><table><thead><tr><th>Document</th><th>Customer</th><th>Document No.</th><th>Date</th><th>Subtotal</th><th>TAX</th><th>Total</th><th>WHT</th><th>Collected</th><th>Remaining</th><th>Collection Date</th><th>Actions</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}><td>{item.document_type === "DR_NOTE" ? "DR Note" : "Invoice"}</td><td>{item.customer_name}</td><td>{item.invoice_no}</td><td>{displayDate(item.invoice_date)}</td><td>{money(item.subtotal)}</td><td>{money(item.tax)}</td><td>{money(item.total)}</td><td>{money(item.wht_amount)}</td><td>{money(item.collected_amount)}</td><td>{money(item.wht_amount - item.collected_amount)}</td><td>{displayDate(item.collection_date)}</td><td><div className="wht-row-actions"><button onClick={() => edit(item)}>Edit</button><button className="danger" onClick={() => remove(item.id)}>Delete</button></div></td></tr>)}</tbody></table>{filtered.length === 0 && <p className="empty-state">No WHT records found.</p>}</div>
         </section>
       </main>
       <Footer lang={lang} />

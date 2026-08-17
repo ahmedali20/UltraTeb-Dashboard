@@ -10,7 +10,7 @@ const PAGE_SIZE = 1000;
 async function fetchAllInvoices(canViewHistorical: boolean, salesRepName: string | null) {
   const rows: any[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
-    let query = supabase.from("sales_view").select("invoice_no, customer_name, sales_date, sales_item_total, tax").eq("document_type", "INVOICE").order("sales_date", { ascending: false }).order("id", { ascending: false }).range(from, from + PAGE_SIZE - 1);
+    let query = supabase.from("sales_view").select("id, invoice_no, customer_name, sales_date, sales_item_total, tax, document_type").in("document_type", ["INVOICE", "DR_NOTE"]).order("sales_date", { ascending: false }).order("id", { ascending: false }).range(from, from + PAGE_SIZE - 1);
     if (salesRepName) query = query.eq("sales_rep", salesRepName);
     if (!canViewHistorical) query = query.gte("sales_date", NON_ADMIN_SALES_START_DATE);
     const { data, error } = await query;
