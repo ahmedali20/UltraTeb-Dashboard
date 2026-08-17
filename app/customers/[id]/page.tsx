@@ -26,7 +26,7 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
     invoiceIds.length ? supabase.from("cheque_allocations").select("invoice_id, cheque_id, allocated_amount, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds) : Promise.resolve({ data: [], error: null }),
     supabase.from("wht_collections").select("sales_id, document_type, invoice_no, invoice_date, wht_amount, collected_amount").eq("customer_name", customer.customer_name),
   ]);
-  const customerChequesResult = await supabase.from("customer_cheques").select("id, amount, cheque_status").eq("customer_code", customer.customer_code);
+  const customerChequesResult = await supabase.from("customer_cheques").select("id, cheque_no, bank_name, cheque_date, amount, cheque_status").eq("customer_code", customer.customer_code);
   const customerChequeIds = (customerChequesResult.data ?? []).map((item: any) => String(item.id));
   const allCustomerAllocationsResult = customerChequeIds.length
     ? await supabase.from("cheque_allocations").select("cheque_id, allocated_amount").in("cheque_id", customerChequeIds)
@@ -76,5 +76,13 @@ export default async function CustomerBalancePage({ params }: { params: { id: st
   const allocationsByCheque = new Map<string, number>();
   (allCustomerAllocationsResult.data ?? []).forEach((item: any) => allocationsByCheque.set(String(item.cheque_id), (allocationsByCheque.get(String(item.cheque_id)) ?? 0) + Number(item.allocated_amount || 0)));
   const unallocatedChequeBalance = (customerChequesResult.data ?? []).reduce((sum: number, cheque: any) => cheque.cheque_status === "COLLECTED" ? sum + Math.max(0, Number(cheque.amount || 0) - (allocationsByCheque.get(String(cheque.id)) ?? 0)) : sum, 0);
-  return <CustomerBalanceClient customer={customer} invoices={rows} unallocatedChequeBalance={unallocatedChequeBalance} />;
+  const unallocatedCheques = (customerChequesResult.data ?? []).map((cheque: any) => ({
+    id: Number(cheque.id),
+    cheque_no: String(cheque.cheque_no || ""),
+    bank_name: cheque.bank_name ? String(cheque.bank_name) : null,
+    cheque_date: cheque.cheque_date ? String(cheque.cheque_date) : null,
+    amount: Number(cheque.amount || 0),
+    unallocated_amount: Math.max(0, Number(cheque.amount || 0) - (allocationsByCheque.get(String(cheque.id)) ?? 0)),
+  })).filter((cheque: any) => cheque.unallocated_amount > 0.005);
+  return <CustomerBalanceClient customer={customer} invoices={rows} unallocatedChequeBalance={unallocatedChequeBalance} unallocatedCheques={unallocatedCheques} />;
 }
