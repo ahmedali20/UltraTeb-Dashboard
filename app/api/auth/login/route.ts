@@ -14,7 +14,40 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
+const LOGIN_RATE_LIMIT_WINDOW_MINUTES = 15;
+const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 5;
+
+function getClientIp(request: Request) {
+  const forwarded = request.headers.get("x-forwarded-for");
+  return forwarded?.split(",")[0]?.trim() || "unknown";
+}
+
+async function isRateLimited(ip: string) {
+  if (ip === "unknown") return false; // avoid locking everyone out together if IP is ever missing
+  const since = new Date(
+    Date.now() - LOGIN_RATE_LIMIT_WINDOW_MINUTES * 60 * 1000
+  ).toISOString();
+  const { count } = await supabase
+    .from("dashboard_audit_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("action", "LOGIN_FAILED")
+    .eq("ip_address", ip)
+    .gte("created_at", since);
+  return (count ?? 0) >= LOGIN_RATE_LIMIT_MAX_ATTEMPTS;
+}
+
 export async function POST(request: Request) {
+  const clientIp = getClientIp(request);
+
+  if (await isRateLimited(clientIp)) {
+    return NextResponse.json(
+      {
+        error: `عدد محاولات كبير جدًا. حاول تاني بعد ${LOGIN_RATE_LIMIT_WINDOW_MINUTES} دقيقة.`,
+      },
+      { status: 429 }
+    );
+  }
+
   const { username, password } = await request.json();
   const normalizedUsername = String(username ?? "").trim();
   const submittedPassword = String(password ?? "");
