@@ -12,8 +12,9 @@ const supabaseServer = createClient(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const body = await request.json();
   const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
   if (!session) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
@@ -44,7 +45,7 @@ export async function PATCH(
   const { data: before } = await supabaseServer
     .from("sales")
     .select("invoice_no, sales_date, due_date, sales_item_total, tax, document_type, original_invoice_no, note_reason")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
   if (session.role !== "admin" && (String(before?.sales_date ?? "") < NON_ADMIN_SALES_START_DATE || String(body.sales_date ?? "") < NON_ADMIN_SALES_START_DATE)) {
     return NextResponse.json({ error: "Only Admin can edit invoices dated before 2026." }, { status: 403 });
@@ -86,7 +87,7 @@ export async function PATCH(
       note_reason:
         documentType === "INVOICE" ? null : String(body.note_reason).trim(),
     })
-    .eq("id", params.id)
+    .eq("id", id)
     .select()
     .single();
 
@@ -125,7 +126,7 @@ export async function PATCH(
   await writeAuditLog(request, {
     action: "UPDATE_SALES_RECORD",
     entityType: documentType,
-    entityId: params.id,
+    entityId: id,
     description: `Updated ${documentType.toLowerCase().replace("_", " ")} ${data.invoice_no}.`,
     metadata: { changes },
   });
@@ -134,14 +135,15 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
   if (!session) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   const { data: deletedRecord } = await supabaseServer
     .from("sales")
     .select("invoice_no, sales_date, due_date, sales_item_total, tax, document_type, original_invoice_no, note_reason")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
   if (session.role !== "admin" && String(deletedRecord?.sales_date ?? "") < NON_ADMIN_SALES_START_DATE) {
     return NextResponse.json({ error: "Only Admin can delete invoices dated before 2026." }, { status: 403 });
@@ -149,7 +151,7 @@ export async function DELETE(
   const { error } = await supabaseServer
     .from("sales")
     .delete()
-    .eq("id", params.id);
+    .eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
@@ -158,8 +160,8 @@ export async function DELETE(
   await writeAuditLog(request, {
     action: "DELETE_SALES_RECORD",
     entityType: "SALES",
-    entityId: params.id,
-    description: `Deleted sales record ${deletedRecord?.invoice_no ?? params.id}.`,
+    entityId: id,
+    description: `Deleted sales record ${deletedRecord?.invoice_no ?? id}.`,
     metadata: { deletedRecord },
   });
   return NextResponse.json({ success: true });
