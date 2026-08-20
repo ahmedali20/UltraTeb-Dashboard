@@ -277,6 +277,76 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: { cheque, allocations: createdAllocations } });
   }
 
+  if (values.payment_method === "BANK_TRANSFER" && !invoiceId && Array.isArray(body.allocations)) {
+    const customerName = String(body.customerName ?? "").trim();
+    const allocations = (body.allocations as Record<string, unknown>[])
+      .map((item) => ({
+        invoiceId: String(item.invoiceId ?? "").trim(),
+        amount: Number(item.amount ?? 0),
+        whtDeductedAmount: Number(item.whtDeductedAmount ?? 0),
+      }))
+      .filter((item) => item.invoiceId && Number.isFinite(item.amount) && item.amount > 0 && Number.isFinite(item.whtDeductedAmount) && item.whtDeductedAmount >= 0);
+    const allocatedTotal = Math.round(allocations.reduce((sum, item) => sum + item.amount, 0) * 100) / 100;
+    if (!customerName || !allocations.length) {
+      return NextResponse.json({ error: "Customer and at least one invoice allocation are required." }, { status: 400 });
+    }
+    if (Math.abs(allocatedTotal - values.amount) > 0.01) {
+      return NextResponse.json({ error: "The full bank transfer amount, including transfer fees, must be allocated." }, { status: 400 });
+    }
+
+    const checked: { invoice: any; amount: number; cashFraction: number; whtDeductedAmount: number }[] = [];
+    for (const allocation of allocations) {
+      const invoice = await permittedInvoice(allocation.invoiceId, session.salesRepName, session.role === "admin");
+      if (!invoice || invoice.customer_name !== customerName) {
+        return NextResponse.json({ error: "Every allocated invoice must belong to the selected customer and be available to this user." }, { status: 400 });
+      }
+      if (allocation.whtDeductedAmount > 0 && await existingWhtDeduction(allocation.invoiceId) > 0.005) {
+        return NextResponse.json({ error: `WHT was already deducted for invoice ${invoice.invoice_no}.` }, { status: 409 });
+      }
+      const alreadySettled = await settledInvoiceAmount(invoice);
+      const remaining = Math.round((Number(invoice.total_sales || 0) - alreadySettled - allocation.amount - allocation.whtDeductedAmount) * 100) / 100;
+      if (remaining < -0.01) {
+        return NextResponse.json({ error: `Allocation exceeds the remaining balance of invoice ${invoice.invoice_no}.` }, { status: 400 });
+      }
+      checked.push({ invoice, amount: allocation.amount, cashFraction: remaining > 0 && remaining < 1 ? remaining : 0, whtDeductedAmount: allocation.whtDeductedAmount });
+    }
+
+    let distributedFees = 0;
+    const payload = checked.map(({ invoice, amount, cashFraction, whtDeductedAmount }, index) => {
+      const transferFees = index === checked.length - 1
+        ? Math.round((values.transfer_fees - distributedFees) * 100) / 100
+        : Math.round((values.transfer_fees * amount / allocatedTotal) * 100) / 100;
+      distributedFees += transferFees;
+      return {
+        collection_date: values.collection_date,
+        amount,
+        transfer_fees: transferFees,
+        cash_fraction: cashFraction,
+        wht_deducted_amount: whtDeductedAmount,
+        payment_method: "BANK_TRANSFER",
+        reference_no: values.reference_no,
+        notes: values.notes,
+        updated_at: values.updated_at,
+        cheque_status: null,
+        cheque_status_date: null,
+        invoice_id: String(invoice.id),
+        invoice_no: String(invoice.invoice_no),
+        customer_code: invoice.customer_code,
+        customer_name: invoice.customer_name,
+      };
+    });
+    const { data, error } = await supabase.from("invoice_collections").insert(payload).select("*");
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    await writeAuditLog(request, {
+      action: "CREATE_COLLECTION",
+      entityType: "COLLECTION",
+      entityId: data?.[0]?.id,
+      description: `Recorded bank transfer of ${values.amount} EGP across ${data?.length ?? 0} invoices.`,
+      metadata: { after: data, referenceNo: values.reference_no },
+    });
+    return NextResponse.json({ data });
+  }
+
   if (!invoiceId) return NextResponse.json({ error: "Please choose an invoice." }, { status: 400 });
   const invoice = await permittedInvoice(invoiceId, session.salesRepName, session.role === "admin");
   if (!invoice) return NextResponse.json({ error: "Invoice not found or unavailable to this user." }, { status: 404 });
