@@ -13,9 +13,10 @@ const supabase = createClient(
 
 export const revalidate = 0;
 
-export default async function InvoiceDetailsPage({ params }: { params: { id: string } }) {
+export default async function InvoiceDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const session = await getCurrentDashboardUser();
-  let invoiceQuery = supabase.from("sales_view").select("*").eq("id", params.id).eq("document_type", "INVOICE");
+  let invoiceQuery = supabase.from("sales_view").select("*").eq("id", id).eq("document_type", "INVOICE");
   if (!canViewPre2026Sales(session)) invoiceQuery = invoiceQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   if (session?.salesRepName) invoiceQuery = invoiceQuery.eq("sales_rep", session.salesRepName);
   const { data: invoice, error } = await invoiceQuery.maybeSingle();
