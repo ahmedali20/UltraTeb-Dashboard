@@ -74,6 +74,26 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     const remainingMoney = Number(invoice.total_sales || 0) - expectedWht - customerPayments - cashFraction;
     return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, cash_fraction: cashFraction, remaining_wht: invoice.document_type === "CR_NOTE" ? remainingWht : Math.max(0, remainingWht), remaining_money: invoice.document_type === "CR_NOTE" ? remainingMoney : Math.max(0, remainingMoney) };
   });
+  const invoiceRowsByNumber = new Map<string, any[]>();
+  rows.filter((row: any) => row.document_type === "INVOICE").forEach((invoice: any) => {
+    const key = String(invoice.invoice_no).trim();
+    const matches = invoiceRowsByNumber.get(key) ?? [];
+    matches.push(invoice);
+    invoiceRowsByNumber.set(key, matches);
+  });
+  invoiceRowsByNumber.forEach((matches) => matches.sort((a, b) => String(a.sales_date).localeCompare(String(b.sales_date))));
+  rows.filter((row: any) => row.document_type === "CR_NOTE" || row.document_type === "DR_NOTE").forEach((note: any) => {
+    const originalInvoiceNo = String(note.original_invoice_no ?? "").trim();
+    if (!originalInvoiceNo) return;
+    const matches = invoiceRowsByNumber.get(originalInvoiceNo) ?? [];
+    const eligible = matches.filter((invoice: any) => String(invoice.sales_date) <= String(note.sales_date));
+    const invoice = eligible.at(-1) ?? matches.at(-1);
+    if (!invoice) return;
+    invoice.remaining_money = Math.max(0, Number(invoice.remaining_money || 0) + Number(note.remaining_money || 0));
+    invoice.remaining_wht = Math.max(0, Number(invoice.remaining_wht || 0) + Number(note.remaining_wht || 0));
+    note.remaining_money = 0;
+    note.remaining_wht = 0;
+  });
   const allocationsByCheque = new Map<string, number>();
   (allCustomerAllocationsResult.data ?? []).forEach((item: any) => allocationsByCheque.set(String(item.cheque_id), (allocationsByCheque.get(String(item.cheque_id)) ?? 0) + Number(item.allocated_amount || 0)));
   const unallocatedChequeBalance = (customerChequesResult.data ?? []).reduce((sum: number, cheque: any) => cheque.cheque_status === "COLLECTED" ? sum + Math.max(0, Number(cheque.amount || 0) - (allocationsByCheque.get(String(cheque.id)) ?? 0)) : sum, 0);
