@@ -8,9 +8,10 @@ import ChequeDetailsClient from "./ChequeDetailsClient";
 const supabase = createClient(process.env.SUPABASE_URL as string, process.env.SUPABASE_SERVICE_ROLE_KEY as string, { auth: { persistSession: false } });
 export const revalidate = 0;
 
-export default async function ChequeDetailsPage({ params }: { params: { id: string } }) {
+export default async function ChequeDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const session = await getCurrentDashboardUser();
-  const chequeId = Number(params.id);
+  const chequeId = Number(id);
   if (!Number.isSafeInteger(chequeId) || chequeId <= 0) notFound();
   const { data: cheque } = await supabase.from("customer_cheques").select("*").eq("id", chequeId).maybeSingle();
   if (!cheque) notFound();
