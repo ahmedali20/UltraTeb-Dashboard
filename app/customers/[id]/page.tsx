@@ -7,9 +7,10 @@ import CustomerBalanceClient from "./CustomerBalanceClient";
 const supabase = createClient(process.env.SUPABASE_URL as string, process.env.SUPABASE_SERVICE_ROLE_KEY as string, { auth: { persistSession: false } });
 export const revalidate = 0;
 
-export default async function CustomerBalancePage({ params }: { params: { id: string } }) {
+export default async function CustomerBalancePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const session = await getCurrentDashboardUser();
-  let customerQuery = supabase.from("customers").select("*").eq("id", params.id);
+  let customerQuery = supabase.from("customers").select("*").eq("id", id);
   if (session?.salesRepName) customerQuery = customerQuery.eq("sales_rep_name", session.salesRepName);
   const { data: customer } = await customerQuery.maybeSingle();
   if (!customer) notFound();
