@@ -18,8 +18,9 @@ function isAmountLike(value: unknown) {
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const body = await request.json();
   if (isAmountLike(body.customer_name)) {
     return NextResponse.json(
@@ -37,7 +38,7 @@ export async function PATCH(
   const { data: before } = await supabaseServer
     .from("customers")
     .select("customer_name, customer_official_name, payment_terms_days, customer_trn, customer_address, sales_rep_name, credit_limit")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
 
   const { data, error } = await supabaseServer
@@ -53,7 +54,7 @@ export async function PATCH(
       sales_rep_name: body.sales_rep_name || null,
       credit_limit: body.credit_limit ? Number(body.credit_limit) : 0,
     })
-    .eq("id", params.id)
+    .eq("id", id)
     .select()
     .single();
 
@@ -64,7 +65,7 @@ export async function PATCH(
   await writeAuditLog(request, {
     action: "UPDATE_CUSTOMER",
     entityType: "CUSTOMER",
-    entityId: params.id,
+    entityId: id,
     description: `Updated customer ${data.customer_name}.`,
     metadata: {
       before,
@@ -84,17 +85,18 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const { data: deletedRecord } = await supabaseServer
     .from("customers")
     .select("customer_name, customer_official_name, payment_terms_days, customer_trn, customer_address, sales_rep_name, credit_limit")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
   const { error } = await supabaseServer
     .from("customers")
     .delete()
-    .eq("id", params.id);
+    .eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
@@ -103,8 +105,8 @@ export async function DELETE(
   await writeAuditLog(request, {
     action: "DELETE_CUSTOMER",
     entityType: "CUSTOMER",
-    entityId: params.id,
-    description: `Deleted customer ${deletedRecord?.customer_name ?? params.id}.`,
+    entityId: id,
+    description: `Deleted customer ${deletedRecord?.customer_name ?? id}.`,
     metadata: { deletedRecord },
   });
   return NextResponse.json({ success: true });
