@@ -1089,6 +1089,7 @@
     }
     .records-toolbar {
       display: flex;
+      flex-wrap: wrap;
       align-items: flex-end;
       gap: 12px;
       margin-top: 26px;
@@ -1107,6 +1108,49 @@
     .records-toolbar > div span {
       color: var(--text-secondary);
       font-size: 11px;
+    }
+
+    .records-toolbar > .records-summary-cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      flex: 1 0 100%;
+      width: 100%;
+      margin: 0 0 4px;
+      gap: 10px;
+    }
+
+    .records-summary-cards article {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+      padding: 13px 15px;
+      border: 1px solid var(--border-color);
+      border-radius: 9px;
+      background: var(--surface-muted);
+    }
+
+    .records-summary-cards article strong {
+      overflow: hidden;
+      color: var(--text-primary);
+      font-size: 20px;
+      line-height: 1.15;
+      text-overflow: ellipsis;
+    }
+
+    .records-summary-cards article small {
+      color: var(--text-secondary);
+      font-size: 10px;
+    }
+
+    .records-summary-cards .records-summary-cards__total {
+      border-color: transparent;
+      background: var(--brand-primary);
+    }
+
+    .records-summary-cards .records-summary-cards__total span,
+    .records-summary-cards .records-summary-cards__total strong,
+    .records-summary-cards .records-summary-cards__total small {
+      color: #fff;
     }
     
     .records-toolbar label {
@@ -1387,6 +1431,10 @@
     
       .records-toolbar > div {
         margin-inline-end: 0;
+      }
+
+      .records-toolbar > .records-summary-cards {
+        grid-template-columns: 1fr;
       }
     
       .rep-summary-grid {
