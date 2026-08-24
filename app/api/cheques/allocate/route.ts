@@ -11,26 +11,37 @@ export async function POST(request: NextRequest) {
   const session = await readDashboardSession(request.cookies.get("ultra_teb_session")?.value);
   if (!session || !hasDashboardPermission(session, "cheques", "edit")) return NextResponse.json({ error: "Cheques edit permission required." }, { status: 403 });
   const body = await request.json();
-  const chequeId = Number(body.chequeId);
   const invoiceId = String(body.invoiceId ?? "").trim();
   const amount = Math.round(Number(body.amount ?? 0) * 100) / 100;
-  if (!Number.isSafeInteger(chequeId) || chequeId <= 0 || !invoiceId || !Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: "Select a cheque, invoice and valid allocation amount." }, { status: 400 });
-
-  const { data: cheque } = await supabase.from("customer_cheques").select("*").eq("id", chequeId).maybeSingle();
-  if (!cheque) return NextResponse.json({ error: "Cheque not found." }, { status: 404 });
-  if (["REFUSED", "RETURNED_TO_CUSTOMER"].includes(String(cheque.cheque_status))) return NextResponse.json({ error: "This cheque cannot be allocated in its current status." }, { status: 400 });
+  if (!invoiceId || !Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: "Select an invoice and enter a valid allocation amount." }, { status: 400 });
 
   let invoiceQuery = supabase.from("sales_view").select("id, invoice_no, customer_code, customer_name, sales_date, sales_item_total, total_sales, sales_rep").eq("id", invoiceId).eq("document_type", "INVOICE");
   if (session.salesRepName) invoiceQuery = invoiceQuery.eq("sales_rep", session.salesRepName);
   if (session.role !== "admin") invoiceQuery = invoiceQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   const { data: invoice } = await invoiceQuery.maybeSingle();
-  if (!invoice || String(invoice.customer_code) !== String(cheque.customer_code)) return NextResponse.json({ error: "The invoice must belong to the same customer as the cheque." }, { status: 400 });
+  if (!invoice) return NextResponse.json({ error: "Invoice not found or unavailable." }, { status: 404 });
 
-  const { data: chequeAllocations, error: chequeAllocationError } = await supabase.from("cheque_allocations").select("allocated_amount").eq("cheque_id", chequeId);
+  const { data: customerCheques, error: chequesError } = await supabase
+    .from("customer_cheques")
+    .select("id, cheque_no, cheque_date, collection_date, amount, cheque_status")
+    .eq("customer_code", invoice.customer_code)
+    .eq("cheque_status", "COLLECTED")
+    .order("cheque_date", { ascending: true })
+    .order("id", { ascending: true });
+  if (chequesError) return NextResponse.json({ error: chequesError.message }, { status: 400 });
+  const chequeIds = (customerCheques ?? []).map((cheque) => Number(cheque.id));
+  const { data: allChequeAllocations, error: chequeAllocationError } = chequeIds.length
+    ? await supabase.from("cheque_allocations").select("cheque_id, allocated_amount").in("cheque_id", chequeIds)
+    : { data: [], error: null };
   if (chequeAllocationError) return NextResponse.json({ error: chequeAllocationError.message }, { status: 400 });
-  const allocatedChequeTotal = (chequeAllocations ?? []).reduce((sum, item) => sum + Number(item.allocated_amount || 0), 0);
-  const chequeAvailable = Math.round((Number(cheque.amount || 0) - allocatedChequeTotal) * 100) / 100;
-  if (amount > chequeAvailable + .01) return NextResponse.json({ error: `Only EGP ${chequeAvailable.toFixed(2)} remains unallocated on this cheque.` }, { status: 400 });
+  const allocatedByCheque = new Map<number, number>();
+  (allChequeAllocations ?? []).forEach((item) => allocatedByCheque.set(Number(item.cheque_id), (allocatedByCheque.get(Number(item.cheque_id)) ?? 0) + Number(item.allocated_amount || 0)));
+  const availableCheques = (customerCheques ?? []).map((cheque) => ({
+    ...cheque,
+    available: Math.max(0, Math.round((Number(cheque.amount || 0) - (allocatedByCheque.get(Number(cheque.id)) ?? 0)) * 100) / 100),
+  })).filter((cheque) => cheque.available > .005);
+  const totalChequeAvailable = availableCheques.reduce((sum, cheque) => sum + cheque.available, 0);
+  if (amount > totalChequeAvailable + .01) return NextResponse.json({ error: `Only EGP ${totalChequeAvailable.toFixed(2)} remains in the customer's collected cheques.` }, { status: 400 });
 
   const [notesResult, collectionsResult, invoiceAllocationsResult, recordedWhtResult] = await Promise.all([
     supabase.from("sales_view").select("sales_item_total, total_sales").eq("customer_code", invoice.customer_code).eq("original_invoice_no", String(invoice.invoice_no)).in("document_type", ["CR_NOTE", "DR_NOTE"]).gte("sales_date", invoice.sales_date),
@@ -53,8 +64,17 @@ export async function POST(request: NextRequest) {
   const invoiceAvailable = Math.max(0, Math.round((effectiveTotal - Math.max(settled, recordedWht)) * 100) / 100);
   if (amount > invoiceAvailable + .01) return NextResponse.json({ error: `Only EGP ${invoiceAvailable.toFixed(2)} remains available on invoice ${invoice.invoice_no}.` }, { status: 400 });
 
-  const { data, error: insertError } = await supabase.from("cheque_allocations").insert({ cheque_id: chequeId, invoice_id: invoiceId, invoice_no: String(invoice.invoice_no), allocated_amount: amount, cash_fraction: 0, wht_deducted_amount: 0 }).select("*").single();
+  let amountLeft = amount;
+  const allocationRows: { cheque_id: number; invoice_id: string; invoice_no: string; allocated_amount: number; cash_fraction: number; wht_deducted_amount: number }[] = [];
+  for (const cheque of availableCheques) {
+    if (amountLeft <= .005) break;
+    const allocatedAmount = Math.min(cheque.available, amountLeft);
+    allocationRows.push({ cheque_id: Number(cheque.id), invoice_id: invoiceId, invoice_no: String(invoice.invoice_no), allocated_amount: Math.round(allocatedAmount * 100) / 100, cash_fraction: 0, wht_deducted_amount: 0 });
+    amountLeft = Math.round((amountLeft - allocatedAmount) * 100) / 100;
+  }
+  const { data, error: insertError } = await supabase.from("cheque_allocations").insert(allocationRows).select("*");
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 400 });
-  await writeAuditLog(request, { action: "ALLOCATE_CHEQUE_BALANCE", entityType: "CHEQUE", entityId: chequeId, description: `Allocated ${amount.toFixed(2)} EGP from cheque ${cheque.cheque_no} to invoice ${invoice.invoice_no}.`, metadata: { chequeId, invoiceId, amount, allocation: data } });
-  return NextResponse.json({ data });
+  const usedChequeNumbers = availableCheques.filter((cheque) => allocationRows.some((row) => row.cheque_id === Number(cheque.id))).map((cheque) => cheque.cheque_no);
+  await writeAuditLog(request, { action: "ALLOCATE_CHEQUE_BALANCE", entityType: "INVOICE", entityId: invoiceId, description: `Automatically allocated ${amount.toFixed(2)} EGP from collected cheque balance to invoice ${invoice.invoice_no}.`, metadata: { invoiceId, amount, chequeNumbers: usedChequeNumbers, allocations: data } });
+  return NextResponse.json({ data, chequeNumbers: usedChequeNumbers });
 }
