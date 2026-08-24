@@ -65,9 +65,17 @@ export default function WhtClient({ customers, initialRecords, invoices, initial
   const tax = Number(form.tax || 0);
   const calculatedWht = Math.round(subtotal * 0.01 * 100) / 100;
   const collected = Number(form.collectedAmount || 0);
+  const recordedInvoiceKeys = useMemo(() => new Set(records
+    .filter((record) => (record.document_type ?? "INVOICE") === "INVOICE")
+    .map((record) => `${record.customer_name.trim().toLowerCase()}|${String(record.invoice_no).trim()}`)), [records]);
   const invoiceSuggestions = useMemo(
-    () => invoices.filter((item) => !form.customerName || item.customer_name === form.customerName),
-    [invoices, form.customerName]
+    () => invoices.filter((item) => {
+      if (item.document_type !== "INVOICE") return false;
+      if (form.customerName && item.customer_name !== form.customerName) return false;
+      const key = `${item.customer_name.trim().toLowerCase()}|${String(item.invoice_no).trim()}`;
+      return !recordedInvoiceKeys.has(key);
+    }),
+    [invoices, form.customerName, recordedInvoiceKeys]
   );
   const filtered = useMemo(() => records.filter((item) =>
     (customerFilter === "All" || item.customer_name === customerFilter) &&
