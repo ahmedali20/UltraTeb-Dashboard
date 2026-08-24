@@ -101,7 +101,12 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
   linkedNoteAdjustments.forEach((adjustment, invoice) => {
     const adjustedMoney = Number(invoice.remaining_money || 0) + adjustment.money;
     if (adjustedMoney < 0) customerCreditBalance += Math.abs(adjustedMoney);
-    invoice.remaining_money = Math.max(0, adjustedMoney);
+    if (adjustedMoney > 0 && adjustedMoney < 1) {
+      invoice.cash_fraction = Number(invoice.cash_fraction || 0) + adjustedMoney;
+      invoice.remaining_money = 0;
+    } else {
+      invoice.remaining_money = Math.max(0, adjustedMoney);
+    }
     invoice.remaining_wht = Math.max(0, Number(invoice.remaining_wht || 0) + adjustment.wht);
   });
   const allocationsByCheque = new Map<string, number>();
