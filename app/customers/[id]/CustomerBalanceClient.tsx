@@ -20,7 +20,7 @@ export default function CustomerBalanceClient({ customer, invoices, customerCred
   const [documentFilter, setDocumentFilter] = useState<DocumentFilter>("ALL");
   const [showWht, setShowWht] = useState(true);
   const [showAllocator, setShowAllocator] = useState(false);
-  const [allocationForm, setAllocationForm] = useState({ invoiceId: "", amount: "" });
+  const [allocationForm, setAllocationForm] = useState<{ invoiceIds: string[]; amounts: Record<string, string> }>({ invoiceIds: [], amounts: {} });
   const [allocationSaving, setAllocationSaving] = useState(false);
   const [allocationMessage, setAllocationMessage] = useState("");
   const today = new Date().toISOString().slice(0, 10);
@@ -38,15 +38,33 @@ export default function CustomerBalanceClient({ customer, invoices, customerCred
     const linkedNotes = invoices.filter((item) => item.document_type !== "INVOICE" && String(item.original_invoice_no || "") === String(invoice.invoice_no));
     return linkedNotes.reduce((result, note) => ({ ...result, remaining_money: result.remaining_money + note.remaining_money }), { ...invoice });
   }).filter((invoice) => invoice.remaining_money > 0.005), [invoices]);
-  const selectedAllocationInvoice = allocationInvoices.find((invoice) => String(invoice.id) === allocationForm.invoiceId);
+  const selectedAllocationInvoices = allocationInvoices.filter((invoice) => allocationForm.invoiceIds.includes(String(invoice.id)));
+  const selectedAllocationTotal = selectedAllocationInvoices.reduce((sum, invoice) => sum + Number(allocationForm.amounts[String(invoice.id)] || 0), 0);
+  const invalidAllocation = selectedAllocationInvoices.some((invoice) => Number(allocationForm.amounts[String(invoice.id)] || 0) <= 0 || Number(allocationForm.amounts[String(invoice.id)] || 0) > invoice.remaining_money + .01);
+
+  function toggleAllocationInvoice(invoice: Invoice) {
+    const id = String(invoice.id);
+    setAllocationForm((current) => {
+      if (current.invoiceIds.includes(id)) {
+        const amounts = { ...current.amounts };
+        delete amounts[id];
+        return { invoiceIds: current.invoiceIds.filter((item) => item !== id), amounts };
+      }
+      const alreadySelected = current.invoiceIds.reduce((sum, item) => sum + Number(current.amounts[item] || 0), 0);
+      const amount = Math.min(invoice.remaining_money, Math.max(0, unallocatedChequeBalance - alreadySelected));
+      return { invoiceIds: [...current.invoiceIds, id], amounts: { ...current.amounts, [id]: amount.toFixed(2) } };
+    });
+  }
 
   async function allocateUnallocatedCheque() {
     setAllocationMessage("");
     setAllocationSaving(true);
     try {
-      const response = await fetch("/api/cheques/allocate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoiceId: allocationForm.invoiceId, amount: Number(allocationForm.amount) }) });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) return setAllocationMessage(result.error || "Unable to allocate cheque balance.");
+      for (const invoice of selectedAllocationInvoices) {
+        const response = await fetch("/api/cheques/allocate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoiceId: String(invoice.id), amount: Number(allocationForm.amounts[String(invoice.id)]) }) });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) return setAllocationMessage(`Invoice ${invoice.invoice_no}: ${result.error || "Unable to allocate cheque balance."}`);
+      }
       window.location.reload();
     } finally { setAllocationSaving(false); }
   }
@@ -116,12 +134,15 @@ export default function CustomerBalanceClient({ customer, invoices, customerCred
       </section>
 
       {showAllocator && <section className="unallocated-allocation-panel">
-        <div className="unallocated-allocation-heading"><div><p>CHEQUE ALLOCATION</p><h2>Allocate Unallocated Balance</h2><span>Select an unpaid invoice. The system will automatically use the oldest available collected cheque balance.</span></div><button type="button" onClick={() => setShowAllocator(false)}>Close</button></div>
+        <div className="unallocated-allocation-heading"><div><p>CHEQUE ALLOCATION</p><h2>Allocate Unallocated Balance</h2><span>Select one or more unpaid invoices. The system automatically uses the oldest available collected cheque balance.</span></div><button type="button" onClick={() => setShowAllocator(false)}>Close</button></div>
         {!unallocatedCheques.length ? <p className="collection-empty">There is no unallocated cheque balance.</p> : <div className="unallocated-allocation-grid">
           <div className="unallocated-auto-source"><span>Available collected cheque balance</span><strong>EGP {money(unallocatedChequeBalance)}</strong><small>The oldest available cheque is used first.</small></div>
-          <label><span>Invoice</span><select value={allocationForm.invoiceId} onChange={(event) => { const invoice = allocationInvoices.find((item) => String(item.id) === event.target.value); setAllocationForm({ invoiceId: event.target.value, amount: invoice ? Math.min(invoice.remaining_money, unallocatedChequeBalance).toFixed(2) : "" }); }}><option value="">Select invoice</option>{allocationInvoices.map((invoice) => <option key={String(invoice.id)} value={String(invoice.id)}>Invoice {invoice.invoice_no} · Remaining EGP {money(invoice.remaining_money)}</option>)}</select></label>
-          <label><span>Allocation Amount</span><input type="number" min="0.01" step="0.01" max={Math.min(unallocatedChequeBalance, selectedAllocationInvoice?.remaining_money || 0)} value={allocationForm.amount} onChange={(event) => setAllocationForm((current) => ({ ...current, amount: event.target.value }))} /></label>
-          <button className="primary" type="button" disabled={allocationSaving || !selectedAllocationInvoice || Number(allocationForm.amount) <= 0 || Number(allocationForm.amount) > Math.min(unallocatedChequeBalance, selectedAllocationInvoice.remaining_money) + .01} onClick={allocateUnallocatedCheque}>{allocationSaving ? "Allocating…" : "Allocate Automatically"}</button>
+          <div className="unallocated-batch-summary"><span>Selected invoices</span><strong>{selectedAllocationInvoices.length}</strong><small>Allocation total: EGP {money(selectedAllocationTotal)}</small></div>
+          <div className="unallocated-invoice-picker">
+            <div className="unallocated-invoice-picker-head"><strong>Open invoices</strong><button type="button" onClick={() => { if (allocationForm.invoiceIds.length === allocationInvoices.length) return setAllocationForm({ invoiceIds: [], amounts: {} }); let available = unallocatedChequeBalance; const amounts: Record<string, string> = {}; const invoiceIds: string[] = []; allocationInvoices.forEach((invoice) => { if (available <= .005) return; const id = String(invoice.id); const amount = Math.min(invoice.remaining_money, available); invoiceIds.push(id); amounts[id] = amount.toFixed(2); available -= amount; }); setAllocationForm({ invoiceIds, amounts }); }}>{allocationForm.invoiceIds.length ? "Clear selection" : "Select invoices"}</button></div>
+            {allocationInvoices.map((invoice) => { const id = String(invoice.id); const checked = allocationForm.invoiceIds.includes(id); return <label className={`unallocated-invoice-option ${checked ? "is-selected" : ""}`} key={id}><input type="checkbox" checked={checked} onChange={() => toggleAllocationInvoice(invoice)} /><span><strong>Invoice {invoice.invoice_no}</strong><small>{dateLabel(invoice.sales_date)} · Remaining EGP {money(invoice.remaining_money)}</small></span><input aria-label={`Allocation for invoice ${invoice.invoice_no}`} type="number" min="0.01" step="0.01" max={invoice.remaining_money} disabled={!checked} value={allocationForm.amounts[id] || ""} onChange={(event) => setAllocationForm((current) => ({ ...current, amounts: { ...current.amounts, [id]: event.target.value } }))} /></label>; })}
+          </div>
+          <button className="primary unallocated-batch-submit" type="button" disabled={allocationSaving || !selectedAllocationInvoices.length || invalidAllocation || selectedAllocationTotal <= 0 || selectedAllocationTotal > unallocatedChequeBalance + .01} onClick={allocateUnallocatedCheque}>{allocationSaving ? "Allocating…" : `Allocate ${selectedAllocationInvoices.length} Invoice${selectedAllocationInvoices.length === 1 ? "" : "s"}`}</button>
         </div>}
         {allocationMessage && <p className="collection-form-error">{allocationMessage}</p>}
       </section>}
