@@ -82,6 +82,7 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     invoiceRowsByNumber.set(key, matches);
   });
   invoiceRowsByNumber.forEach((matches) => matches.sort((a, b) => String(a.sales_date).localeCompare(String(b.sales_date))));
+  const linkedNoteAdjustments = new Map<any, { money: number; wht: number }>();
   rows.filter((row: any) => row.document_type === "CR_NOTE" || row.document_type === "DR_NOTE").forEach((note: any) => {
     const originalInvoiceNo = String(note.original_invoice_no ?? "").trim();
     if (!originalInvoiceNo) return;
@@ -89,10 +90,19 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     const eligible = matches.filter((invoice: any) => String(invoice.sales_date) <= String(note.sales_date));
     const invoice = eligible.at(-1) ?? matches.at(-1);
     if (!invoice) return;
-    invoice.remaining_money = Math.max(0, Number(invoice.remaining_money || 0) + Number(note.remaining_money || 0));
-    invoice.remaining_wht = Math.max(0, Number(invoice.remaining_wht || 0) + Number(note.remaining_wht || 0));
+    const adjustment = linkedNoteAdjustments.get(invoice) ?? { money: 0, wht: 0 };
+    adjustment.money += Number(note.remaining_money || 0);
+    adjustment.wht += Number(note.remaining_wht || 0);
+    linkedNoteAdjustments.set(invoice, adjustment);
     note.remaining_money = 0;
     note.remaining_wht = 0;
+  });
+  let customerCreditBalance = 0;
+  linkedNoteAdjustments.forEach((adjustment, invoice) => {
+    const adjustedMoney = Number(invoice.remaining_money || 0) + adjustment.money;
+    if (adjustedMoney < 0) customerCreditBalance += Math.abs(adjustedMoney);
+    invoice.remaining_money = Math.max(0, adjustedMoney);
+    invoice.remaining_wht = Math.max(0, Number(invoice.remaining_wht || 0) + adjustment.wht);
   });
   const allocationsByCheque = new Map<string, number>();
   (allCustomerAllocationsResult.data ?? []).forEach((item: any) => allocationsByCheque.set(String(item.cheque_id), (allocationsByCheque.get(String(item.cheque_id)) ?? 0) + Number(item.allocated_amount || 0)));
@@ -105,5 +115,5 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     amount: Number(cheque.amount || 0),
     unallocated_amount: Math.max(0, Number(cheque.amount || 0) - (allocationsByCheque.get(String(cheque.id)) ?? 0)),
   })).filter((cheque: any) => cheque.unallocated_amount > 0.005);
-  return <CustomerBalanceClient customer={customer} invoices={rows} unallocatedChequeBalance={unallocatedChequeBalance} unallocatedCheques={unallocatedCheques} />;
+  return <CustomerBalanceClient customer={customer} invoices={rows} customerCreditBalance={customerCreditBalance} unallocatedChequeBalance={unallocatedChequeBalance} unallocatedCheques={unallocatedCheques} />;
 }
