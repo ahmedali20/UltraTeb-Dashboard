@@ -66,11 +66,22 @@ export default async function WhtPage() {
   const visibleGroups = visibleCustomerNames
     ? (groupsResult.data ?? []).filter((group: any) => visibleCustomerNames.has(group.customer_name))
     : groupsResult.data ?? [];
+  const recordedSalesIds = new Set(visibleRecords.map((record: any) => String(record.sales_id ?? "")).filter(Boolean));
+  const recordedDocumentKeys = new Set(visibleRecords.map((record: any) => [
+    String(record.document_type ?? "INVOICE"),
+    String(record.invoice_no ?? ""),
+    String(record.invoice_date ?? "").slice(0, 10),
+  ].join("|")));
+  const availableInvoices = invoices.filter((invoice: any) => {
+    if (recordedSalesIds.has(String(invoice.id))) return false;
+    const key = [String(invoice.document_type ?? "INVOICE"), String(invoice.invoice_no ?? ""), String(invoice.sales_date ?? "").slice(0, 10)].join("|");
+    return !recordedDocumentKeys.has(key);
+  });
 
   return <WhtClient
     customers={Array.from(new Set((customers ?? []).map((item) => item.customer_name).filter((name) => Boolean(name) && (!visibleCustomerNames || visibleCustomerNames.has(name))))) as string[]}
     initialRecords={visibleRecords}
-    invoices={invoices}
+    invoices={availableInvoices}
     initialGroups={visibleGroups}
   />;
 }
