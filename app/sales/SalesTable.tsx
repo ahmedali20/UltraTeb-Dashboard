@@ -283,6 +283,14 @@ export default function SalesTable({
     (total, sale) => total + Number(sale.sales_item_total || 0),
     0
   );
+  const selectedDocumentLabel =
+    recordTypeFilter === "CR_NOTE"
+      ? lang === "ar" ? "الإشعارات الدائنة" : "Credit Notes"
+      : recordTypeFilter === "DR_NOTE"
+        ? lang === "ar" ? "الإشعارات المدينة" : "Debit Notes"
+        : recordTypeFilter === "INVOICE"
+          ? lang === "ar" ? "الفواتير" : "Invoices"
+          : lang === "ar" ? "كل المستندات" : "All Documents";
   const recordPageCount = Math.max(
     1,
     Math.ceil(displayedSales.length / recordsPerPage)
@@ -1380,26 +1388,22 @@ export default function SalesTable({
         id="all-records"
         style={{ display: activeSalesView === "records" ? undefined : "none" }}
       >
-        <div>
-          <strong>{lang === "ar" ? "الفواتير" : "Invoices"}</strong>
-          <span>
-            {lang === "ar" ? "إجمالي الفواتير" : "Total Invoices"}:{" "}
-            {displayedSales.length}
-            {" · "}
-            {lang === "ar"
-              ? "إجمالي الأصناف بدون الضريبة"
-              : "Sales Item Total Without Tax"}:{" "}
-            {displayedSalesItemTotal.toLocaleString(
-              lang === "ar" ? "ar-EG" : "en-US",
-              { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-            )}
-            {" · "}
-            {lang === "ar" ? "إجمالي الأصناف شامل الضريبة" : "Sales Item Total With Tax"}:{" "}
-            {displayedSalesTotal.toLocaleString(
-              lang === "ar" ? "ar-EG" : "en-US",
-              { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-            )}
-          </span>
+        <div className="records-summary-cards">
+          <article>
+            <span>{selectedDocumentLabel}</span>
+            <strong>{displayedSales.length.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</strong>
+            <small>{lang === "ar" ? "عدد المستندات المحددة" : "Selected records"}</small>
+          </article>
+          <article>
+            <span>{lang === "ar" ? "الإجمالي بدون الضريبة" : "Item Total Without Tax"}</span>
+            <strong>{displayedSalesItemTotal.toLocaleString(lang === "ar" ? "ar-EG" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+            <small>EGP</small>
+          </article>
+          <article className="records-summary-cards__total">
+            <span>{lang === "ar" ? "الإجمالي شامل الضريبة" : "Item Total With Tax"}</span>
+            <strong>{displayedSalesTotal.toLocaleString(lang === "ar" ? "ar-EG" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+            <small>EGP</small>
+          </article>
         </div>
         <label>
           {lang === "ar" ? "نوع المستند" : "Document Type"}
