@@ -75,7 +75,7 @@ async function permittedInvoice(invoiceId: string, salesRepName: string | null, 
 async function settledInvoiceAmount(invoice: any, excludeCollectionIds: number[] = []) {
   let collectionsQuery = supabase
     .from("invoice_collections")
-    .select("id, amount, cash_fraction, wht_deducted_amount")
+    .select("id, amount, transfer_fees, cash_fraction, wht_deducted_amount")
     .eq("invoice_id", String(invoice.id))
     .neq("payment_method", "CHEQUE");
   if (excludeCollectionIds.length) collectionsQuery = collectionsQuery.not("id", "in", `(${excludeCollectionIds.join(",")})`);
@@ -114,7 +114,7 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionIds: number[]
   let payments = 0;
   let deductedWht = 0;
   (collectionsResult.data ?? []).forEach((item) => {
-    payments += Number(item.amount || 0) + Number(item.cash_fraction || 0);
+    payments += Math.max(0, Number(item.amount || 0) - Number(item.transfer_fees || 0)) + Number(item.cash_fraction || 0);
     deductedWht += Number(item.wht_deducted_amount || 0);
   });
   (allocationsResult.data ?? []).forEach((item) => {
@@ -133,7 +133,7 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionIds: number[]
 async function addAutomaticFraction(invoice: any, values: ReturnType<typeof collectionValues>, excludeCollectionIds: number[] = []) {
   const alreadySettled = await settledInvoiceAmount(invoice, excludeCollectionIds);
   const remaining = Math.round(
-    (Number(invoice.total_sales || 0) - alreadySettled - values.amount -
+    (Number(invoice.total_sales || 0) - alreadySettled - (values.amount - values.transfer_fees) -
       values.cash_fraction - values.wht_deducted_amount) * 100
   ) / 100;
   if (remaining > 0 && remaining < 1) {
@@ -290,8 +290,9 @@ export async function POST(request: NextRequest) {
     if (!customerName || !allocations.length) {
       return NextResponse.json({ error: "Customer and at least one invoice allocation are required." }, { status: 400 });
     }
-    if (Math.abs(allocatedTotal - values.amount) > 0.01) {
-      return NextResponse.json({ error: "The full bank transfer amount, including transfer fees, must be allocated." }, { status: 400 });
+    const invoicePaymentAmount = Math.round((values.amount - values.transfer_fees) * 100) / 100;
+    if (Math.abs(allocatedTotal - invoicePaymentAmount) > 0.01) {
+      return NextResponse.json({ error: "The bank payment amount must be fully allocated. Transfer fees are recorded separately." }, { status: 400 });
     }
 
     const checked: { invoice: any; amount: number; cashFraction: number; whtDeductedAmount: number }[] = [];
@@ -319,7 +320,7 @@ export async function POST(request: NextRequest) {
       distributedFees += transferFees;
       return {
         collection_date: values.collection_date,
-        amount,
+        amount: Math.round((amount + transferFees) * 100) / 100,
         transfer_fees: transferFees,
         cash_fraction: cashFraction,
         wht_deducted_amount: whtDeductedAmount,
@@ -394,7 +395,8 @@ export async function PATCH(request: NextRequest) {
       invoiceId: String(item.invoiceId ?? "").trim(), amount: Number(item.amount ?? 0), whtDeductedAmount: Number(item.whtDeductedAmount ?? 0),
     })).filter((item: { invoiceId: string; amount: number; whtDeductedAmount: number }) => item.invoiceId && Number.isFinite(item.amount) && item.amount > 0 && Number.isFinite(item.whtDeductedAmount) && item.whtDeductedAmount >= 0);
     const allocatedTotal = Math.round(allocations.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0) * 100) / 100;
-    if (!allocations.length || Math.abs(allocatedTotal - values.amount) > 0.01) return NextResponse.json({ error: "The full bank-transfer amount, including fees, must be allocated." }, { status: 400 });
+    const invoicePaymentAmount = Math.round((values.amount - values.transfer_fees) * 100) / 100;
+    if (!allocations.length || Math.abs(allocatedTotal - invoicePaymentAmount) > 0.01) return NextResponse.json({ error: "The bank payment amount must be fully allocated. Transfer fees are recorded separately." }, { status: 400 });
     const checked: { invoice: any; amount: number; cashFraction: number; whtDeductedAmount: number }[] = [];
     for (const allocation of allocations) {
       const invoice = await permittedInvoice(allocation.invoiceId, session.salesRepName, session.role === "admin");
@@ -409,7 +411,7 @@ export async function PATCH(request: NextRequest) {
     const replacementRows = checked.map(({ invoice, amount, cashFraction, whtDeductedAmount }, index) => {
       const fee = index === checked.length - 1 ? Math.round((values.transfer_fees - distributedFees) * 100) / 100 : Math.round((values.transfer_fees * amount / allocatedTotal) * 100) / 100;
       distributedFees += fee;
-      return { ...values, amount, transfer_fees: fee, cash_fraction: cashFraction, wht_deducted_amount: whtDeductedAmount, cheque_status: null, cheque_status_date: null, invoice_id: String(invoice.id), invoice_no: String(invoice.invoice_no), customer_code: invoice.customer_code, customer_name: invoice.customer_name };
+      return { ...values, amount: Math.round((amount + fee) * 100) / 100, transfer_fees: fee, cash_fraction: cashFraction, wht_deducted_amount: whtDeductedAmount, cheque_status: null, cheque_status_date: null, invoice_id: String(invoice.id), invoice_no: String(invoice.invoice_no), customer_code: invoice.customer_code, customer_name: invoice.customer_name };
     });
     const { error: deleteError } = await supabase.from("invoice_collections").delete().in("id", operationIds);
     if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 400 });
