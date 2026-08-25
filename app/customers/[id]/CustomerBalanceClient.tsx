@@ -25,7 +25,7 @@ export default function CustomerBalanceClient({ customer, invoices, customerCred
   const [allocationMessage, setAllocationMessage] = useState("");
   const today = new Date().toISOString().slice(0, 10);
   const totals = useMemo(() => invoices.reduce((sum, item) => ({ total: sum.total + Number(item.total_sales), payments: sum.payments + item.customer_payments, fractions: sum.fractions + item.cash_fraction, expectedWht: sum.expectedWht + item.expected_wht, collectedWht: sum.collectedWht + item.collected_wht, remainingMoney: sum.remainingMoney + item.remaining_money, remainingWht: sum.remainingWht + item.remaining_wht }), { total: 0, payments: 0, fractions: 0, expectedWht: 0, collectedWht: 0, remainingMoney: 0, remainingWht: 0 }), [invoices]);
-  const netCustomerBalance = Math.max(0, totals.remainingMoney - customerCreditBalance - unallocatedChequeBalance - transferFeeAdjustments);
+  const netCustomerBalance = Math.max(0, totals.remainingMoney - customerCreditBalance - unallocatedChequeBalance);
   const filtered = useMemo(() => invoices.filter((invoice) => {
     const moneyOpen = invoice.remaining_money > 0.005;
     const whtPending = !moneyOpen && invoice.remaining_wht > 0.005;
