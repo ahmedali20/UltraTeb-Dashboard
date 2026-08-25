@@ -28,10 +28,11 @@ export default function InvoiceDetailsClient({ invoice, notes, customer, wht, co
   const whtTotal = wht.reduce((sum, item) => sum + Number(item.wht_amount || 0), 0);
   const whtCollected = wht.reduce((sum, item) => sum + Number(item.collected_amount || 0), 0);
   const customerCollectionsTotal = collections.reduce((sum, item) => sum + Math.max(0, Number(item.amount || 0) - Number(item.transfer_fees || 0)), 0) + chequeAllocations.reduce((sum, allocation) => sum + (allocation.cheque?.cheque_status === "COLLECTED" ? Number(allocation.allocated_amount || 0) : 0), 0);
+  const transferFeeAdjustmentTotal = collections.reduce((sum, item) => sum + Number(item.transfer_fees || 0), 0);
   const cashFractionTotal = collections.reduce((sum, item) => sum + Number(item.cash_fraction || 0), 0) + chequeAllocations.reduce((sum, allocation) => sum + (allocation.cheque?.cheque_status === "COLLECTED" ? Number(allocation.cash_fraction || 0) : 0), 0);
   const storedDeductedWht = collections.reduce((sum, item) => sum + Number(item.wht_deducted_amount || 0), 0) + chequeAllocations.reduce((sum, allocation) => sum + (allocation.cheque?.cheque_status === "COLLECTED" ? Number(allocation.wht_deducted_amount || 0) : 0), 0);
   const deductedWhtTotal = Math.max(storedDeductedWht, whtTotal);
-  const collectedTotal = customerCollectionsTotal + cashFractionTotal + deductedWhtTotal;
+  const collectedTotal = customerCollectionsTotal + transferFeeAdjustmentTotal + cashFractionTotal + deductedWhtTotal;
   const remaining = adjustedSales - collectedTotal;
   const overdue = Boolean(invoice.due_date && new Date(`${invoice.due_date}T23:59:59`) < new Date());
   const paymentStatus = canViewCollections ? (remaining < -0.005 ? "Overpaid" : remaining <= 0.005 ? "Paid" : collectedTotal > 0 ? "Partially Paid" : overdue ? "Overdue" : "Pending") : overdue ? "Overdue" : "Pending";
