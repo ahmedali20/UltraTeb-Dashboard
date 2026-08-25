@@ -72,13 +72,13 @@ async function permittedInvoice(invoiceId: string, salesRepName: string | null, 
   };
 }
 
-async function settledInvoiceAmount(invoice: any, excludeCollectionId?: number) {
+async function settledInvoiceAmount(invoice: any, excludeCollectionIds: number[] = []) {
   let collectionsQuery = supabase
     .from("invoice_collections")
     .select("id, amount, cash_fraction, wht_deducted_amount")
     .eq("invoice_id", String(invoice.id))
     .neq("payment_method", "CHEQUE");
-  if (excludeCollectionId) collectionsQuery = collectionsQuery.neq("id", excludeCollectionId);
+  if (excludeCollectionIds.length) collectionsQuery = collectionsQuery.not("id", "in", `(${excludeCollectionIds.join(",")})`);
 
   const [collectionsResult, allocationsResult, recordedWhtResult] = await Promise.all([
     collectionsQuery,
@@ -130,8 +130,8 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionId?: number) 
   return payments + Math.max(deductedWht, recordedWhtWithNotes);
 }
 
-async function addAutomaticFraction(invoice: any, values: ReturnType<typeof collectionValues>, excludeCollectionId?: number) {
-  const alreadySettled = await settledInvoiceAmount(invoice, excludeCollectionId);
+async function addAutomaticFraction(invoice: any, values: ReturnType<typeof collectionValues>, excludeCollectionIds: number[] = []) {
+  const alreadySettled = await settledInvoiceAmount(invoice, excludeCollectionIds);
   const remaining = Math.round(
     (Number(invoice.total_sales || 0) - alreadySettled - values.amount -
       values.cash_fraction - values.wht_deducted_amount) * 100
@@ -142,12 +142,12 @@ async function addAutomaticFraction(invoice: any, values: ReturnType<typeof coll
   return values;
 }
 
-async function existingWhtDeduction(invoiceId: string, excludeCollectionId?: number) {
+async function existingWhtDeduction(invoiceId: string, excludeCollectionIds: number[] = []) {
   let collectionsQuery = supabase
     .from("invoice_collections")
     .select("wht_deducted_amount")
     .eq("invoice_id", invoiceId);
-  if (excludeCollectionId) collectionsQuery = collectionsQuery.neq("id", excludeCollectionId);
+  if (excludeCollectionIds.length) collectionsQuery = collectionsQuery.not("id", "in", `(${excludeCollectionIds.join(",")})`);
   const [collectionsResult, allocationsResult] = await Promise.all([
     collectionsQuery,
     supabase.from("cheque_allocations").select("wht_deducted_amount").eq("invoice_id", invoiceId),
@@ -373,19 +373,65 @@ export async function PATCH(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Collections edit permission required." }, { status: 403 });
   const body = await request.json();
   const id = Number(body.id);
+  const operationIds = Array.from(new Set((Array.isArray(body.ids) ? body.ids : [])
+    .map((value: unknown) => Number(value))
+    .filter((value: number) => Number.isSafeInteger(value) && value > 0))) as number[];
   const values = collectionValues(body);
   const errorMessage = validationError(values);
+  if (values.payment_method === "BANK_TRANSFER" && (operationIds.length > 1 || (operationIds.length === 1 && Array.isArray(body.allocations)))) {
+    if (errorMessage) return NextResponse.json({ error: errorMessage }, { status: 400 });
+    const { data: beforeRows, error: beforeError } = await supabase.from("invoice_collections").select("*").in("id", operationIds);
+    if (beforeError) return NextResponse.json({ error: beforeError.message }, { status: 400 });
+    if ((beforeRows ?? []).length !== operationIds.length || (beforeRows ?? []).some((row) => row.payment_method !== "BANK_TRANSFER")) {
+      return NextResponse.json({ error: "The complete bank-transfer operation could not be found." }, { status: 404 });
+    }
+    const customerName = String(body.customerName ?? "").trim();
+    if ((beforeRows ?? []).some((row) => row.customer_name !== customerName)) return NextResponse.json({ error: "All transfer allocations must belong to one customer." }, { status: 400 });
+    for (const row of beforeRows ?? []) {
+      if (!(await permittedInvoice(String(row.invoice_id), session.salesRepName, session.role === "admin"))) return NextResponse.json({ error: "Transfer operation unavailable to this user." }, { status: 404 });
+    }
+    const allocations = (Array.isArray(body.allocations) ? body.allocations : []).map((item: Record<string, unknown>) => ({
+      invoiceId: String(item.invoiceId ?? "").trim(), amount: Number(item.amount ?? 0), whtDeductedAmount: Number(item.whtDeductedAmount ?? 0),
+    })).filter((item: { invoiceId: string; amount: number; whtDeductedAmount: number }) => item.invoiceId && Number.isFinite(item.amount) && item.amount > 0 && Number.isFinite(item.whtDeductedAmount) && item.whtDeductedAmount >= 0);
+    const allocatedTotal = Math.round(allocations.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0) * 100) / 100;
+    if (!allocations.length || Math.abs(allocatedTotal - values.amount) > 0.01) return NextResponse.json({ error: "The full bank-transfer amount, including fees, must be allocated." }, { status: 400 });
+    const checked: { invoice: any; amount: number; cashFraction: number; whtDeductedAmount: number }[] = [];
+    for (const allocation of allocations) {
+      const invoice = await permittedInvoice(allocation.invoiceId, session.salesRepName, session.role === "admin");
+      if (!invoice || invoice.customer_name !== customerName) return NextResponse.json({ error: "Every allocation must belong to the selected customer." }, { status: 400 });
+      if (allocation.whtDeductedAmount > 0 && await existingWhtDeduction(allocation.invoiceId, operationIds) > 0.005) return NextResponse.json({ error: `WHT was already deducted for invoice ${invoice.invoice_no}.` }, { status: 409 });
+      const alreadySettled = await settledInvoiceAmount(invoice, operationIds);
+      const remaining = Math.round((Number(invoice.total_sales || 0) - alreadySettled - allocation.amount - allocation.whtDeductedAmount) * 100) / 100;
+      if (remaining < -0.01) return NextResponse.json({ error: `Allocation exceeds the remaining balance of invoice ${invoice.invoice_no}.` }, { status: 400 });
+      checked.push({ invoice, amount: allocation.amount, cashFraction: remaining > 0 && remaining < 1 ? remaining : 0, whtDeductedAmount: allocation.whtDeductedAmount });
+    }
+    let distributedFees = 0;
+    const replacementRows = checked.map(({ invoice, amount, cashFraction, whtDeductedAmount }, index) => {
+      const fee = index === checked.length - 1 ? Math.round((values.transfer_fees - distributedFees) * 100) / 100 : Math.round((values.transfer_fees * amount / allocatedTotal) * 100) / 100;
+      distributedFees += fee;
+      return { ...values, amount, transfer_fees: fee, cash_fraction: cashFraction, wht_deducted_amount: whtDeductedAmount, cheque_status: null, cheque_status_date: null, invoice_id: String(invoice.id), invoice_no: String(invoice.invoice_no), customer_code: invoice.customer_code, customer_name: invoice.customer_name };
+    });
+    const { error: deleteError } = await supabase.from("invoice_collections").delete().in("id", operationIds);
+    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 400 });
+    const { data, error } = await supabase.from("invoice_collections").insert(replacementRows).select("*");
+    if (error) {
+      await supabase.from("invoice_collections").insert(beforeRows);
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    await writeAuditLog(request, { action: "UPDATE_COLLECTION", entityType: "COLLECTION", entityId: data?.[0]?.id, description: `Updated complete bank-transfer operation across ${data?.length ?? 0} invoices.`, metadata: { before: beforeRows, after: data } });
+    return NextResponse.json({ data });
+  }
   if (!Number.isSafeInteger(id) || id <= 0) return NextResponse.json({ error: "Invalid collection record." }, { status: 400 });
   if (errorMessage) return NextResponse.json({ error: errorMessage }, { status: 400 });
   if (values.payment_method === "CHEQUE") return NextResponse.json({ error: "Create and manage cheques through the cheque workflow." }, { status: 400 });
   const { data: before } = await supabase.from("invoice_collections").select("*").eq("id", id).maybeSingle();
   if (!before || !(await permittedInvoice(String(before.invoice_id), session.salesRepName, session.role === "admin"))) return NextResponse.json({ error: "Collection not found or unavailable to this user." }, { status: 404 });
-  if (values.wht_deducted_amount > 0 && await existingWhtDeduction(String(before.invoice_id), id) > 0.005) {
+  if (values.wht_deducted_amount > 0 && await existingWhtDeduction(String(before.invoice_id), [id]) > 0.005) {
     return NextResponse.json({ error: `WHT was already deducted for invoice ${before.invoice_no}.` }, { status: 409 });
   }
   const invoice = await permittedInvoice(String(before.invoice_id), session.salesRepName, session.role === "admin");
   if (!invoice) return NextResponse.json({ error: "Invoice not found or unavailable to this user." }, { status: 404 });
-  await addAutomaticFraction(invoice, values, id);
+  await addAutomaticFraction(invoice, values, [id]);
   const { data, error } = await supabase.from("invoice_collections").update({
     ...values,
     cheque_status: null,
@@ -399,7 +445,20 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const session = await editableSession(request);
   if (!session) return NextResponse.json({ error: "Collections edit permission required." }, { status: 403 });
-  const id = Number(new URL(request.url).searchParams.get("id"));
+  const params = new URL(request.url).searchParams;
+  const ids = String(params.get("ids") ?? params.get("id") ?? "").split(",").map(Number).filter((id) => Number.isSafeInteger(id) && id > 0);
+  const id = ids[0];
+  if (!ids.length) return NextResponse.json({ error: "Invalid collection operation." }, { status: 400 });
+  if (ids.length > 1) {
+    const { data: beforeRows, error: beforeError } = await supabase.from("invoice_collections").select("*").in("id", ids);
+    if (beforeError) return NextResponse.json({ error: beforeError.message }, { status: 400 });
+    if ((beforeRows ?? []).length !== ids.length) return NextResponse.json({ error: "Complete collection operation not found." }, { status: 404 });
+    for (const row of beforeRows ?? []) if (!(await permittedInvoice(String(row.invoice_id), session.salesRepName, session.role === "admin"))) return NextResponse.json({ error: "Collection operation unavailable to this user." }, { status: 404 });
+    const { error } = await supabase.from("invoice_collections").delete().in("id", ids);
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    await writeAuditLog(request, { action: "DELETE_COLLECTION", entityType: "COLLECTION", entityId: ids.join(","), description: `Deleted complete ${beforeRows?.[0]?.payment_method ?? "collection"} operation.`, metadata: { before: beforeRows } });
+    return NextResponse.json({ success: true });
+  }
   const { data: before } = await supabase.from("invoice_collections").select("*").eq("id", id).maybeSingle();
   if (!before || !(await permittedInvoice(String(before.invoice_id), session.salesRepName, session.role === "admin"))) return NextResponse.json({ error: "Collection not found or unavailable to this user." }, { status: 404 });
   const { error } = await supabase.from("invoice_collections").delete().eq("id", id);
