@@ -55,7 +55,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
     const payments = new Map<string, number>();
     const deductions = new Map<string, number>();
     records.forEach((record) => {
-      payments.set(record.invoice_id, (payments.get(record.invoice_id) ?? 0) + Math.max(0, Number(record.amount || 0) - Number(record.transfer_fees || 0)) + Number(record.cash_fraction || 0));
+      payments.set(record.invoice_id, (payments.get(record.invoice_id) ?? 0) + Number(record.amount || 0) + Number(record.cash_fraction || 0));
       deductions.set(record.invoice_id, (deductions.get(record.invoice_id) ?? 0) + Number(record.wht_deducted_amount || 0));
     });
     initialChequeAllocations.forEach((allocation) => {
@@ -84,7 +84,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
   }, [initialChequeAllocations]);
   const editingOwnSettlement = useMemo(() => records.filter((record) => editingIds.includes(record.id)).reduce((map, record) => {
     const id = String(record.invoice_id);
-    map.set(id, (map.get(id) ?? 0) + Math.max(0, Number(record.amount || 0) - Number(record.transfer_fees || 0)) + Number(record.cash_fraction || 0) + Number(record.wht_deducted_amount || 0));
+    map.set(id, (map.get(id) ?? 0) + Number(record.amount || 0) + Number(record.cash_fraction || 0) + Number(record.wht_deducted_amount || 0));
     return map;
   }, new Map<string, number>()), [records, editingIds]);
   const editingOwnWht = useMemo(() => records.filter((record) => editingIds.includes(record.id)).reduce((map, record) => {
