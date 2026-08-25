@@ -114,7 +114,7 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionIds: number[]
   let payments = 0;
   let deductedWht = 0;
   (collectionsResult.data ?? []).forEach((item) => {
-    payments += Math.max(0, Number(item.amount || 0) - Number(item.transfer_fees || 0)) + Number(item.cash_fraction || 0);
+    payments += Number(item.amount || 0) + Number(item.cash_fraction || 0);
     deductedWht += Number(item.wht_deducted_amount || 0);
   });
   (allocationsResult.data ?? []).forEach((item) => {
@@ -133,7 +133,7 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionIds: number[]
 async function addAutomaticFraction(invoice: any, values: ReturnType<typeof collectionValues>, excludeCollectionIds: number[] = []) {
   const alreadySettled = await settledInvoiceAmount(invoice, excludeCollectionIds);
   const remaining = Math.round(
-    (Number(invoice.total_sales || 0) - alreadySettled - (values.amount - values.transfer_fees) -
+    (Number(invoice.total_sales || 0) - alreadySettled - values.amount -
       values.cash_fraction - values.wht_deducted_amount) * 100
   ) / 100;
   if (remaining > 0 && remaining < 1) {
