@@ -38,12 +38,10 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
   if (error) return <main style={{ padding: 32, color: "#dc2626" }}>{error.message}</main>;
 
   const payments = new Map<string, number>();
-  const transferFeeAdjustmentsByInvoice = new Map<string, number>();
   const deductedWht = new Map<string, number>();
   const cashFractions = new Map<string, number>();
   (collectionsResult.data ?? []).forEach((item: any) => {
     payments.set(String(item.invoice_id), (payments.get(String(item.invoice_id)) ?? 0) + Math.max(0, Number(item.amount || 0) - Number(item.transfer_fees || 0)));
-    transferFeeAdjustmentsByInvoice.set(String(item.invoice_id), (transferFeeAdjustmentsByInvoice.get(String(item.invoice_id)) ?? 0) + Number(item.transfer_fees || 0));
     cashFractions.set(String(item.invoice_id), (cashFractions.get(String(item.invoice_id)) ?? 0) + Number(item.cash_fraction || 0));
     deductedWht.set(String(item.invoice_id), (deductedWht.get(String(item.invoice_id)) ?? 0) + Number(item.wht_deducted_amount || 0));
   });
@@ -73,8 +71,7 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     const customerPayments = payments.get(String(invoice.id)) ?? 0;
     const cashFraction = cashFractions.get(String(invoice.id)) ?? 0;
     const remainingWht = expectedWht - collectedWht;
-    const transferFeeAdjustment = transferFeeAdjustmentsByInvoice.get(String(invoice.id)) ?? 0;
-    const remainingMoney = Number(invoice.total_sales || 0) - expectedWht - customerPayments - transferFeeAdjustment - cashFraction;
+    const remainingMoney = Number(invoice.total_sales || 0) - expectedWht - customerPayments - cashFraction;
     return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, cash_fraction: cashFraction, remaining_wht: invoice.document_type === "CR_NOTE" ? remainingWht : Math.max(0, remainingWht), remaining_money: invoice.document_type === "CR_NOTE" ? remainingMoney : Math.max(0, remainingMoney) };
   });
   const invoiceRowsByNumber = new Map<string, any[]>();
@@ -112,6 +109,19 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     }
     invoice.remaining_wht = Math.max(0, Number(invoice.remaining_wht || 0) + adjustment.wht);
   });
+  const transferFeeAdjustments = (collectionsResult.data ?? []).reduce((sum: number, item: any) => sum + Number(item.transfer_fees || 0), 0);
+  const transferFeeInvoiceIds = new Set((collectionsResult.data ?? []).filter((item: any) => Number(item.transfer_fees || 0) > 0).map((item: any) => String(item.invoice_id)));
+  let remainingTransferFeeAdjustment = transferFeeAdjustments;
+  rows
+    .filter((invoice: any) => invoice.document_type === "INVOICE" && transferFeeInvoiceIds.has(String(invoice.id)) && Number(invoice.remaining_money || 0) > 0)
+    .sort((a: any, b: any) => String(b.sales_date).localeCompare(String(a.sales_date)))
+    .forEach((invoice: any) => {
+      if (remainingTransferFeeAdjustment <= 0.005) return;
+      const applied = Math.min(Number(invoice.remaining_money || 0), remainingTransferFeeAdjustment);
+      invoice.remaining_money = Math.round((Number(invoice.remaining_money || 0) - applied) * 100) / 100;
+      remainingTransferFeeAdjustment = Math.round((remainingTransferFeeAdjustment - applied) * 100) / 100;
+    });
+  if (remainingTransferFeeAdjustment > 0.005) customerCreditBalance += remainingTransferFeeAdjustment;
   const allocationsByCheque = new Map<string, number>();
   (allCustomerAllocationsResult.data ?? []).forEach((item: any) => allocationsByCheque.set(String(item.cheque_id), (allocationsByCheque.get(String(item.cheque_id)) ?? 0) + Number(item.allocated_amount || 0)));
   const unallocatedChequeBalance = (customerChequesResult.data ?? []).reduce((sum: number, cheque: any) => cheque.cheque_status === "COLLECTED" ? sum + Math.max(0, Number(cheque.amount || 0) - (allocationsByCheque.get(String(cheque.id)) ?? 0)) : sum, 0);
@@ -123,6 +133,5 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     amount: Number(cheque.amount || 0),
     unallocated_amount: Math.max(0, Number(cheque.amount || 0) - (allocationsByCheque.get(String(cheque.id)) ?? 0)),
   })).filter((cheque: any) => cheque.unallocated_amount > 0.005);
-  const transferFeeAdjustments = (collectionsResult.data ?? []).reduce((sum: number, item: any) => sum + Number(item.transfer_fees || 0), 0);
   return <CustomerBalanceClient customer={customer} invoices={rows} customerCreditBalance={customerCreditBalance} unallocatedChequeBalance={unallocatedChequeBalance} unallocatedCheques={unallocatedCheques} transferFeeAdjustments={transferFeeAdjustments} />;
 }
