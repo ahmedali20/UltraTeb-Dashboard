@@ -38,10 +38,12 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
   if (error) return <main style={{ padding: 32, color: "#dc2626" }}>{error.message}</main>;
 
   const payments = new Map<string, number>();
+  const transferFeeAdjustmentsByInvoice = new Map<string, number>();
   const deductedWht = new Map<string, number>();
   const cashFractions = new Map<string, number>();
   (collectionsResult.data ?? []).forEach((item: any) => {
     payments.set(String(item.invoice_id), (payments.get(String(item.invoice_id)) ?? 0) + Math.max(0, Number(item.amount || 0) - Number(item.transfer_fees || 0)));
+    transferFeeAdjustmentsByInvoice.set(String(item.invoice_id), (transferFeeAdjustmentsByInvoice.get(String(item.invoice_id)) ?? 0) + Number(item.transfer_fees || 0));
     cashFractions.set(String(item.invoice_id), (cashFractions.get(String(item.invoice_id)) ?? 0) + Number(item.cash_fraction || 0));
     deductedWht.set(String(item.invoice_id), (deductedWht.get(String(item.invoice_id)) ?? 0) + Number(item.wht_deducted_amount || 0));
   });
@@ -71,7 +73,8 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     const customerPayments = payments.get(String(invoice.id)) ?? 0;
     const cashFraction = cashFractions.get(String(invoice.id)) ?? 0;
     const remainingWht = expectedWht - collectedWht;
-    const remainingMoney = Number(invoice.total_sales || 0) - expectedWht - customerPayments - cashFraction;
+    const transferFeeAdjustment = transferFeeAdjustmentsByInvoice.get(String(invoice.id)) ?? 0;
+    const remainingMoney = Number(invoice.total_sales || 0) - expectedWht - customerPayments - transferFeeAdjustment - cashFraction;
     return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, cash_fraction: cashFraction, remaining_wht: invoice.document_type === "CR_NOTE" ? remainingWht : Math.max(0, remainingWht), remaining_money: invoice.document_type === "CR_NOTE" ? remainingMoney : Math.max(0, remainingMoney) };
   });
   const invoiceRowsByNumber = new Map<string, any[]>();
