@@ -55,7 +55,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
     const payments = new Map<string, number>();
     const deductions = new Map<string, number>();
     records.forEach((record) => {
-      payments.set(record.invoice_id, (payments.get(record.invoice_id) ?? 0) + Number(record.amount || 0) + Number(record.cash_fraction || 0));
+      payments.set(record.invoice_id, (payments.get(record.invoice_id) ?? 0) + Math.max(0, Number(record.amount || 0) - Number(record.transfer_fees || 0)) + Number(record.cash_fraction || 0));
       deductions.set(record.invoice_id, (deductions.get(record.invoice_id) ?? 0) + Number(record.wht_deducted_amount || 0));
     });
     initialChequeAllocations.forEach((allocation) => {
@@ -84,7 +84,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
   }, [initialChequeAllocations]);
   const editingOwnSettlement = useMemo(() => records.filter((record) => editingIds.includes(record.id)).reduce((map, record) => {
     const id = String(record.invoice_id);
-    map.set(id, (map.get(id) ?? 0) + Number(record.amount || 0) + Number(record.cash_fraction || 0) + Number(record.wht_deducted_amount || 0));
+    map.set(id, (map.get(id) ?? 0) + Math.max(0, Number(record.amount || 0) - Number(record.transfer_fees || 0)) + Number(record.cash_fraction || 0) + Number(record.wht_deducted_amount || 0));
     return map;
   }, new Map<string, number>()), [records, editingIds]);
   const editingOwnWht = useMemo(() => records.filter((record) => editingIds.includes(record.id)).reduce((map, record) => {
@@ -135,7 +135,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
 
   function update(name: keyof typeof emptyForm, value: string) { setForm((current) => ({ ...current, [name]: value })); }
   function reset() { setForm({ ...emptyForm, paymentMethod: activeCategory }); setAllocations({}); setWhtDeductions({}); setApplyWht(false); setEditingId(null); setEditingIds([]); }
-  function editOperation(operation: CollectionOperation) { const record = operation.records[0]; setActiveCategory(operation.method as "CASH" | "BANK_TRANSFER"); setEditingId(record.id); setEditingIds(operation.records.map((item) => item.id)); setApplyWht(Number(record.wht_deducted_amount || 0) > 0); setAllocations(operation.records.reduce((result, item) => ({ ...result, [item.invoice_id]: String(item.amount) }), {})); setWhtDeductions(operation.records.reduce((result, item) => ({ ...result, [item.invoice_id]: Number(item.wht_deducted_amount || 0) > 0 }), {})); setForm({ customerName: operation.customer_name, invoiceId: operation.records.length === 1 ? record.invoice_id : "", collectionDate: operation.collection_date, chequeDate: operation.collection_date, bankName: "", amount: String(Math.max(0, operation.amount - operation.transfer_fees)), transferFees: operation.transfer_fees ? String(operation.transfer_fees) : "", cashFraction: operation.cash_fraction ? String(operation.cash_fraction) : "", paymentMethod: operation.method, referenceNo: operation.reference_no ?? "", notes: operation.notes ?? "" }); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  function editOperation(operation: CollectionOperation) { const record = operation.records[0]; setActiveCategory(operation.method as "CASH" | "BANK_TRANSFER"); setEditingId(record.id); setEditingIds(operation.records.map((item) => item.id)); setApplyWht(Number(record.wht_deducted_amount || 0) > 0); setAllocations(operation.records.reduce((result, item) => ({ ...result, [item.invoice_id]: String(Math.max(0, Number(item.amount || 0) - Number(item.transfer_fees || 0))) }), {})); setWhtDeductions(operation.records.reduce((result, item) => ({ ...result, [item.invoice_id]: Number(item.wht_deducted_amount || 0) > 0 }), {})); setForm({ customerName: operation.customer_name, invoiceId: operation.records.length === 1 ? record.invoice_id : "", collectionDate: operation.collection_date, chequeDate: operation.collection_date, bankName: "", amount: String(Math.max(0, operation.amount - operation.transfer_fees)), transferFees: operation.transfer_fees ? String(operation.transfer_fees) : "", cashFraction: operation.cash_fraction ? String(operation.cash_fraction) : "", paymentMethod: operation.method, referenceNo: operation.reference_no ?? "", notes: operation.notes ?? "" }); window.scrollTo({ top: 0, behavior: "smooth" }); }
 
   async function save() {
     setSaving(true);
@@ -172,9 +172,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
   }
 
   function autoAllocatePayment() {
-    let paymentRemaining = form.paymentMethod === "BANK_TRANSFER"
-      ? Math.max(0, (Number(form.amount) || 0) + (Number(form.transferFees) || 0))
-      : Math.max(0, Number(form.amount) || 0);
+    let paymentRemaining = Math.max(0, Number(form.amount) || 0);
     const next: Record<string, string> = {};
     const invoicesByDueDate = [...allocatableCustomerInvoices].sort((a, b) => {
       if (!a.due_date && !b.due_date) return String(a.invoice_no).localeCompare(String(b.invoice_no), undefined, { numeric: true });
@@ -198,14 +196,14 @@ export default function CollectionsClient({ invoices, initialCollections, initia
 
   const chequeValid = form.paymentMethod === "CHEQUE" && Boolean(form.customerName && form.referenceNo && form.bankName.trim() && form.collectionDate && form.chequeDate && Number(form.amount) > 0 && allocatedTotal > 0 && allocatedTotal <= Number(form.amount) + .01);
   const transferFees = form.paymentMethod === "BANK_TRANSFER" ? Math.max(0, Number(form.transferFees) || 0) : 0;
-  const transferAllocationTotal = (Number(form.amount) || 0) + transferFees;
+  const transferAllocationTotal = Number(form.amount) || 0;
   const multiTransfer = form.paymentMethod === "BANK_TRANSFER" && (!editingId || editingIds.length > 1);
   const transferValid = multiTransfer && Boolean(form.customerName && form.collectionDate && Number(form.amount) > 0 && allocatedTotal > 0 && Math.abs(allocatedTotal - transferAllocationTotal) <= .01);
   const cashFraction = form.paymentMethod === "CASH" ? Math.max(0, Number(form.cashFraction) || 0) : 0;
   const editingRecord = editingId ? records.find((record) => record.id === editingId) : null;
   const selectedWhtAlreadyApplied = selectedInvoice && (deductedWhtByInvoice.get(String(selectedInvoice.id)) ?? 0) > 0.005 && Number(editingRecord?.wht_deducted_amount || 0) <= 0;
   const selectedWhtAmount = selectedInvoice && applyWht && !selectedWhtAlreadyApplied ? (whtByInvoice.get(String(selectedInvoice.invoice_no)) ?? 0) : 0;
-  const collectedTotal = (Number(form.amount) || 0) + transferFees + cashFraction;
+  const collectedTotal = (Number(form.amount) || 0) + cashFraction;
   const remainingBeforeAutoFraction = selectedInvoice
     ? Math.max(0, Number(selectedInvoice.total_sales) - (settledByInvoice.get(String(selectedInvoice.id)) ?? 0) - collectedTotal - selectedWhtAmount)
     : 0;
@@ -234,7 +232,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
           <label><span>{form.paymentMethod === "CHEQUE" ? "Cheque No. *" : "Reference No."}</span><input value={form.referenceNo} onChange={(event) => update("referenceNo", event.target.value)} /></label>
           <label className="collection-notes-field"><span>Notes</span><input value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
         </div>
-        {form.paymentMethod === "BANK_TRANSFER" && <div className="collection-transfer-summary"><span>Bank Amount <strong>EGP {money(Number(form.amount))}</strong></span><span>Transfer Fees <strong>EGP {money(transferFees)}</strong></span><span>Total Collected <strong>EGP {money(collectedTotal)}</strong></span></div>}
+        {form.paymentMethod === "BANK_TRANSFER" && <div className="collection-transfer-summary"><span>Invoice Payment <strong>EGP {money(Number(form.amount))}</strong></span><span>Liability Adjustment (Fees) <strong>EGP {money(transferFees)}</strong></span><span>Total Customer Balance Reduction <strong>EGP {money((Number(form.amount) || 0) + transferFees)}</strong></span></div>}
         {form.paymentMethod === "CASH" && <div className="collection-transfer-summary"><span>Cash Received <strong>EGP {money(Number(form.amount))}</strong></span><span>Unpayable Fraction <strong>EGP {money(cashFraction)}</strong></span><span>Total Settled <strong>EGP {money(collectedTotal)}</strong></span></div>}
         {form.paymentMethod === "CHEQUE" && form.customerName && <div className="cheque-allocation-panel">
           <div className="cheque-allocation-summary"><span>Cheque Amount <strong>EGP {money(Number(form.amount))}</strong></span><span>Allocated <strong>EGP {money(allocatedTotal)}</strong></span><span className={Math.abs(allocatedTotal - Number(form.amount)) <= .01 ? "balanced" : "unbalanced"}>Unallocated <strong>EGP {money(Number(form.amount) - allocatedTotal)}</strong></span></div>
