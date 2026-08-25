@@ -23,7 +23,7 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
 
   const invoiceIds = (invoices ?? []).map((item) => String(item.id));
   const [collectionsResult, allocationsResult, whtResult] = await Promise.all([
-    invoiceIds.length ? supabase.from("invoice_collections").select("invoice_id, amount, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds).neq("payment_method", "CHEQUE") : Promise.resolve({ data: [], error: null }),
+    invoiceIds.length ? supabase.from("invoice_collections").select("invoice_id, amount, transfer_fees, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds).neq("payment_method", "CHEQUE") : Promise.resolve({ data: [], error: null }),
     invoiceIds.length ? supabase.from("cheque_allocations").select("invoice_id, cheque_id, allocated_amount, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds) : Promise.resolve({ data: [], error: null }),
     supabase.from("wht_collections").select("sales_id, document_type, invoice_no, invoice_date, wht_amount, collected_amount").eq("customer_name", customer.customer_name),
   ]);
@@ -41,7 +41,7 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
   const deductedWht = new Map<string, number>();
   const cashFractions = new Map<string, number>();
   (collectionsResult.data ?? []).forEach((item: any) => {
-    payments.set(String(item.invoice_id), (payments.get(String(item.invoice_id)) ?? 0) + Number(item.amount || 0));
+    payments.set(String(item.invoice_id), (payments.get(String(item.invoice_id)) ?? 0) + Math.max(0, Number(item.amount || 0) - Number(item.transfer_fees || 0)));
     cashFractions.set(String(item.invoice_id), (cashFractions.get(String(item.invoice_id)) ?? 0) + Number(item.cash_fraction || 0));
     deductedWht.set(String(item.invoice_id), (deductedWht.get(String(item.invoice_id)) ?? 0) + Number(item.wht_deducted_amount || 0));
   });
@@ -120,5 +120,6 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     amount: Number(cheque.amount || 0),
     unallocated_amount: Math.max(0, Number(cheque.amount || 0) - (allocationsByCheque.get(String(cheque.id)) ?? 0)),
   })).filter((cheque: any) => cheque.unallocated_amount > 0.005);
-  return <CustomerBalanceClient customer={customer} invoices={rows} customerCreditBalance={customerCreditBalance} unallocatedChequeBalance={unallocatedChequeBalance} unallocatedCheques={unallocatedCheques} />;
+  const transferFeeAdjustments = (collectionsResult.data ?? []).reduce((sum: number, item: any) => sum + Number(item.transfer_fees || 0), 0);
+  return <CustomerBalanceClient customer={customer} invoices={rows} customerCreditBalance={customerCreditBalance} unallocatedChequeBalance={unallocatedChequeBalance} unallocatedCheques={unallocatedCheques} transferFeeAdjustments={transferFeeAdjustments} />;
 }
