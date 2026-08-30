@@ -18,6 +18,24 @@ const supabase = createClient(
 
 type SheetRow = Record<string, string>;
 
+const DATABASE_PAGE_SIZE = 1000;
+
+async function fetchAllSalesForSync() {
+  const rows: any[] = [];
+  for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("sales_view")
+      .select("id, invoice_no, sales_date, customer_code, customer_name, sales_rep, document_type")
+      .order("id", { ascending: true })
+      .range(from, from + DATABASE_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < DATABASE_PAGE_SIZE) break;
+  }
+  return rows;
+}
+
 function base64Url(value: string | Buffer) {
   return Buffer.from(value)
     .toString("base64")
@@ -455,7 +473,7 @@ async function syncInvoiceCogs(token: string) {
     }
   }
 
-  return { rowsRead: values.length - headerRowIndex - 1, upserted, deleted, failed, deletionSkipped };
+  return { rowsRead: values.length - headerRowIndex - 1, upserted, deleted, failed, skippedIncomplete: 0, deletionSkipped };
 }
 
 async function syncNoteCogs(token: string, sheetName: "CR Notes" | "DR Notes", documentType: "CR_NOTE" | "DR_NOTE") {
@@ -481,6 +499,7 @@ async function syncNoteCogs(token: string, sheetName: "CR Notes" | "DR Notes", d
   const headers = values[headerRowIndex].map(normalizeHeader);
   const records = new Map<string, any>();
   const failed: { row: number; invoice?: string; error: string }[] = [];
+  let skippedIncomplete = 0;
   values.slice(headerRowIndex + 1).forEach((sheetValues, index) => {
     const rowNumber = headerRowIndex + index + 2;
     const row = Object.fromEntries(headers.map((header, column) => [header, String(sheetValues[column] ?? "").trim()]));
@@ -494,7 +513,7 @@ async function syncNoteCogs(token: string, sheetName: "CR Notes" | "DR Notes", d
     const vat = parseNumber(getValue(row, ["cogs_tax", "cogs_vat"]));
     const suppliedTotal = parseNumber(getValue(row, ["total_cogs", "cogs_total"]));
     if (!noteNo || !originalInvoiceNo || !customerName || !noteDate) {
-      failed.push({ row: rowNumber, invoice: noteNo, error: "Missing note number, original invoice number, customer, or valid note date." });
+      skippedIncomplete += 1;
       return;
     }
     if (subtotal < 0 || vat < 0 || suppliedTotal < 0) {
@@ -534,7 +553,7 @@ async function syncNoteCogs(token: string, sheetName: "CR Notes" | "DR Notes", d
     if (error) throw new Error(`Could not save ${sheetName} COGS: ${error.message}`);
   }
   let deleted = 0;
-  const deletionSkipped = failed.length > 0 || payload.length === 0;
+  const deletionSkipped = failed.length > 0 || skippedIncomplete > 0 || payload.length === 0;
   if (!deletionSkipped) {
     const { data: existing, error } = await supabase.from("invoice_cogs").select("id, invoice_no").eq("document_type", documentType);
     if (error) throw new Error(error.message);
@@ -546,7 +565,7 @@ async function syncNoteCogs(token: string, sheetName: "CR Notes" | "DR Notes", d
       deleted = staleIds.length;
     }
   }
-  return { rowsRead: values.length - headerRowIndex - 1, upserted: payload.length, deleted, failed, deletionSkipped };
+  return { rowsRead: values.length - headerRowIndex - 1, upserted: payload.length, deleted, failed, skippedIncomplete, deletionSkipped };
 }
 
 async function nextCustomerCode() {
@@ -606,6 +625,10 @@ function combineRowsWithSameInvoice(sheetRows: SheetRow[]) {
     existing.tax = String(
       parseNumber(existing.tax || "") + parseNumber(row.tax || "")
     );
+    existing.total = String(
+      parseNumber(existing.total || existing.total_sales || "") +
+        parseNumber(row.total || row.total_sales || "")
+    );
     existing.vat_amount = String(
       parseNumber(existing.vat_amount || "") + parseNumber(row.vat_amount || "")
     );
@@ -641,6 +664,7 @@ async function syncInvoices() {
     upserted: cogsParts.reduce((sum, part) => sum + part.upserted, 0),
     deleted: cogsParts.reduce((sum, part) => sum + part.deleted, 0),
     failed: cogsParts.flatMap((part) => part.failed),
+    skippedIncomplete: cogsParts.reduce((sum, part) => sum + Number(part.skippedIncomplete || 0), 0),
     deletionSkipped: cogsParts.some((part) => part.deletionSkipped),
     invoices: invoiceCogs.upserted,
     creditNotes: creditNoteCogs.upserted,
@@ -648,18 +672,15 @@ async function syncInvoices() {
   };
   const sheetRows = sheetGroups.flat();
   const combinedRows = combineRowsWithSameInvoice(sheetRows);
-  const [{ data: customers, error: customersError }, { data: priorSales, error: salesError }] =
+  const [{ data: customers, error: customersError }, priorSales] =
     await Promise.all([
       supabase
         .from("customers")
         .select("customer_code, customer_name, sales_rep_name"),
-      supabase
-        .from("sales_view")
-        .select("id, invoice_no, sales_date, customer_code, customer_name, document_type"),
+      fetchAllSalesForSync(),
     ]);
 
   if (customersError) throw new Error(customersError.message);
-  if (salesError) throw new Error(salesError.message);
 
   const customerList = [...(customers ?? [])];
   let inserted = 0;
@@ -705,6 +726,9 @@ async function syncInvoices() {
       ])
     );
     const tax = parseNumber(getValue(row, ["tax", "tax_value", "vat"]));
+    const suppliedTotal = parseNumber(
+      getValue(row, ["total", "total_sales", "amount_after_tax", "gross_total"])
+    );
     const vatAmount = parseNumber(getValue(row, ["vat_amount", "vat_tax_amount"]));
     const tableTaxAmount = parseNumber(getValue(row, ["table_tax_amount", "table_tax"]));
     const rawTaxClassification = getValue(row, ["tax_classification", "tax_type"])
@@ -757,6 +781,10 @@ async function syncInvoices() {
       continue;
     }
     if (!invoiceNo || !salesDate || (!customerName && !sourceCode)) {
+      if (documentType !== "INVOICE" && invoiceNo && (customerName || sourceCode) && !salesDate) {
+        skippedIncomplete += 1;
+        continue;
+      }
       const missing = [
         !invoiceNo ? "invoice number" : "",
         !rawSalesDate ? "sales date" : "",
@@ -880,12 +908,15 @@ async function syncInvoices() {
     }
 
     const sign = documentType === "CR_NOTE" ? -1 : 1;
+    const calculatedTotal = Math.round((Math.abs(salesItemTotal) + Math.abs(tax)) * 100) / 100;
+    const sourceTotal = suppliedTotal ? Math.abs(suppliedTotal) : calculatedTotal;
     const payload = {
       invoice_no: invoiceNo,
       sales_date: salesDate,
       customer_code: customer.customer_code,
       sales_item_total: sign * Math.abs(salesItemTotal),
       tax: sign * Math.abs(tax),
+      source_total_sales: sign * sourceTotal,
       vat_amount: sign * Math.abs(vatAmount),
       table_tax_amount: sign * Math.abs(tableTaxAmount),
       tax_classification: taxClassification,
@@ -893,6 +924,7 @@ async function syncInvoices() {
       original_invoice_no:
         documentType === "INVOICE" ? null : originalInvoiceNo,
       note_reason: documentType === "INVOICE" ? null : noteReason,
+      sales_rep_name: salesRep || null,
     };
     const existingMatches = (priorSales ?? []).filter(
       (sale) =>
@@ -982,6 +1014,8 @@ async function syncInvoices() {
   const fullSyncSucceeded =
     failed.length === 0 && skippedIncomplete === 0 && !deletionSkipped &&
     cogsSync.failed.length === 0 && !cogsSync.deletionSkipped;
+  const syncCompletedWithoutErrors =
+    failed.length === 0 && cogsSync.failed.length === 0;
 
   if (fullSyncSucceeded) {
     const [
@@ -1048,6 +1082,13 @@ async function syncInvoices() {
       cleanedSalesReps = invalidRepIds.length;
     }
 
+  }
+
+  // A run can safely process every valid row while protecting deletion because
+  // the source contains an incomplete draft note. Record that run as successful
+  // when there were no database or validation errors, and report skipped drafts
+  // separately to the UI.
+  if (syncCompletedWithoutErrors) {
     const { error: statusError } = await supabase
       .from("dashboard_settings")
       .upsert(
@@ -1058,7 +1099,6 @@ async function syncInvoices() {
         },
         { onConflict: "key" }
       );
-
     if (statusError) throw new Error(statusError.message);
   }
 
@@ -1084,7 +1124,7 @@ async function syncInvoices() {
     skippedIncomplete,
     failed,
     syncedAt,
-    lastSuccessfulSync: fullSyncSucceeded ? syncedAt : null,
+    lastSuccessfulSync: syncCompletedWithoutErrors ? syncedAt : null,
   };
 }
 
