@@ -474,6 +474,9 @@ export default function SalesTable({
           (result.deletionSkipped ? ` ${result.deletionSkipReason}` : "") +
           (result.cogs?.failed?.length
             ? ` ${result.cogs.failed.length} COGS rows failed. First COGS error: row ${result.cogs.failed[0].row} — ${result.cogs.failed[0].error}`
+            : "") +
+          ((result.skippedIncomplete ?? 0) + (result.cogs?.skippedIncomplete ?? 0) > 0
+            ? ` ${(result.skippedIncomplete ?? 0) + (result.cogs?.skippedIncomplete ?? 0)} incomplete draft rows skipped safely.`
             : "")
       );
       if (result.lastSuccessfulSync) {
