@@ -48,13 +48,17 @@ export async function POST(request: NextRequest) {
       continue;
     }
     const sign = documentType === "CR_NOTE" ? -1 : 1;
+    const itemTotal = Math.abs(Number(row.sales_item_total) || 0);
+    const tax = Math.abs(Number(row.tax) || 0);
 
     const { error } = await supabaseServer.from("sales").insert({
       invoice_no: String(row.invoice_no).trim(),
       sales_date: row.sales_date,
       customer_code: String(row.customer_code).trim(),
-      sales_item_total: sign * Math.abs(Number(row.sales_item_total) || 0),
-      tax: sign * Math.abs(Number(row.tax) || 0),
+      sales_item_total: sign * itemTotal,
+      tax: sign * tax,
+      source_total_sales: sign * Math.round((itemTotal + tax) * 100) / 100,
+      sales_rep_name: String(row.sales_rep_name ?? "").trim() || null,
       document_type: documentType,
       original_invoice_no: documentType === "INVOICE" ? null : originalInvoiceNo,
       note_reason: documentType === "INVOICE" ? null : noteReason,
