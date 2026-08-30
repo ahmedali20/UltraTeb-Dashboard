@@ -40,6 +40,8 @@ export async function POST(request: NextRequest) {
   }
 
   const sign = documentType === "CR_NOTE" ? -1 : 1;
+  const itemTotal = Math.abs(Number(body.sales_item_total) || 0);
+  const tax = Math.abs(Number(body.tax) || 0);
 
   const { error: customerError } = await supabaseServer
     .from("customers")
@@ -60,9 +62,10 @@ export async function POST(request: NextRequest) {
       sales_date: body.sales_date,
       due_date: body.due_date || null,
       customer_code: body.customer_code,
-      sales_item_total:
-        sign * Math.abs(Number(body.sales_item_total) || 0),
-      tax: sign * Math.abs(Number(body.tax) || 0),
+      sales_item_total: sign * itemTotal,
+      tax: sign * tax,
+      source_total_sales: sign * Math.round((itemTotal + tax) * 100) / 100,
+      sales_rep_name: String(body.sales_rep_name).trim(),
       document_type: documentType,
       original_invoice_no:
         documentType === "INVOICE"
