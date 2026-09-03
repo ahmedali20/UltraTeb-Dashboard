@@ -5,6 +5,15 @@ import { hasDashboardPermission } from "../../../../lib/dashboard-permissions";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { NON_ADMIN_SALES_START_DATE } from "../../../../lib/sales-visibility";
 
+const linkedCustomerGroups = [
+  ["Nile Scan", "Nile Scan Lab"],
+  ["Ibrahim Badran 1", "Ibrahim Badran 2"],
+];
+
+function linkedCustomerNames(customerName: string) {
+  return linkedCustomerGroups.find((group) => group.includes(customerName)) ?? [customerName];
+}
+
 const supabase = createClient(process.env.SUPABASE_URL as string, process.env.SUPABASE_SERVICE_ROLE_KEY as string, { auth: { persistSession: false } });
 
 export async function POST(request: NextRequest) {
@@ -22,7 +31,8 @@ export async function POST(request: NextRequest) {
   if (!customerName || !/^\d{4}-\d{2}-\d{2}$/.test(collectionDate) || !documentIds.length) return NextResponse.json({ error: "Customer, collection date, and at least one document allocation are required." }, { status: 400 });
   if (!Number.isFinite(collectedAmount) || collectedAmount <= 0 || allocatedTotal > collectedAmount + 0.01) return NextResponse.json({ error: "Invoice allocations cannot exceed the collected WHT amount." }, { status: 400 });
 
-  let query = supabase.from("sales_view").select("id, invoice_no, customer_name, sales_date, sales_item_total, tax, sales_rep, document_type").in("document_type", ["INVOICE", "DR_NOTE"]).eq("customer_name", customerName).in("id", documentIds);
+  const customerNames = linkedCustomerNames(customerName);
+  let query = supabase.from("sales_view").select("id, invoice_no, customer_name, sales_date, sales_item_total, tax, sales_rep, document_type").in("document_type", ["INVOICE", "DR_NOTE"]).in("customer_name", customerNames).in("id", documentIds);
   if (session.salesRepName) query = query.eq("sales_rep", session.salesRepName);
   if (session.role !== "admin") query = query.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   const { data: invoices, error: invoiceError } = await query;
@@ -47,7 +57,7 @@ export async function POST(request: NextRequest) {
   const rows = (invoices ?? []).map((invoice) => {
     const subtotal = Number(invoice.sales_item_total || 0);
     const allocation = Number(allocationMap.get(String(invoice.id)) || 0);
-    return { sales_id: String(invoice.id), document_type: invoice.document_type, customer_name: customerName, invoice_no: String(invoice.invoice_no), invoice_date: invoice.sales_date, subtotal, tax: Number(invoice.tax || 0), wht_rate: 1, collected_amount: allocation, collection_date: collectionDate, wht_group_id: groupId, certificate_no: certificateNo || null };
+    return { sales_id: String(invoice.id), document_type: invoice.document_type, customer_name: String(invoice.customer_name), invoice_no: String(invoice.invoice_no), invoice_date: invoice.sales_date, subtotal, tax: Number(invoice.tax || 0), wht_rate: 1, collected_amount: allocation, collection_date: collectionDate, wht_group_id: groupId, certificate_no: certificateNo || null };
   });
   const { data: created, error } = await supabase.from("wht_collections").insert(rows).select("*");
   if (error) {
