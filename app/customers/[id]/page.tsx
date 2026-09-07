@@ -22,10 +22,11 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
   if (invoiceError) return <main style={{ padding: 32, color: "#dc2626" }}>{invoiceError.message}</main>;
 
   const invoiceIds = (invoices ?? []).map((item) => String(item.id));
-  const [collectionsResult, allocationsResult, whtResult] = await Promise.all([
+  const [collectionsResult, allocationsResult, whtResult, sentStatusResult] = await Promise.all([
     invoiceIds.length ? supabase.from("invoice_collections").select("invoice_id, amount, transfer_fees, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds).neq("payment_method", "CHEQUE") : Promise.resolve({ data: [], error: null }),
     invoiceIds.length ? supabase.from("cheque_allocations").select("invoice_id, cheque_id, allocated_amount, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds) : Promise.resolve({ data: [], error: null }),
     supabase.from("wht_collections").select("sales_id, document_type, invoice_no, invoice_date, wht_amount, collected_amount").eq("customer_name", customer.customer_name),
+    invoiceIds.length ? supabase.from("sales").select("id, sent_to_hospital").in("id", invoiceIds) : Promise.resolve({ data: [], error: null }),
   ]);
   const customerChequesResult = await supabase.from("customer_cheques").select("id, cheque_no, bank_name, cheque_date, amount, cheque_status").eq("customer_code", customer.customer_code);
   const customerChequeIds = (customerChequesResult.data ?? []).map((item: any) => String(item.id));
@@ -34,7 +35,7 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     : { data: [], error: null };
   const chequeIds = Array.from(new Set((allocationsResult.data ?? []).map((item: any) => String(item.cheque_id))));
   const chequesResult = chequeIds.length ? await supabase.from("customer_cheques").select("id, cheque_status").in("id", chequeIds) : { data: [], error: null };
-  const error = collectionsResult.error || allocationsResult.error || whtResult.error || chequesResult.error || customerChequesResult.error || allCustomerAllocationsResult.error;
+  const error = collectionsResult.error || allocationsResult.error || whtResult.error || sentStatusResult.error || chequesResult.error || customerChequesResult.error || allCustomerAllocationsResult.error;
   if (error) return <main style={{ padding: 32, color: "#dc2626" }}>{error.message}</main>;
 
   const payments = new Map<string, number>();
@@ -54,6 +55,7 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     }
   });
   const wht = new Map<string, { expected: number; collected: number }>();
+  const sentStatuses = new Map((sentStatusResult.data ?? []).map((item: any) => [String(item.id), Boolean(item.sent_to_hospital)]));
   (whtResult.data ?? []).forEach((item: any) => {
     const key = item.sales_id ? String(item.sales_id) : `${item.document_type ?? "INVOICE"}|${String(item.invoice_no)}|${String(item.invoice_date ?? "").slice(0, 10)}`;
     const current = wht.get(key) ?? { expected: 0, collected: 0 };
@@ -72,7 +74,7 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     const cashFraction = cashFractions.get(String(invoice.id)) ?? 0;
     const remainingWht = expectedWht - collectedWht;
     const remainingMoney = Number(invoice.total_sales || 0) - expectedWht - customerPayments - cashFraction;
-    return { ...invoice, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, cash_fraction: cashFraction, remaining_wht: invoice.document_type === "CR_NOTE" ? remainingWht : Math.max(0, remainingWht), remaining_money: invoice.document_type === "CR_NOTE" ? remainingMoney : Math.max(0, remainingMoney) };
+    return { ...invoice, sent_to_hospital: sentStatuses.get(String(invoice.id)) ?? false, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, cash_fraction: cashFraction, remaining_wht: invoice.document_type === "CR_NOTE" ? remainingWht : Math.max(0, remainingWht), remaining_money: invoice.document_type === "CR_NOTE" ? remainingMoney : Math.max(0, remainingMoney) };
   });
   const invoiceRowsByNumber = new Map<string, any[]>();
   rows.filter((row: any) => row.document_type === "INVOICE").forEach((invoice: any) => {
