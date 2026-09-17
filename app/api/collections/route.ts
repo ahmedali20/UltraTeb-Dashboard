@@ -52,6 +52,8 @@ async function permittedInvoice(invoiceId: string, salesRepName: string | null, 
   if (!isAdmin) query = query.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   const { data } = await query.maybeSingle();
   if (!data) return null;
+  const { data: discountRow, error: discountError } = await supabase.from("sales").select("balance_discount").eq("id", invoiceId).maybeSingle();
+  if (discountError) throw discountError;
   const { data: notes } = await supabase
     .from("sales_view")
     .select("sales_item_total, total_sales, sales_date, document_type")
@@ -69,6 +71,7 @@ async function permittedInvoice(invoiceId: string, salesRepName: string | null, 
     sales_item_total: Number(data.sales_item_total || 0) + adjustments.salesItemTotal,
     total_sales: Number(data.total_sales || 0) + adjustments.totalSales,
     note_wht_adjustment: adjustments.wht,
+    balance_discount: Number(discountRow?.balance_discount || 0),
   };
 }
 
@@ -127,7 +130,7 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionIds: number[]
     0
   );
   const recordedWhtWithNotes = Math.max(0, recordedWht + Number(invoice.note_wht_adjustment || 0));
-  return payments + Math.max(deductedWht, recordedWhtWithNotes);
+  return payments + Math.max(deductedWht, recordedWhtWithNotes) + Number(invoice.balance_discount || 0);
 }
 
 async function addAutomaticFraction(invoice: any, values: ReturnType<typeof collectionValues>, excludeCollectionIds: number[] = []) {
@@ -295,7 +298,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "The bank payment amount must be fully allocated. Transfer fees are recorded separately." }, { status: 400 });
     }
 
-    const checked: { invoice: any; amount: number; cashFraction: number; whtDeductedAmount: number }[] = [];
+    const checked: { invoice: any; amount: number; remainingBalance: number; whtDeductedAmount: number }[] = [];
     for (const allocation of allocations) {
       const invoice = await permittedInvoice(allocation.invoiceId, session.salesRepName, session.role === "admin");
       if (!invoice || invoice.customer_name !== customerName) {
@@ -309,15 +312,22 @@ export async function POST(request: NextRequest) {
       if (remaining < -0.01) {
         return NextResponse.json({ error: `Allocation exceeds the remaining balance of invoice ${invoice.invoice_no}.` }, { status: 400 });
       }
-      checked.push({ invoice, amount: allocation.amount, cashFraction: remaining > 0 && remaining < 1 ? remaining : 0, whtDeductedAmount: allocation.whtDeductedAmount });
+      checked.push({ invoice, amount: allocation.amount, remainingBalance: Math.max(0, remaining), whtDeductedAmount: allocation.whtDeductedAmount });
     }
 
-    let distributedFees = 0;
-    const payload = checked.map(({ invoice, amount, cashFraction, whtDeductedAmount }, index) => {
-      const transferFees = index === checked.length - 1
-        ? Math.round((values.transfer_fees - distributedFees) * 100) / 100
-        : Math.round((values.transfer_fees * amount / allocatedTotal) * 100) / 100;
-      distributedFees += transferFees;
+    const feeAllocations = Array(checked.length).fill(0) as number[];
+    let remainingFees = values.transfer_fees;
+    checked.map((item, index) => ({ index, remainingBalance: item.remainingBalance })).sort((a, b) => b.remainingBalance - a.remainingBalance).forEach(({ index, remainingBalance }) => {
+      if (remainingFees <= 0.005) return;
+      const applied = Math.min(remainingBalance, remainingFees);
+      feeAllocations[index] = Math.round(applied * 100) / 100;
+      remainingFees = Math.round((remainingFees - applied) * 100) / 100;
+    });
+    if (remainingFees > 0.01) return NextResponse.json({ error: "Transfer fees exceed the remaining balances of the selected invoices and would create an overpayment." }, { status: 400 });
+    const payload = checked.map(({ invoice, amount, remainingBalance, whtDeductedAmount }, index) => {
+      const transferFees = feeAllocations[index];
+      const remainingAfterFee = Math.round((remainingBalance - transferFees) * 100) / 100;
+      const cashFraction = remainingAfterFee > 0 && remainingAfterFee < 1 ? remainingAfterFee : 0;
       return {
         collection_date: values.collection_date,
         amount: Math.round((amount + transferFees) * 100) / 100,
@@ -397,7 +407,7 @@ export async function PATCH(request: NextRequest) {
     const allocatedTotal = Math.round(allocations.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0) * 100) / 100;
     const invoicePaymentAmount = Math.round((values.amount - values.transfer_fees) * 100) / 100;
     if (!allocations.length || Math.abs(allocatedTotal - invoicePaymentAmount) > 0.01) return NextResponse.json({ error: "The bank payment amount must be fully allocated. Transfer fees are recorded separately." }, { status: 400 });
-    const checked: { invoice: any; amount: number; cashFraction: number; whtDeductedAmount: number }[] = [];
+    const checked: { invoice: any; amount: number; remainingBalance: number; whtDeductedAmount: number }[] = [];
     for (const allocation of allocations) {
       const invoice = await permittedInvoice(allocation.invoiceId, session.salesRepName, session.role === "admin");
       if (!invoice || invoice.customer_name !== customerName) return NextResponse.json({ error: "Every allocation must belong to the selected customer." }, { status: 400 });
@@ -405,12 +415,21 @@ export async function PATCH(request: NextRequest) {
       const alreadySettled = await settledInvoiceAmount(invoice, operationIds);
       const remaining = Math.round((Number(invoice.total_sales || 0) - alreadySettled - allocation.amount - allocation.whtDeductedAmount) * 100) / 100;
       if (remaining < -0.01) return NextResponse.json({ error: `Allocation exceeds the remaining balance of invoice ${invoice.invoice_no}.` }, { status: 400 });
-      checked.push({ invoice, amount: allocation.amount, cashFraction: remaining > 0 && remaining < 1 ? remaining : 0, whtDeductedAmount: allocation.whtDeductedAmount });
+      checked.push({ invoice, amount: allocation.amount, remainingBalance: Math.max(0, remaining), whtDeductedAmount: allocation.whtDeductedAmount });
     }
-    let distributedFees = 0;
-    const replacementRows = checked.map(({ invoice, amount, cashFraction, whtDeductedAmount }, index) => {
-      const fee = index === checked.length - 1 ? Math.round((values.transfer_fees - distributedFees) * 100) / 100 : Math.round((values.transfer_fees * amount / allocatedTotal) * 100) / 100;
-      distributedFees += fee;
+    const feeAllocations = Array(checked.length).fill(0) as number[];
+    let remainingFees = values.transfer_fees;
+    checked.map((item, index) => ({ index, remainingBalance: item.remainingBalance })).sort((a, b) => b.remainingBalance - a.remainingBalance).forEach(({ index, remainingBalance }) => {
+      if (remainingFees <= 0.005) return;
+      const applied = Math.min(remainingBalance, remainingFees);
+      feeAllocations[index] = Math.round(applied * 100) / 100;
+      remainingFees = Math.round((remainingFees - applied) * 100) / 100;
+    });
+    if (remainingFees > 0.01) return NextResponse.json({ error: "Transfer fees exceed the remaining balances of the selected invoices and would create an overpayment." }, { status: 400 });
+    const replacementRows = checked.map(({ invoice, amount, remainingBalance, whtDeductedAmount }, index) => {
+      const fee = feeAllocations[index];
+      const remainingAfterFee = Math.round((remainingBalance - fee) * 100) / 100;
+      const cashFraction = remainingAfterFee > 0 && remainingAfterFee < 1 ? remainingAfterFee : 0;
       return { ...values, amount: Math.round((amount + fee) * 100) / 100, transfer_fees: fee, cash_fraction: cashFraction, wht_deducted_amount: whtDeductedAmount, cheque_status: null, cheque_status_date: null, invoice_id: String(invoice.id), invoice_no: String(invoice.invoice_no), customer_code: invoice.customer_code, customer_name: invoice.customer_name };
     });
     const { error: deleteError } = await supabase.from("invoice_collections").delete().in("id", operationIds);

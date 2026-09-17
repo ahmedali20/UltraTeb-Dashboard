@@ -21,6 +21,7 @@ export default async function InvoiceDetailsPage({ params }: { params: Promise<{
   if (session?.salesRepName) invoiceQuery = invoiceQuery.eq("sales_rep", session.salesRepName);
   const { data: invoice, error } = await invoiceQuery.maybeSingle();
   if (error || !invoice) notFound();
+  const { data: discountRow } = await supabase.from("sales").select("balance_discount, balance_discount_reason").eq("id", String(invoice.id)).maybeSingle();
   const canViewCollections = Boolean(session && hasDashboardPermission(session, "collections", "view"));
   let notesQuery = supabase.from("sales_view").select("id, invoice_no, sales_date, document_type, original_invoice_no, note_reason, sales_item_total, tax, total_sales").eq("original_invoice_no", invoice.invoice_no).in("document_type", ["CR_NOTE", "DR_NOTE"]).order("sales_date");
   let whtQuery = supabase.from("wht_collections").select("id, wht_amount, collected_amount, collection_date").eq("document_type", "INVOICE").eq("invoice_no", invoice.invoice_no).order("collection_date", { ascending: false });
@@ -56,7 +57,7 @@ export default async function InvoiceDetailsPage({ params }: { params: Promise<{
 
   return (
     <InvoiceDetailsClient
-      invoice={invoice}
+      invoice={{ ...invoice, balance_discount: Number(discountRow?.balance_discount || 0), balance_discount_reason: discountRow?.balance_discount_reason ?? null }}
       notes={notesResult.data ?? []}
       customer={customerResult.data ?? null}
       wht={whtResult.data ?? []}

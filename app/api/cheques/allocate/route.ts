@@ -20,6 +20,8 @@ export async function POST(request: NextRequest) {
   if (session.role !== "admin") invoiceQuery = invoiceQuery.gte("sales_date", NON_ADMIN_SALES_START_DATE);
   const { data: invoice } = await invoiceQuery.maybeSingle();
   if (!invoice) return NextResponse.json({ error: "Invoice not found or unavailable." }, { status: 404 });
+  const { data: discountRow, error: discountError } = await supabase.from("sales").select("balance_discount").eq("id", invoiceId).maybeSingle();
+  if (discountError) return NextResponse.json({ error: discountError.message }, { status: 400 });
 
   const { data: customerCheques, error: chequesError } = await supabase
     .from("customer_cheques")
@@ -52,16 +54,19 @@ export async function POST(request: NextRequest) {
   const error = notesResult.error || collectionsResult.error || invoiceAllocationsResult.error || recordedWhtResult.error;
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   const effectiveTotal = Number(invoice.total_sales || 0) + (notesResult.data ?? []).reduce((sum, note) => sum + Number(note.total_sales || 0), 0);
-  let settled = (collectionsResult.data ?? []).reduce((sum, item) => sum + Number(item.amount || 0) + Number(item.cash_fraction || 0) + Number(item.wht_deducted_amount || 0), 0);
+  let settled = (collectionsResult.data ?? []).reduce((sum, item) => sum + Number(item.amount || 0) + Number(item.cash_fraction || 0), 0);
+  let deductedWht = (collectionsResult.data ?? []).reduce((sum, item) => sum + Number(item.wht_deducted_amount || 0), 0);
   const relatedChequeIds = Array.from(new Set((invoiceAllocationsResult.data ?? []).map((item) => String(item.cheque_id))));
   const activeChequeIds = new Set<string>();
   if (relatedChequeIds.length) {
     const { data: statuses } = await supabase.from("customer_cheques").select("id, cheque_status").in("id", relatedChequeIds);
     (statuses ?? []).forEach((item) => { if (!["REFUSED", "RETURNED_TO_CUSTOMER"].includes(String(item.cheque_status))) activeChequeIds.add(String(item.id)); });
   }
-  settled += (invoiceAllocationsResult.data ?? []).filter((item) => activeChequeIds.has(String(item.cheque_id))).reduce((sum, item) => sum + Number(item.allocated_amount || 0) + Number(item.cash_fraction || 0) + Number(item.wht_deducted_amount || 0), 0);
+  const activeAllocations = (invoiceAllocationsResult.data ?? []).filter((item) => activeChequeIds.has(String(item.cheque_id)));
+  settled += activeAllocations.reduce((sum, item) => sum + Number(item.allocated_amount || 0) + Number(item.cash_fraction || 0), 0);
+  deductedWht += activeAllocations.reduce((sum, item) => sum + Number(item.wht_deducted_amount || 0), 0);
   const recordedWht = (recordedWhtResult.data ?? []).reduce((sum, item) => sum + Number(item.wht_amount || 0), 0);
-  const invoiceAvailable = Math.max(0, Math.round((effectiveTotal - Math.max(settled, recordedWht)) * 100) / 100);
+  const invoiceAvailable = Math.max(0, Math.round((effectiveTotal - settled - Math.max(deductedWht, recordedWht) - Number(discountRow?.balance_discount || 0)) * 100) / 100);
   if (amount > invoiceAvailable + .01) return NextResponse.json({ error: `Only EGP ${invoiceAvailable.toFixed(2)} remains available on invoice ${invoice.invoice_no}.` }, { status: 400 });
 
   let amountLeft = amount;

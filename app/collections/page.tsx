@@ -68,6 +68,14 @@ async function fetchAllInvoices(
     invoice.total_sales = Number(invoice.total_sales || 0) + Number(note.total_sales || 0);
     invoice.note_wht_adjustment += Math.round(Number(note.sales_item_total || 0)) / 100;
   });
+  const discountResult = invoices.length
+    ? await fetchInBatches(invoices.map((invoice) => String(invoice.id)), (batch) =>
+        supabase.from("sales").select("id, balance_discount").in("id", batch)
+      )
+    : { data: [], error: null };
+  if (discountResult.error) return { data: null, error: discountResult.error };
+  const discountById = new Map((discountResult.data ?? []).map((row) => [String(row.id), Number(row.balance_discount || 0)]));
+  invoices.forEach((invoice) => { invoice.balance_discount = discountById.get(String(invoice.id)) ?? 0; });
   return { data: invoices, error: null };
 }
 

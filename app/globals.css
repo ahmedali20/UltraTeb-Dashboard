@@ -3664,3 +3664,13 @@
   cursor: wait;
   opacity: 0.65;
 }
+.customer-balance-discount-panel { padding: 18px 20px; margin-bottom: 16px; }
+.customer-balance-discount-panel h2 { margin: 0 0 4px; }
+.customer-balance-discount-panel p { margin: 0 0 12px; color: var(--muted, #7b8496); }
+.customer-balance-discount-fields { display: grid; grid-template-columns: minmax(180px, 1.5fr) minmax(120px, .7fr) minmax(180px, 1.5fr) auto; gap: 12px; align-items: end; }
+.customer-balance-discount-fields label { display: grid; gap: 5px; min-width: 0; }
+.customer-balance-discount-fields label span { font-size: 12px; font-weight: 700; }
+.customer-balance-discount-fields select, .customer-balance-discount-fields input { width: 100%; min-width: 0; height: 38px; padding: 7px 10px; border: 1px solid var(--border-color, #c8d0da); border-radius: 7px; background: var(--surface-bg, #fff); color: var(--text-color, #202938); }
+.customer-balance-discount-fields button { min-height: 38px; white-space: nowrap; }
+@media (max-width: 900px) { .customer-balance-discount-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .customer-balance-discount-fields { grid-template-columns: 1fr; } }

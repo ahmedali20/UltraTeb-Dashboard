@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Header from "../../Header";
 import Footer from "../../Footer";
 
-type Invoice = { id: string; invoice_no: string; sales_date: string; due_date: string | null; month: string; customer_name: string; sales_rep: string | null; sales_item_total: number; tax: number; total_sales: number };
+type Invoice = { id: string; invoice_no: string; sales_date: string; due_date: string | null; month: string; customer_name: string; sales_rep: string | null; sales_item_total: number; tax: number; total_sales: number; balance_discount: number; balance_discount_reason: string | null };
 type Note = { id: string; invoice_no: string; sales_date: string; document_type: "CR_NOTE" | "DR_NOTE"; note_reason: string | null; sales_item_total: number; tax: number; total_sales: number };
 type Cogs = { id: number; invoice_no: string; document_type: "INVOICE" | "CR_NOTE" | "DR_NOTE"; cogs_subtotal: number; cogs_vat: number; total: number };
 type Wht = { id: number; wht_amount: number; collected_amount: number; collection_date: string | null };
@@ -28,12 +28,13 @@ export default function InvoiceDetailsClient({ invoice, notes, customer, wht, co
   const whtTotal = wht.reduce((sum, item) => sum + Number(item.wht_amount || 0), 0);
   const whtCollected = wht.reduce((sum, item) => sum + Number(item.collected_amount || 0), 0);
   const customerCollectionsTotal = collections.reduce((sum, item) => sum + Math.max(0, Number(item.amount || 0) - Number(item.transfer_fees || 0)), 0) + chequeAllocations.reduce((sum, allocation) => sum + (allocation.cheque?.cheque_status === "COLLECTED" ? Number(allocation.allocated_amount || 0) : 0), 0);
-  const transferFeeAdjustmentTotal = collections.reduce((sum, item) => sum + Number(item.transfer_fees || 0), 0);
   const cashFractionTotal = collections.reduce((sum, item) => sum + Number(item.cash_fraction || 0), 0) + chequeAllocations.reduce((sum, allocation) => sum + (allocation.cheque?.cheque_status === "COLLECTED" ? Number(allocation.cash_fraction || 0) : 0), 0);
   const storedDeductedWht = collections.reduce((sum, item) => sum + Number(item.wht_deducted_amount || 0), 0) + chequeAllocations.reduce((sum, allocation) => sum + (allocation.cheque?.cheque_status === "COLLECTED" ? Number(allocation.wht_deducted_amount || 0) : 0), 0);
   const deductedWhtTotal = Math.max(storedDeductedWht, whtTotal);
-  const collectedTotal = customerCollectionsTotal + transferFeeAdjustmentTotal + cashFractionTotal + deductedWhtTotal;
-  const remaining = adjustedSales - collectedTotal;
+  // Transfer fees reduce the customer's overall liability, but they are not
+  // payments against an individual invoice and must never create overpayment.
+  const collectedTotal = customerCollectionsTotal + cashFractionTotal + deductedWhtTotal;
+  const remaining = adjustedSales - collectedTotal - Number(invoice.balance_discount || 0);
   const overdue = Boolean(invoice.due_date && new Date(`${invoice.due_date}T23:59:59`) < new Date());
   const paymentStatus = canViewCollections ? (remaining < -0.005 ? "Overpaid" : remaining <= 0.005 ? "Paid" : collectedTotal > 0 ? "Partially Paid" : overdue ? "Overdue" : "Pending") : overdue ? "Overdue" : "Pending";
 
@@ -52,7 +53,7 @@ export default function InvoiceDetailsClient({ invoice, notes, customer, wht, co
             <div><dt>Issue Date</dt><dd>{dateLabel(invoice.sales_date)}</dd></div><div><dt>Due Date</dt><dd>{dateLabel(invoice.due_date)}</dd></div><div><dt>Payment Terms</dt><dd>{customer?.payment_terms_days ?? 0} days</dd></div>
             <div><dt>Subtotal (net)</dt><dd>{money(invoice.sales_item_total)}</dd></div><div><dt>VAT</dt><dd>{money(invoice.tax)}</dd></div><div className="invoice-detail-total"><dt>Invoice Total</dt><dd>{money(invoice.total_sales)}</dd></div>
           </dl></section>
-          <section className="invoice-detail-card"><h2>Settlement Signals</h2><p className="invoice-detail-note">{canViewCollections ? "Settled includes cleared payments, cash fraction write-offs, and WHT actually deducted by the customer." : "Collection details require Collections view permission."}</p><div className="invoice-signal-grid"><article><span>Adjusted Invoice</span><strong>{money(adjustedSales)}</strong></article>{canViewCollections && <><article><span>Customer Payments</span><strong>{money(customerCollectionsTotal)}</strong></article><article><span>Cash Fraction Write-off</span><strong>{money(cashFractionTotal)}</strong></article><article><span>WHT Deducted</span><strong>{money(deductedWhtTotal)}</strong></article><article><span>Total Settled</span><strong>{money(collectedTotal)}</strong></article><article><span>{remaining < 0 ? "Overpaid" : "Remaining"}</span><strong>{money(Math.abs(remaining))}</strong></article></>}</div></section>
+          <section className="invoice-detail-card"><h2>Settlement Signals</h2><p className="invoice-detail-note">{canViewCollections ? "Settled includes cleared payments, cash fraction write-offs, and WHT actually deducted by the customer. Balance discounts are separate from payments and do not change sales or VAT." : "Collection details require Collections view permission."}</p><div className="invoice-signal-grid"><article><span>Adjusted Invoice</span><strong>{money(adjustedSales)}</strong></article><article><span>Balance Discount</span><strong>{money(invoice.balance_discount)}</strong>{invoice.balance_discount_reason && <small>{invoice.balance_discount_reason}</small>}</article>{canViewCollections && <><article><span>Customer Payments</span><strong>{money(customerCollectionsTotal)}</strong></article><article><span>Cash Fraction Write-off</span><strong>{money(cashFractionTotal)}</strong></article><article><span>WHT Deducted</span><strong>{money(deductedWhtTotal)}</strong></article><article><span>Total Settled</span><strong>{money(collectedTotal)}</strong></article><article><span>{remaining < 0 ? "Overpaid" : "Remaining"}</span><strong>{money(Math.abs(remaining))}</strong></article></>}</div></section>
         </div>
 
         <section className="invoice-detail-card"><h2>Invoice Summary</h2><div className="invoice-summary-row"><div><span>Description</span><strong>Sales invoice {invoice.invoice_no}</strong></div><div><span>Subtotal</span><strong>{money(invoice.sales_item_total)}</strong></div><div><span>VAT</span><strong>{money(invoice.tax)}</strong></div><div><span>Total</span><strong>{money(invoice.total_sales)}</strong></div></div><p className="invoice-detail-note">Product-level line items are not stored in the current dashboard.</p></section>

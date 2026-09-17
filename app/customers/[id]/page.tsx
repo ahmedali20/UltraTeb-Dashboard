@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import { getCurrentDashboardUser } from "../../../lib/current-dashboard-user";
+import { hasDashboardPermission } from "../../../lib/dashboard-permissions";
 import { canViewPre2026Sales, NON_ADMIN_SALES_START_DATE } from "../../../lib/sales-visibility";
 import CustomerBalanceClient from "./CustomerBalanceClient";
 
@@ -26,7 +27,7 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     invoiceIds.length ? supabase.from("invoice_collections").select("invoice_id, amount, transfer_fees, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds).neq("payment_method", "CHEQUE") : Promise.resolve({ data: [], error: null }),
     invoiceIds.length ? supabase.from("cheque_allocations").select("invoice_id, cheque_id, allocated_amount, cash_fraction, wht_deducted_amount").in("invoice_id", invoiceIds) : Promise.resolve({ data: [], error: null }),
     supabase.from("wht_collections").select("sales_id, document_type, invoice_no, invoice_date, wht_amount, collected_amount").eq("customer_name", customer.customer_name),
-    invoiceIds.length ? supabase.from("sales").select("id, sent_to_hospital").in("id", invoiceIds) : Promise.resolve({ data: [], error: null }),
+    invoiceIds.length ? supabase.from("sales").select("id, sent_to_hospital, balance_discount, balance_discount_reason").in("id", invoiceIds) : Promise.resolve({ data: [], error: null }),
   ]);
   const customerChequesResult = await supabase.from("customer_cheques").select("id, cheque_no, bank_name, cheque_date, amount, cheque_status").eq("customer_code", customer.customer_code);
   const customerChequeIds = (customerChequesResult.data ?? []).map((item: any) => String(item.id));
@@ -56,6 +57,7 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
   });
   const wht = new Map<string, { expected: number; collected: number }>();
   const sentStatuses = new Map((sentStatusResult.data ?? []).map((item: any) => [String(item.id), Boolean(item.sent_to_hospital)]));
+  const balanceDiscounts = new Map((sentStatusResult.data ?? []).map((item: any) => [String(item.id), { amount: Number(item.balance_discount || 0), reason: item.balance_discount_reason ?? null }]));
   (whtResult.data ?? []).forEach((item: any) => {
     const key = item.sales_id ? String(item.sales_id) : `${item.document_type ?? "INVOICE"}|${String(item.invoice_no)}|${String(item.invoice_date ?? "").slice(0, 10)}`;
     const current = wht.get(key) ?? { expected: 0, collected: 0 };
@@ -73,8 +75,9 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     const customerPayments = payments.get(String(invoice.id)) ?? 0;
     const cashFraction = cashFractions.get(String(invoice.id)) ?? 0;
     const remainingWht = expectedWht - collectedWht;
-    const remainingMoney = Number(invoice.total_sales || 0) - expectedWht - customerPayments - cashFraction;
-    return { ...invoice, sent_to_hospital: sentStatuses.get(String(invoice.id)) ?? false, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, cash_fraction: cashFraction, remaining_wht: invoice.document_type === "CR_NOTE" ? remainingWht : Math.max(0, remainingWht), remaining_money: invoice.document_type === "CR_NOTE" ? remainingMoney : Math.max(0, remainingMoney) };
+    const balanceDiscount = invoice.document_type === "INVOICE" ? balanceDiscounts.get(String(invoice.id)) : null;
+    const remainingMoney = Number(invoice.total_sales || 0) - expectedWht - customerPayments - cashFraction - Number(balanceDiscount?.amount || 0);
+    return { ...invoice, sent_to_hospital: sentStatuses.get(String(invoice.id)) ?? false, balance_discount: balanceDiscount?.amount ?? 0, balance_discount_reason: balanceDiscount?.reason ?? null, expected_wht: expectedWht, collected_wht: collectedWht, customer_payments: customerPayments, cash_fraction: cashFraction, remaining_wht: invoice.document_type === "CR_NOTE" ? remainingWht : Math.max(0, remainingWht), remaining_money: invoice.document_type === "CR_NOTE" ? remainingMoney : Math.max(0, remainingMoney) };
   });
   const invoiceRowsByNumber = new Map<string, any[]>();
   rows.filter((row: any) => row.document_type === "INVOICE").forEach((invoice: any) => {
@@ -135,5 +138,5 @@ export default async function CustomerBalancePage({ params }: { params: Promise<
     amount: Number(cheque.amount || 0),
     unallocated_amount: Math.max(0, Number(cheque.amount || 0) - (allocationsByCheque.get(String(cheque.id)) ?? 0)),
   })).filter((cheque: any) => cheque.unallocated_amount > 0.005);
-  return <CustomerBalanceClient customer={customer} invoices={rows} customerCreditBalance={customerCreditBalance} unallocatedChequeBalance={unallocatedChequeBalance} unallocatedCheques={unallocatedCheques} transferFeeAdjustments={transferFeeAdjustments} />;
+  return <CustomerBalanceClient customer={customer} invoices={rows} customerCreditBalance={customerCreditBalance} unallocatedChequeBalance={unallocatedChequeBalance} unallocatedCheques={unallocatedCheques} transferFeeAdjustments={transferFeeAdjustments} canEditCustomers={Boolean(session && hasDashboardPermission(session, "customers", "edit"))} />;
 }

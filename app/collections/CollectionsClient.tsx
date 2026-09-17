@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "../Header";
 import Footer from "../Footer";
 
-type Invoice = { id: string | number; invoice_no: string; customer_name: string; sales_date: string; due_date: string | null; sales_item_total: number; total_sales: number; base_sales_item_total?: number; base_total_sales?: number; note_wht_adjustment?: number; sales_rep: string | null };
+type Invoice = { id: string | number; invoice_no: string; customer_name: string; sales_date: string; due_date: string | null; sales_item_total: number; total_sales: number; balance_discount: number; base_sales_item_total?: number; base_total_sales?: number; note_wht_adjustment?: number; sales_rep: string | null };
 type Collection = { id: number; invoice_id: string; invoice_no: string; customer_name: string; collection_date: string; amount: number; transfer_fees: number; cash_fraction: number; wht_deducted_amount: number; payment_method: string; reference_no: string | null; notes: string | null; updated_at?: string | null };
 type WhtCollection = { invoice_no: string; wht_amount: number; collected_amount: number };
 type ChequeAllocation = { id: number; cheque_id: number; invoice_id: string; invoice_no: string; allocated_amount: number; cash_fraction: number; wht_deducted_amount: number; cheque: { id: number; cheque_no: string; collection_date: string; cheque_date: string; cheque_status: string; cheque_status_date: string; customer_name: string; amount: number; notes: string | null } | null };
@@ -68,7 +68,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
     invoices.forEach((invoice) => {
       const invoiceId = String(invoice.id);
       const recordedWht = recordedWhtByInvoice.get(String(invoice.invoice_no)) ?? 0;
-      map.set(invoiceId, (payments.get(invoiceId) ?? 0) + Math.max(deductions.get(invoiceId) ?? 0, recordedWht));
+      map.set(invoiceId, (payments.get(invoiceId) ?? 0) + Math.max(deductions.get(invoiceId) ?? 0, recordedWht) + Number(invoice.balance_discount || 0));
     });
     return map;
   }, [records, initialChequeAllocations, invoices, recordedWhtByInvoice]);
