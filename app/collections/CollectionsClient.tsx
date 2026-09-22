@@ -55,7 +55,8 @@ export default function CollectionsClient({ invoices, initialCollections, initia
     const payments = new Map<string, number>();
     const deductions = new Map<string, number>();
     records.forEach((record) => {
-      payments.set(record.invoice_id, (payments.get(record.invoice_id) ?? 0) + Number(record.amount || 0) + Number(record.cash_fraction || 0));
+      const invoicePayment = Math.max(0, Number(record.amount || 0) - Number(record.transfer_fees || 0));
+      payments.set(record.invoice_id, (payments.get(record.invoice_id) ?? 0) + invoicePayment + Number(record.cash_fraction || 0));
       deductions.set(record.invoice_id, (deductions.get(record.invoice_id) ?? 0) + Number(record.wht_deducted_amount || 0));
     });
     initialChequeAllocations.forEach((allocation) => {
@@ -84,7 +85,8 @@ export default function CollectionsClient({ invoices, initialCollections, initia
   }, [initialChequeAllocations]);
   const editingOwnSettlement = useMemo(() => records.filter((record) => editingIds.includes(record.id)).reduce((map, record) => {
     const id = String(record.invoice_id);
-    map.set(id, (map.get(id) ?? 0) + Number(record.amount || 0) + Number(record.cash_fraction || 0) + Number(record.wht_deducted_amount || 0));
+    const invoicePayment = Math.max(0, Number(record.amount || 0) - Number(record.transfer_fees || 0));
+    map.set(id, (map.get(id) ?? 0) + invoicePayment + Number(record.cash_fraction || 0) + Number(record.wht_deducted_amount || 0));
     return map;
   }, new Map<string, number>()), [records, editingIds]);
   const editingOwnWht = useMemo(() => records.filter((record) => editingIds.includes(record.id)).reduce((map, record) => {
@@ -241,7 +243,7 @@ export default function CollectionsClient({ invoices, initialCollections, initia
         </div>}
         {multiTransfer && form.customerName && <div className="cheque-allocation-panel">
           <div className="cheque-allocation-summary"><span>Total Transfer <strong>EGP {money(transferAllocationTotal)}</strong></span><span>Allocated <strong>EGP {money(allocatedTotal)}</strong></span><span className={Math.abs(allocatedTotal - transferAllocationTotal) <= .01 ? "balanced" : "unbalanced"}>Unallocated <strong>EGP {money(transferAllocationTotal - allocatedTotal)}</strong></span></div>
-          <div className="cheque-allocation-tools"><button type="button" disabled={!Number(form.amount)} onClick={autoAllocatePayment}>Auto Allocate Transfer</button><span>The full bank amount and transfer fees must be allocated across one or more invoices.</span></div>
+          <div className="cheque-allocation-tools"><button type="button" disabled={!Number(form.amount)} onClick={autoAllocatePayment}>Auto Allocate Transfer</button><span>Only the collected amount is allocated to invoices. Transfer fees remain a separate customer-liability adjustment.</span></div>
           <div className="cheque-allocation-list">{allocatableCustomerInvoices.map((invoice) => { const invoiceId = String(invoice.id); const wht = whtByInvoice.get(String(invoice.invoice_no)) ?? 0; const whtAlreadyApplied = (deductedWhtByInvoice.get(invoiceId) ?? 0) - (editingOwnWht.get(invoiceId) ?? 0) > 0.005; const remaining = availableInvoiceBalance(invoice); const cashRemaining = Math.max(0, remaining - (whtDeductions[invoiceId] && !whtAlreadyApplied ? wht : 0)); return <div className="cheque-allocation-row" key={invoiceId}><span><strong>Invoice {invoice.invoice_no} · {dateLabel(invoice.sales_date)}</strong><small><b>Invoice Total:</b> EGP {money(invoice.total_sales)} <b>Possible WHT:</b> EGP {money(wht)} <b>Remaining:</b> EGP {money(remaining)}</small><label className="collection-wht-option"><input type="checkbox" disabled={whtAlreadyApplied} checked={!whtAlreadyApplied && Boolean(whtDeductions[invoiceId])} onChange={(event) => setWhtDeductions((current) => ({ ...current, [invoiceId]: event.target.checked }))} /> {whtAlreadyApplied ? "WHT already deducted" : "Customer deducted WHT"}</label></span><div><input type="number" min="0" max={cashRemaining} step="0.01" placeholder="Write amount" value={allocations[invoiceId] ?? ""} onChange={(event) => setAllocations((current) => ({ ...current, [invoiceId]: event.target.value }))} /><button type="button" onClick={() => setAllocations((current) => ({ ...current, [invoiceId]: cashRemaining.toFixed(2) }))}>Use Full Remaining</button></div></div>; })}{!allocatableCustomerInvoices.length && <p className="collection-empty">This customer has no invoices with a remaining money balance.</p>}</div>
         </div>}
         {selectedInvoice && form.paymentMethod !== "CHEQUE" && !multiTransfer && <><label className="collection-wht-option collection-wht-option--single"><input type="checkbox" disabled={Boolean(selectedWhtAlreadyApplied)} checked={!selectedWhtAlreadyApplied && applyWht} onChange={(event) => setApplyWht(event.target.checked)} /> {selectedWhtAlreadyApplied ? "WHT already deducted for this invoice" : `Customer deducted WHT (EGP ${money(whtByInvoice.get(String(selectedInvoice.invoice_no)) ?? 0)})`}</label><div className="collection-invoice-preview"><span>Invoice Total <strong>EGP {money(selectedInvoice.total_sales)}</strong></span><span>Total Settled After Save <strong>EGP {money((settledByInvoice.get(String(selectedInvoice.id)) ?? 0) + collectedTotal + selectedWhtAmount + automaticFraction)}</strong></span>{automaticFraction > 0 && <span>Automatic Fraction <strong>EGP {money(automaticFraction)}</strong></span>}<span>Remaining After Save <strong>EGP {money(automaticFraction > 0 ? 0 : remainingBeforeAutoFraction)}</strong></span></div></>}
