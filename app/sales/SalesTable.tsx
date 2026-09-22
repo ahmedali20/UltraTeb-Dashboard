@@ -195,6 +195,7 @@ export default function SalesTable({
   const [recordMonthFilter, setRecordMonthFilter] = useState(currentRecordsMonth);
   const [recordCustomerFilter, setRecordCustomerFilter] = useState("All");
   const [recordTypeFilter, setRecordTypeFilter] = useState("All");
+  const [recordInvoiceSearch, setRecordInvoiceSearch] = useState("");
   const [recordPage, setRecordPage] = useState(1);
   const [recordSort, setRecordSort] = useState<
     "invoice" | "date" | "customer" | "total"
@@ -273,7 +274,9 @@ export default function SalesTable({
       (recordYearFilter === "All" || String(sale.sales_date || "").startsWith(`${recordYearFilter}-`)) &&
       (recordMonthFilter === "All" || sale.month === recordMonthFilter) &&
       (recordCustomerFilter === "All" ||
-        sale.customer_name === recordCustomerFilter)
+        sale.customer_name === recordCustomerFilter) &&
+      (!recordInvoiceSearch.trim() ||
+        String(sale.invoice_no || "").toLocaleLowerCase().includes(recordInvoiceSearch.trim().toLocaleLowerCase()))
   );
   const displayedSalesTotal = displayedSales.reduce(
     (total, sale) => total + Number(sale.total_sales || 0),
@@ -308,6 +311,7 @@ export default function SalesTable({
     recordMonthFilter,
     recordCustomerFilter,
     recordTypeFilter,
+    recordInvoiceSearch,
     recordSort,
     recordSortDirection,
   ]);
@@ -1459,6 +1463,15 @@ export default function SalesTable({
             <option value="All">{lang === "ar" ? "كل السنوات" : "All Years"}</option>
             {recordYears.map((year) => <option key={year} value={year}>{year}</option>)}
           </select>
+        </label>
+        <label>
+          {lang === "ar" ? "\u0631\u0642\u0645 \u0627\u0644\u0645\u0633\u062a\u0646\u062f" : "Invoice No."}
+          <input
+            type="search"
+            value={recordInvoiceSearch}
+            onChange={(event) => setRecordInvoiceSearch(event.target.value)}
+            placeholder={lang === "ar" ? "\u0627\u0628\u062d\u062b \u0628\u0631\u0642\u0645 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629" : "Search invoice number"}
+          />
         </label>
       </div>
 

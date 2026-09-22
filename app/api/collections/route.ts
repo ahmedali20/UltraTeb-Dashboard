@@ -117,7 +117,7 @@ async function settledInvoiceAmount(invoice: any, excludeCollectionIds: number[]
   let payments = 0;
   let deductedWht = 0;
   (collectionsResult.data ?? []).forEach((item) => {
-    payments += Number(item.amount || 0) + Number(item.cash_fraction || 0);
+    payments += Math.max(0, Number(item.amount || 0) - Number(item.transfer_fees || 0)) + Number(item.cash_fraction || 0);
     deductedWht += Number(item.wht_deducted_amount || 0);
   });
   (allocationsResult.data ?? []).forEach((item) => {
