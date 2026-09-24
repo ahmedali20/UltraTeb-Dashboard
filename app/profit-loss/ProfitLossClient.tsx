@@ -16,7 +16,7 @@ const signedCogs = (type: DocumentType, value: number) => type === "CR_NOTE" ? -
 
 export default function ProfitLossClient({ sales, cogs }: { sales: Sale[]; cogs: Cogs[] }) {
   const [lang, setLang] = useState<"en" | "ar">("en");
-  const [year, setYear] = useState("All");
+  const [year, setYear] = useState("2026");
   const [month, setMonth] = useState("All");
   const [customer, setCustomer] = useState("All");
   const [salesRep, setSalesRep] = useState("All");
