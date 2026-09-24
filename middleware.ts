@@ -13,6 +13,7 @@ function requestedModule(pathname: string): DashboardModule | null {
   if (pathname.startsWith("/collections") || pathname.startsWith("/api/collections")) return "collections";
   if (pathname.startsWith("/cheques") || pathname.startsWith("/api/cheques")) return "cheques";
   if (pathname.startsWith("/cogs")) return "cogs";
+  if (pathname.startsWith("/profit-loss")) return "profitLoss";
   if (pathname.startsWith("/vat-report") || pathname.startsWith("/api/vat-report")) return "vat";
   if (pathname.startsWith("/income-statement-data") || pathname.startsWith("/api/income-statement-data")) return "incomeStatement";
   if (pathname.startsWith("/authorization") || pathname.startsWith("/api/authorized-employees")) return "authorization";

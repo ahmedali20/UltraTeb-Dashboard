@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { normalizePermissions, type DashboardModule, type DashboardPermissions } from "../lib/dashboard-permissions";
 
 type Props = {
-  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "collections" | "cheques" | "cogs" | "vat" | "incomeStatement" | "authorization" | "users" | "activity";
+  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "collections" | "cheques" | "cogs" | "profitLoss" | "vat" | "incomeStatement" | "authorization" | "users" | "activity";
   lang: "en" | "ar";
   onToggleLang: () => void;
 };
@@ -22,6 +22,7 @@ const labels = {
     collections: "Collections",
     cheques: "Cheques",
     cogs: "Invoices COGS",
+    profitLoss: "Profit & Loss",
     vat: "VAT Report",
     incomeStatement: "Income Statement Data",
     authorization: "Authorization Letters",
@@ -35,6 +36,7 @@ const labels = {
     switchTo: "العربية",
   },
   ar: {
+    profitLoss: "\u0627\u0644\u0623\u0631\u0628\u0627\u062d \u0648\u0627\u0644\u062e\u0633\u0627\u0626\u0631",
     home: "الرئيسية",
     customers: "العملاء",
     addRecord: "إضافة فاتورة",
@@ -165,7 +167,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
     `app-sidebar__link${active === page ? " app-sidebar__link--active" : ""}`;
   const canView = (module: DashboardModule) =>
     isAdmin || normalizePermissions(currentUser?.permissions)[module]?.view === true;
-  const hasAdministrationAccess = isAdmin || (["teams", "wht", "collections", "cheques", "cogs", "vat", "incomeStatement", "authorization"] as DashboardModule[]).some(canView);
+  const hasAdministrationAccess = isAdmin || (["teams", "wht", "collections", "cheques", "cogs", "profitLoss", "vat", "incomeStatement", "authorization"] as DashboardModule[]).some(canView);
 
   return (
     <header
@@ -266,6 +268,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
               {canView("collections") && <NavLink href="/collections" page="collections" label={t.collections} icon="records" className={linkClass("collections")} />}
               {canView("cheques") && <NavLink href="/cheques" page="cheques" label={t.cheques} icon="records" className={linkClass("cheques")} />}
               {canView("cogs") && <NavLink href="/cogs" page="cogs" label={t.cogs} icon="records" className={linkClass("cogs")} />}
+              {canView("profitLoss") && <NavLink href="/profit-loss" page="profitLoss" label={t.profitLoss} icon="reports" className={linkClass("profitLoss")} />}
               {canView("vat") && <NavLink href="/vat-report" page="vat" label={t.vat} icon="reports" className={linkClass("vat")} />}
               {canView("incomeStatement") && <NavLink href="/income-statement-data" page="incomeStatement" label={t.incomeStatement} icon="reports" className={linkClass("incomeStatement")} />}
               {canView("authorization") && <NavLink href="/authorization" page="authorization" label={t.authorization} icon="reports" className={linkClass("authorization")} />}
