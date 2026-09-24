@@ -16,7 +16,7 @@ const signedCogs = (type: DocumentType, value: number) => type === "CR_NOTE" ? -
 
 export default function ProfitLossClient({ sales, cogs }: { sales: Sale[]; cogs: Cogs[] }) {
   const [lang, setLang] = useState<"en" | "ar">("en");
-  const [year, setYear] = useState("2026");
+  const [year, setYear] = useState("All");
   const [month, setMonth] = useState("All");
   const [customer, setCustomer] = useState("All");
   const [salesRep, setSalesRep] = useState("All");
@@ -59,6 +59,107 @@ export default function ProfitLossClient({ sales, cogs }: { sales: Sale[]; cogs:
     value.revenue += item.revenue; value.cogs += item.cogs; value.profit += item.profit; map.set(monthKey, value); return map;
   }, new Map<string, { month: string; revenue: number; cogs: number; profit: number }>()).values()).sort((a, b) => b.month.localeCompare(a.month)), [filtered]);
 
+  async function downloadFilteredPdf() {
+    const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const purple: [number, number, number] = [80, 35, 155];
+    const navy: [number, number, number] = [24, 39, 64];
+    const muted: [number, number, number] = [92, 106, 128];
+    const pale: [number, number, number] = [246, 248, 252];
+    const loadImage = (path: string) => fetch(path).then((response) => response.blob()).then((blob) => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    })).catch(() => "");
+    const [logo, footerImage] = await Promise.all([
+      loadImage("/brand/ultra-teb-logo.png"),
+      loadImage("/brand/ultra-teb-footer.png"),
+    ]);
+    const brandedPages = new Set<number>();
+    const drawBranding = () => {
+      const page = doc.getCurrentPageInfo().pageNumber;
+      if (brandedPages.has(page)) return;
+      brandedPages.add(page);
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      if (logo) doc.addImage(logo, "PNG", 14, 8, 17, 24, undefined, "FAST");
+      doc.setDrawColor(...purple);
+      doc.setLineWidth(0.8);
+      doc.line(14, 35, pageWidth - 14, 35);
+      if (footerImage) doc.addImage(footerImage, "PNG", 14, pageHeight - 14, pageWidth - 28, 6, undefined, "FAST");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...muted);
+      doc.text(`Page ${page}`, pageWidth - 14, pageHeight - 5, { align: "right" });
+    };
+    drawBranding();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(...navy);
+    doc.text("Profit & Loss Report", 37, 17);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...muted);
+    doc.text("Revenue and COGS before VAT, after credit and debit note adjustments", 37, 23);
+    const filterText = [
+      `Year: ${year === "All" ? "All" : year}`,
+      `Month: ${month === "All" ? "All" : month}`,
+      `Customer: ${customer === "All" ? "All" : customer}`,
+      `Sales Rep: ${salesRep === "All" ? "All" : salesRep}`,
+      search.trim() ? `Search: ${search.trim()}` : "",
+    ].filter(Boolean).join("  |  ");
+    doc.text(filterText, 14, 42);
+
+    autoTable(doc, {
+      startY: 47,
+      head: [["Invoice Revenue", "Credit Notes", "Debit Notes", "Net Revenue", "Net COGS", totals.profit >= 0 ? "Gross Profit" : "Gross Loss", "Margin"]],
+      body: [[money(totals.invoiceRevenue), money(totals.creditRevenue), money(totals.debitRevenue), money(totals.revenue), money(totals.cogs), money(Math.abs(totals.profit)), `${margin.toFixed(2)}%`]],
+      theme: "grid",
+      headStyles: { fillColor: purple, textColor: 255, fontStyle: "bold", halign: "center" },
+      bodyStyles: { fillColor: pale, textColor: navy, fontStyle: "bold", halign: "right" },
+      styles: { fontSize: 8, cellPadding: 3 },
+      margin: { left: 14, right: 14 },
+    });
+    let nextY = (doc as any).lastAutoTable.finalY + 7;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...navy); doc.text("Monthly Performance", 14, nextY);
+    autoTable(doc, {
+      startY: nextY + 3,
+      head: [["Month", "Net Revenue", "Net COGS", "Gross Profit / Loss", "Margin"]],
+      body: monthly.map((item) => [item.month, money(item.revenue), money(item.cogs), money(item.profit), `${item.revenue ? (item.profit / item.revenue * 100).toFixed(2) : "0.00"}%`]),
+      theme: "striped",
+      headStyles: { fillColor: navy, textColor: 255 },
+      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
+      styles: { fontSize: 7.5, cellPadding: 2.4 },
+      margin: { left: 14, right: 14 },
+    });
+    nextY = (doc as any).lastAutoTable.finalY + 8;
+    if (nextY > 165) { doc.addPage(); drawBranding(); nextY = 43; }
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...navy); doc.text("Document Profitability", 14, nextY);
+    autoTable(doc, {
+      startY: nextY + 3,
+      head: [["Type", "No.", "Date", "Customer", "Sales Rep", "Revenue", "COGS", "Profit / Loss"]],
+      body: filtered.map((item) => [
+        item.document_type === "INVOICE" ? "Invoice" : item.document_type === "CR_NOTE" ? "CR Note" : "DR Note",
+        item.invoice_no, dateLabel(item.sales_date), item.customer_name, item.sales_rep || "Unassigned",
+        money(item.revenue), money(item.cogs), money(item.profit),
+      ]),
+      theme: "striped",
+      headStyles: { fillColor: navy, textColor: 255 },
+      columnStyles: { 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right", fontStyle: "bold" } },
+      styles: { fontSize: 7, cellPadding: 2.2, overflow: "linebreak" },
+      margin: { left: 14, right: 14, top: 40, bottom: 17 },
+      didDrawPage: drawBranding,
+    });
+    const clean = (value: string) => value.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+    const period = month !== "All" ? month : year !== "All" ? year : "All-Periods";
+    const subject = customer !== "All" ? customer : salesRep !== "All" ? salesRep : "All";
+    doc.save(`Profit-Loss-${clean(period)}-${clean(subject)}.pdf`);
+  }
+
   return <div className="dashboard-shell" dir={lang === "ar" ? "rtl" : "ltr"}>
     <Header active="profitLoss" lang={lang} onToggleLang={() => setLang((value) => value === "en" ? "ar" : "en")} />
     <main className="profit-loss-page">
@@ -77,6 +178,7 @@ export default function ProfitLossClient({ sales, cogs }: { sales: Sale[]; cogs:
         <label>Customer<select value={customer} onChange={(event) => setCustomer(event.target.value)}><option value="All">All Customers</option>{customers.map((value) => <option key={value}>{value}</option>)}</select></label>
         <label>Sales Rep<select value={salesRep} onChange={(event) => setSalesRep(event.target.value)}><option value="All">All Reps</option>{reps.map((value) => <option key={value}>{value}</option>)}</select></label>
         <label>Search<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Invoice or customer" /></label>
+        <button className="profit-loss-download" type="button" onClick={downloadFilteredPdf} disabled={!filtered.length}>Download Filtered PDF</button>
         <button type="button" onClick={() => { setYear("All"); setMonth("All"); setCustomer("All"); setSalesRep("All"); setSearch(""); }}>Clear Filters</button>
       </section>
       <section className="profit-loss-grid">
