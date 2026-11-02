@@ -14,9 +14,11 @@ function requestedModule(pathname: string): DashboardModule | null {
   if (pathname.startsWith("/cheques") || pathname.startsWith("/api/cheques")) return "cheques";
   if (pathname.startsWith("/cogs")) return "cogs";
   if (pathname.startsWith("/profit-loss")) return "profitLoss";
+  if (pathname.startsWith("/bank-reconciliation")) return "bankReconciliation";
   if (pathname.startsWith("/vat-report") || pathname.startsWith("/api/vat-report")) return "vat";
   if (pathname.startsWith("/income-statement-data") || pathname.startsWith("/api/income-statement-data")) return "incomeStatement";
   if (pathname.startsWith("/authorization") || pathname.startsWith("/api/authorized-employees")) return "authorization";
+  if (pathname.startsWith("/api/google-sheets-sync")) return "googleSync";
   return null;
 }
 
@@ -34,7 +36,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const alwaysAdmin = pathname === "/users" || pathname === "/activity-log" || pathname.startsWith("/api/auth/users") || pathname.startsWith("/api/activity-log") || pathname.startsWith("/api/google-sheets-sync");
+  const alwaysAdmin = pathname === "/users" || pathname === "/activity-log" || pathname.startsWith("/api/auth/users") || pathname.startsWith("/api/activity-log");
   if (alwaysAdmin && session.role !== "admin") {
     if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
     return NextResponse.redirect(new URL("/access-denied", request.url));
