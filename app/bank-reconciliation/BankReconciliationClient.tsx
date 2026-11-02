@@ -91,6 +91,65 @@ function rowsToTransactions(rows: Record<string, unknown>[], prefix: string) {
 
 async function readStatement(file: File, prefix: string) {
   const extension = file.name.split(".").pop()?.toLowerCase();
+  if (extension === "pdf") {
+    if (prefix !== "bank") throw new Error("The company statement must be an Excel file.");
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.js");
+    pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const document = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const lines: string[] = [];
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+      const page = await document.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const positioned = content.items
+        .filter((item): item is typeof item & { str: string; transform: number[] } => "str" in item && "transform" in item)
+        .map((item) => ({ text: item.str.trim(), x: item.transform[4], y: item.transform[5] }))
+        .filter((item) => item.text);
+      const rows = new Map<number, typeof positioned>();
+      positioned.forEach((item) => {
+        const key = Math.round(item.y / 3) * 3;
+        rows.set(key, [...(rows.get(key) || []), item]);
+      });
+      [...rows.entries()].sort((a, b) => b[0] - a[0]).forEach(([, items]) => {
+        lines.push(items.sort((a, b) => a.x - b.x).map((item) => item.text).join(" "));
+      });
+    }
+    const datePattern = /\b(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\d{4}[\/-]\d{1,2}[\/-]\d{1,2})\b/;
+    const amountPattern = /\(?-?\d[\d,]*(?:\.\d{1,2})?\)?/g;
+    const transactions = lines.flatMap((line, index) => {
+      const dateMatch = line.match(datePattern);
+      if (!dateMatch) return [];
+      const withoutDate = line.replace(dateMatch[0], " ");
+      const amountTokens = withoutDate.match(amountPattern) || [];
+      if (!amountTokens.length) return [];
+      const amounts = amountTokens.map(parseAmount).filter(Number.isFinite);
+      if (!amounts.length) return [];
+      let amount = amounts[amounts.length - 1];
+      let balance: number | null = null;
+      if (amounts.length >= 3) {
+        const debit = Math.abs(amounts[amounts.length - 3]);
+        const credit = Math.abs(amounts[amounts.length - 2]);
+        amount = credit - debit;
+        balance = amounts[amounts.length - 1];
+      } else if (amounts.length === 2) {
+        amount = amounts[0];
+        balance = amounts[1];
+      }
+      const description = withoutDate.replace(amountPattern, " ").replace(/\s+/g, " ").trim();
+      return [{
+        id: `bank-pdf-${index + 1}`,
+        row: index + 1,
+        date: parseDate(dateMatch[0]),
+        description,
+        reference: description.match(/\b\d{5,}\b/)?.[0] || "",
+        amount: Math.round(amount * 100) / 100,
+        balance,
+      }];
+    }).filter((item) => item.date && item.amount !== 0);
+    if (!transactions.length) {
+      throw new Error("No bank transactions were found. The PDF must contain selectable text, not scanned images.");
+    }
+    return transactions;
+  }
   if (extension === "csv") {
     const text = await file.text();
     const parsed = Papa.parse<Record<string, unknown>>(text, { header: true, skipEmptyLines: "greedy" });
@@ -111,7 +170,7 @@ async function readStatement(file: File, prefix: string) {
     const rows = matrix.slice(headerIndex + 1).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index]])));
     return rowsToTransactions(rows, prefix);
   }
-  throw new Error("Use a CSV or XLSX file.");
+  throw new Error(prefix === "bank" ? "Use a PDF, CSV, or XLSX bank statement." : "Use an XLSX company statement.");
 }
 
 function dateDifference(a: string, b: string) {
@@ -367,8 +426,8 @@ export default function BankReconciliationClient() {
     <main className="bank-rec-page">
       <div className="bank-rec-heading"><div><span>FINANCE CONTROL</span><h1>Bank Reconciliation</h1><p>Upload the bank statement and company statement to identify matched and outstanding transactions.</p></div><div className="bank-rec-downloads"><button onClick={downloadPdf} disabled={generatingPdf || generatingExcel || (!bank.length && !company.length)}>{generatingPdf ? "Preparing PDF..." : "Download PDF"}</button><button onClick={downloadExcel} disabled={generatingPdf || generatingExcel || (!bank.length && !company.length)}>{generatingExcel ? "Preparing Excel..." : "Download Excel"}</button></div></div>
       <section className="bank-rec-upload-grid">
-        <label><strong>Bank Statement</strong><small>{bankName || "CSV or XLSX"}</small><input type="file" accept=".csv,.xlsx" onChange={(event) => loadFile(event.target.files?.[0], "bank")} /><span>{bank.length ? `${bank.length} transactions loaded` : "Choose Bank Statement"}</span></label>
-        <label><strong>Company Statement</strong><small>{companyName || "CSV or XLSX"}</small><input type="file" accept=".csv,.xlsx" onChange={(event) => loadFile(event.target.files?.[0], "company")} /><span>{company.length ? `${company.length} transactions loaded` : "Choose Company Statement"}</span></label>
+        <label><strong>Bank Statement</strong><small>{bankName || "PDF (text-based), CSV, or XLSX"}</small><input type="file" accept=".pdf,.csv,.xlsx,application/pdf" onChange={(event) => loadFile(event.target.files?.[0], "bank")} /><span>{bank.length ? `${bank.length} transactions loaded` : "Choose Bank Statement PDF"}</span></label>
+        <label><strong>Company Statement</strong><small>{companyName || "Excel XLSX"}</small><input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => loadFile(event.target.files?.[0], "company")} /><span>{company.length ? `${company.length} transactions loaded` : "Choose Company Excel"}</span></label>
         <label className="bank-rec-tolerance"><strong>Date Tolerance</strong><small>Maximum days between matching transactions</small><input type="number" min="0" max="31" value={tolerance} onChange={(event) => setTolerance(Math.max(0, Number(event.target.value) || 0))} /><span>{tolerance} days</span></label>
       </section>
       {error && <p className="bank-rec-error">{error}</p>}
