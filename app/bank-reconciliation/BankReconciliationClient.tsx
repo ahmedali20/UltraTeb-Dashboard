@@ -89,6 +89,41 @@ function rowsToTransactions(rows: Record<string, unknown>[], prefix: string) {
   }).filter((item) => item.date && item.amount !== 0);
 }
 
+function bankLinesToTransactions(lines: string[]) {
+  const datePattern = /\b(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\d{4}[\/-]\d{1,2}[\/-]\d{1,2}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}|\d{1,2}[A-Za-z]{3}\d{2,4})\b/i;
+  const amountPattern = /\(?-?\d[\d,]*(?:\.\d{1,2})?\)?/g;
+  return lines.flatMap((line, index) => {
+    const dateMatch = line.match(datePattern);
+    if (!dateMatch) return [];
+    const withoutDate = line.replace(dateMatch[0], " ");
+    const amountTokens = withoutDate.match(amountPattern) || [];
+    if (!amountTokens.length) return [];
+    const amounts = amountTokens.map(parseAmount).filter(Number.isFinite);
+    if (!amounts.length) return [];
+    let amount = amounts[amounts.length - 1];
+    let balance: number | null = null;
+    if (amounts.length >= 3) {
+      const debit = Math.abs(amounts[amounts.length - 3]);
+      const credit = Math.abs(amounts[amounts.length - 2]);
+      amount = credit - debit;
+      balance = amounts[amounts.length - 1];
+    } else if (amounts.length === 2) {
+      amount = amounts[0];
+      balance = amounts[1];
+    }
+    const description = withoutDate.replace(amountPattern, " ").replace(/\s+/g, " ").trim();
+    return [{
+      id: `bank-pdf-${index + 1}`,
+      row: index + 1,
+      date: parseDate(dateMatch[0]),
+      description,
+      reference: description.match(/\b\d{5,}\b/)?.[0] || "",
+      amount: Math.round(amount * 100) / 100,
+      balance,
+    }];
+  }).filter((item) => item.date && item.amount !== 0);
+}
+
 async function readStatement(file: File, prefix: string) {
   const extension = file.name.split(".").pop()?.toLowerCase();
   if (extension === "pdf") {
@@ -115,40 +150,31 @@ async function readStatement(file: File, prefix: string) {
         lines.push(items.sort((a, b) => a.x - b.x).map((item) => item.text).join(" "));
       });
     }
-    const datePattern = /\b(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\d{4}[\/-]\d{1,2}[\/-]\d{1,2})\b/;
-    const amountPattern = /\(?-?\d[\d,]*(?:\.\d{1,2})?\)?/g;
-    const transactions = lines.flatMap((line, index) => {
-      const dateMatch = line.match(datePattern);
-      if (!dateMatch) return [];
-      const withoutDate = line.replace(dateMatch[0], " ");
-      const amountTokens = withoutDate.match(amountPattern) || [];
-      if (!amountTokens.length) return [];
-      const amounts = amountTokens.map(parseAmount).filter(Number.isFinite);
-      if (!amounts.length) return [];
-      let amount = amounts[amounts.length - 1];
-      let balance: number | null = null;
-      if (amounts.length >= 3) {
-        const debit = Math.abs(amounts[amounts.length - 3]);
-        const credit = Math.abs(amounts[amounts.length - 2]);
-        amount = credit - debit;
-        balance = amounts[amounts.length - 1];
-      } else if (amounts.length === 2) {
-        amount = amounts[0];
-        balance = amounts[1];
-      }
-      const description = withoutDate.replace(amountPattern, " ").replace(/\s+/g, " ").trim();
-      return [{
-        id: `bank-pdf-${index + 1}`,
-        row: index + 1,
-        date: parseDate(dateMatch[0]),
-        description,
-        reference: description.match(/\b\d{5,}\b/)?.[0] || "",
-        amount: Math.round(amount * 100) / 100,
-        balance,
-      }];
-    }).filter((item) => item.date && item.amount !== 0);
+    let transactions = bankLinesToTransactions(lines);
     if (!transactions.length) {
-      throw new Error("No bank transactions were found. The PDF must contain selectable text, not scanned images.");
+      const tesseract = await loadModule("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js");
+      const worker = await tesseract.createWorker(["eng", "ara"]);
+      const ocrLines: string[] = [];
+      try {
+        for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+          const page = await document.getPage(pageNumber);
+          const viewport = page.getViewport({ scale: 2 });
+          const canvas = window.document.createElement("canvas");
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          const context = canvas.getContext("2d", { willReadFrequently: true });
+          if (!context) continue;
+          await page.render({ canvasContext: context, viewport }).promise;
+          const result = await worker.recognize(canvas);
+          ocrLines.push(...String(result.data.text || "").split(/\r?\n/));
+        }
+      } finally {
+        await worker.terminate();
+      }
+      transactions = bankLinesToTransactions(ocrLines);
+    }
+    if (!transactions.length) {
+      throw new Error("The scanned PDF was read, but its transaction rows could not be identified. Please upload a clearer PDF.");
     }
     return transactions;
   }
