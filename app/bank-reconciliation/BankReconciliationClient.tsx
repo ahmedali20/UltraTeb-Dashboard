@@ -93,15 +93,17 @@ async function readStatement(file: File, prefix: string) {
   const extension = file.name.split(".").pop()?.toLowerCase();
   if (extension === "pdf") {
     if (prefix !== "bank") throw new Error("The company statement must be an Excel file.");
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.js");
-    pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const loadModule = new Function("url", "return import(url)") as (url: string) => Promise<any>;
+    const pdfjs = await loadModule("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs");
+    pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
     const document = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
     const lines: string[] = [];
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       const page = await document.getPage(pageNumber);
       const content = await page.getTextContent();
-      const positioned = content.items
-        .filter((item): item is typeof item & { str: string; transform: number[] } => "str" in item && "transform" in item)
+      const contentItems = content.items as Array<{ str?: string; transform?: number[] }>;
+      const positioned = contentItems
+        .filter((item): item is { str: string; transform: number[] } => typeof item.str === "string" && Array.isArray(item.transform))
         .map((item) => ({ text: item.str.trim(), x: item.transform[4], y: item.transform[5] }))
         .filter((item) => item.text);
       const rows = new Map<number, typeof positioned>();
