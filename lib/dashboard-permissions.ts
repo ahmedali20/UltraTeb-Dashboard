@@ -1,6 +1,7 @@
 export const dashboardModules = [
   "home", "customers", "sales", "reps", "reports", "teams", "wht",
-  "collections", "cheques", "cogs", "profitLoss", "vat", "incomeStatement", "authorization",
+  "collections", "cheques", "cogs", "profitLoss", "bankReconciliation", "vat", "incomeStatement", "authorization",
+  "googleSync",
 ] as const;
 
 export type DashboardModule = (typeof dashboardModules)[number];
