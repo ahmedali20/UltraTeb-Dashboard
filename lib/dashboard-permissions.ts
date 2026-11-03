@@ -1,6 +1,6 @@
 export const dashboardModules = [
   "home", "customers", "sales", "reps", "reports", "teams", "wht",
-  "collections", "cheques", "cogs", "profitLoss", "bankReconciliation", "vat", "incomeStatement", "authorization",
+  "collections", "cheques", "cogs", "profitLoss", "bankReconciliation", "purchaseVariance", "vat", "incomeStatement", "authorization",
   "googleSync",
 ] as const;
 
@@ -41,3 +41,4 @@ export function hasDashboardPermission(
   if (session.role === "admin") return true;
   return normalizePermissions(session.permissions)[module]?.[access] === true;
 }
+
