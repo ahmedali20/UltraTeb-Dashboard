@@ -39,6 +39,7 @@ export default function PurchasePriceVarianceClient({ initialRows }: { initialRo
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const preview = useMemo(() => {
     const quantity = Number(form.quantity || 0);
@@ -111,12 +112,102 @@ export default function PurchasePriceVarianceClient({ initialRows }: { initialRo
     if (editingId === row.id) reset();
   }
 
+  async function downloadPdf() {
+    if (!filtered.length) return;
+    setGeneratingPdf(true);
+    try {
+      const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const reportTotals = filtered.reduce((result, row) => {
+        const variance = Number(row.quantity) * (Number(row.actual_price) - Number(row.invoice_price));
+        result.net += variance;
+        if (variance > 0) result.unfavorable += variance;
+        if (variance < 0) result.favorable += Math.abs(variance);
+        return result;
+      }, { net: 0, favorable: 0, unfavorable: 0 });
+      const generatedAt = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date());
+
+      doc.setFillColor(76, 29, 149);
+      doc.rect(0, 0, 210, 31, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(17);
+      doc.text("Purchase Price Variance Report", 14, 14);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(`UltraTeb Tegara  |  Generated ${generatedAt}`, 14, 22);
+      doc.text(`${filtered.length} line item${filtered.length === 1 ? "" : "s"}${search.trim() ? `  |  Filter: ${search.trim()}` : ""}`, 196, 22, { align: "right" });
+
+      const summary = [
+        { label: "Favorable Saving", value: reportTotals.favorable, color: [5, 150, 105] as [number, number, number] },
+        { label: "Unfavorable Increase", value: reportTotals.unfavorable, color: [220, 38, 38] as [number, number, number] },
+        { label: "Net Variance", value: reportTotals.net, color: (reportTotals.net > 0 ? [220, 38, 38] : [5, 150, 105]) as [number, number, number] },
+      ];
+      summary.forEach((item, index) => {
+        const x = 14 + index * 61;
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(x, 37, 56, 18, 2, 2, "FD");
+        doc.setTextColor(100, 116, 139);
+        doc.setFontSize(7.5);
+        doc.text(item.label, x + 4, 43);
+        doc.setTextColor(...item.color);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.text(`EGP ${money(item.value)}`, x + 4, 50);
+        doc.setFont("helvetica", "normal");
+      });
+
+      autoTable(doc, {
+        startY: 61,
+        margin: { left: 10, right: 10, bottom: 17 },
+        head: [["Item Code", "Product", "Invoices", "Qty", "Invoice Price", "Actual Price", "Unit Var.", "Total Var."]],
+        body: filtered.map((row) => {
+          const unit = Number(row.actual_price) - Number(row.invoice_price);
+          return [row.item_code, `${row.product_name}${row.notes ? `\n${row.notes}` : ""}`, (row.invoice_numbers || []).join(", "), Number(row.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 }), money(Number(row.invoice_price)), money(Number(row.actual_price)), money(unit), money(Number(row.quantity) * unit)];
+        }),
+        theme: "grid",
+        styles: { font: "helvetica", fontSize: 6.8, cellPadding: 2, lineColor: [226, 232, 240], lineWidth: 0.2, textColor: [30, 41, 59], valign: "middle" },
+        headStyles: { fillColor: [76, 29, 149], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: { 0: { cellWidth: 19 }, 1: { cellWidth: 39 }, 2: { cellWidth: 29 }, 3: { cellWidth: 13, halign: "right" }, 4: { cellWidth: 22, halign: "right" }, 5: { cellWidth: 22, halign: "right" }, 6: { cellWidth: 21, halign: "right" }, 7: { cellWidth: 25, halign: "right", fontStyle: "bold" } },
+        didParseCell(data) {
+          if (data.section === "body" && (data.column.index === 6 || data.column.index === 7)) {
+            const row = filtered[data.row.index];
+            const value = data.column.index === 6 ? Number(row.actual_price) - Number(row.invoice_price) : Number(row.quantity) * (Number(row.actual_price) - Number(row.invoice_price));
+            data.cell.styles.textColor = value > 0 ? [220, 38, 38] : [5, 150, 105];
+          }
+        },
+        didDrawPage(data) {
+          const page = doc.getNumberOfPages();
+          doc.setDrawColor(226, 232, 240);
+          doc.line(14, 282, 196, 282);
+          doc.setFontSize(7.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text("UltraTeb Tegara — Internal Dashboard", 14, 288);
+          doc.text(`Page ${page}`, 196, 288, { align: "right" });
+          if (page > 1) {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9);
+            doc.setTextColor(76, 29, 149);
+            doc.text("Purchase Price Variance Report", data.settings.margin.left, 9);
+          }
+        },
+      });
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      doc.save(`Purchase-Price-Variance-Report-${stamp}.pdf`);
+    } finally {
+      setGeneratingPdf(false);
+    }
+  }
+
   return <div className="dashboard-shell" dir={lang === "ar" ? "rtl" : "ltr"}>
     <Header active="purchaseVariance" lang={lang} onToggleLang={() => setLang((value) => value === "en" ? "ar" : "en")} />
     <main className="purchase-variance-page">
       <section className="purchase-variance-hero">
         <div><p>PROCUREMENT CONTROL</p><h1>Purchase Price Variance</h1><span>Compare invoiced purchase prices with actual prices and connect each item to multiple invoices.</span></div>
-        <button className="primary" onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm); }}>+ Add New Line</button>
+        <div className="purchase-variance-hero-actions"><button className="purchase-variance-pdf" type="button" onClick={downloadPdf} disabled={!filtered.length || generatingPdf}>{generatingPdf ? "Preparing PDF..." : "Download PDF Report"}</button><button className="primary" onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm); }}>+ Add New Line</button></div>
       </section>
 
       <section className="purchase-variance-kpis">
