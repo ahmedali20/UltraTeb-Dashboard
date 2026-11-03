@@ -133,6 +133,7 @@ async function readStatement(file: File, prefix: string) {
     pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
     const document = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
     const lines: string[] = [];
+    const positionedTransactions: Transaction[] = [];
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       const page = await document.getPage(pageNumber);
       const content = await page.getTextContent();
@@ -147,10 +148,29 @@ async function readStatement(file: File, prefix: string) {
         rows.set(key, [...(rows.get(key) || []), item]);
       });
       [...rows.entries()].sort((a, b) => b[0] - a[0]).forEach(([, items]) => {
-        lines.push(items.sort((a, b) => a.x - b.x).map((item) => item.text).join(" "));
+        const sorted = items.sort((a, b) => a.x - b.x);
+        lines.push(sorted.map((item) => item.text).join(" "));
+        const transactionDate = sorted.find((item) => item.x < 100 && /^\d{1,2}-[A-Za-z]{3}-\d{4}$/.test(item.text));
+        const balanceItem = sorted.find((item) => item.x >= 650 && /^\(?[\d,]+\.\d{2}\)?$/.test(item.text));
+        if (!transactionDate || !balanceItem) return;
+        const debitItem = sorted.find((item) => item.x >= 475 && item.x < 560 && /^\(?[\d,]+\.\d{2}\)?$/.test(item.text));
+        const creditItem = sorted.find((item) => item.x >= 560 && item.x < 650 && /^\(?[\d,]+\.\d{2}\)?$/.test(item.text));
+        const amount = (creditItem ? Math.abs(parseAmount(creditItem.text)) : 0) - (debitItem ? Math.abs(parseAmount(debitItem.text)) : 0);
+        if (!amount) return;
+        const detailItems = sorted.filter((item) => item.x >= 88 && item.x < 405);
+        const description = detailItems.map((item) => item.text).join(" ").trim();
+        positionedTransactions.push({
+          id: `bank-pdf-${pageNumber}-${positionedTransactions.length + 1}`,
+          row: positionedTransactions.length + 1,
+          date: parseDate(transactionDate.text),
+          description,
+          reference: detailItems.map((item) => item.text).find((text) => /^\d{5,}$/.test(text)) || "",
+          amount: Math.round(amount * 100) / 100,
+          balance: parseAmount(balanceItem.text),
+        });
       });
     }
-    let transactions = bankLinesToTransactions(lines);
+    let transactions = positionedTransactions.length ? positionedTransactions : bankLinesToTransactions(lines);
     if (!transactions.length) {
       const tesseract = await loadModule("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js");
       const worker = await tesseract.createWorker(["eng", "ara"]);
