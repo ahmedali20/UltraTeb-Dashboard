@@ -282,12 +282,16 @@ export default function BankReconciliationClient() {
 
   async function downloadPdf() {
     if (!bank.length && !company.length) return;
+    setError("");
     setGeneratingPdf(true);
     try {
-      const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+      const [jsPdfModule, autoTableModule] = await Promise.all([
         import("jspdf"),
         import("jspdf-autotable"),
       ]);
+      const { jsPDF } = jsPdfModule;
+      const autoTable = (autoTableModule.default || (autoTableModule as any).autoTable || autoTableModule) as any;
+      if (typeof autoTable !== "function") throw new Error("PDF table renderer could not be loaded.");
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 14;
@@ -381,7 +385,17 @@ export default function BankReconciliationClient() {
         "-", item.date, item.reference || "-", item.description || "-", money(item.amount), "Outstanding",
       ]));
 
-      doc.save(`Bank-Reconciliation-${new Date().toISOString().slice(0, 10)}.pdf`);
+      const fileName = `Bank-Reconciliation-${new Date().toISOString().slice(0, 10)}.pdf`;
+      const blob = doc.output("blob");
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    } catch (cause) {
+      setError(`PDF download failed: ${cause instanceof Error ? cause.message : "Unknown error"}`);
     } finally {
       setGeneratingPdf(false);
     }
