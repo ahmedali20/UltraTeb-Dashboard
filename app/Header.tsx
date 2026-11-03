@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { normalizePermissions, type DashboardModule, type DashboardPermissions } from "../lib/dashboard-permissions";
 
 type Props = {
-  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "collections" | "cheques" | "cogs" | "profitLoss" | "bankReconciliation" | "vat" | "incomeStatement" | "authorization" | "users" | "activity";
+  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "collections" | "cheques" | "cogs" | "profitLoss" | "bankReconciliation" | "purchaseVariance" | "vat" | "incomeStatement" | "authorization" | "users" | "activity";
   lang: "en" | "ar";
   onToggleLang: () => void;
 };
@@ -24,6 +24,7 @@ const labels = {
     cogs: "Invoices COGS",
     profitLoss: "Profit & Loss",
     bankReconciliation: "Bank Reconciliation",
+    purchaseVariance: "Purchase Price Variance",
     vat: "VAT Report",
     incomeStatement: "Income Statement Data",
     authorization: "Authorization Letters",
@@ -50,6 +51,7 @@ const labels = {
     cogs: "تكلفة الفواتير",
     profitLoss: "الأرباح والخسائر",
     bankReconciliation: "التسوية البنكية",
+    purchaseVariance: "فروق أسعار المشتريات",
     vat: "تقرير ضريبة القيمة المضافة",
     incomeStatement: "بيانات قائمة الدخل",
     authorization: "خطابات التفويض",
@@ -169,7 +171,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
     `app-sidebar__link${active === page ? " app-sidebar__link--active" : ""}`;
   const canView = (module: DashboardModule) =>
     isAdmin || normalizePermissions(currentUser?.permissions)[module]?.view === true;
-  const hasAdministrationAccess = isAdmin || (["teams", "wht", "collections", "cheques", "cogs", "profitLoss", "bankReconciliation", "vat", "incomeStatement", "authorization"] as DashboardModule[]).some(canView);
+  const hasAdministrationAccess = isAdmin || (["teams", "wht", "collections", "cheques", "cogs", "profitLoss", "bankReconciliation", "purchaseVariance", "vat", "incomeStatement", "authorization"] as DashboardModule[]).some(canView);
 
   return (
     <header
@@ -272,6 +274,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
               {canView("cogs") && <NavLink href="/cogs" page="cogs" label={t.cogs} icon="records" className={linkClass("cogs")} />}
               {canView("profitLoss") && <NavLink href="/profit-loss" page="profitLoss" label={t.profitLoss} icon="reports" className={linkClass("profitLoss")} />}
               {canView("bankReconciliation") && <NavLink href="/bank-reconciliation" page="bankReconciliation" label={t.bankReconciliation} icon="records" className={linkClass("bankReconciliation")} />}
+              {canView("purchaseVariance") && <NavLink href="/purchase-price-variance" page="purchaseVariance" label={t.purchaseVariance} icon="records" className={linkClass("purchaseVariance")} />}
               {canView("vat") && <NavLink href="/vat-report" page="vat" label={t.vat} icon="reports" className={linkClass("vat")} />}
               {canView("incomeStatement") && <NavLink href="/income-statement-data" page="incomeStatement" label={t.incomeStatement} icon="reports" className={linkClass("incomeStatement")} />}
               {canView("authorization") && <NavLink href="/authorization" page="authorization" label={t.authorization} icon="reports" className={linkClass("authorization")} />}
@@ -372,3 +375,4 @@ function MoonIcon() {
     </svg>
   );
 }
+
