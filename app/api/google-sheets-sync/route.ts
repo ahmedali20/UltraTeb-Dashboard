@@ -693,7 +693,6 @@ async function syncInvoices() {
   let deletionSkipped = false;
   let deletionSkipReason = "";
   let protectedOutside2026 = 0;
-  let invalidRepValuesIgnored = 0;
   let cleanedCustomers = 0;
   let cleanedCustomerReps = 0;
   let cleanedSalesReps = 0;
@@ -744,14 +743,6 @@ async function syncInvoices() {
             : rawTaxClassification === "EXEMPT" || tax === 0
               ? "EXEMPT"
               : "UNKNOWN";
-    const rawSalesRep = getValue(row, [
-      "sales_rep",
-      "sales_representative",
-      "representative",
-      "rep",
-    ]);
-    const salesRep = isAmountLike(rawSalesRep) ? "" : rawSalesRep;
-    if (rawSalesRep && !salesRep) invalidRepValuesIgnored += 1;
     const rawDocumentType = getValue(row, [
       "document_type",
       "document",
@@ -890,26 +881,16 @@ async function syncInvoices() {
       continue;
     }
 
-    if (salesRep && customer.sales_rep_name !== salesRep) {
-      const { error: repError } = await supabase
-        .from("customers")
-        .update({ sales_rep_name: salesRep })
-        .eq("customer_code", customer.customer_code);
-
-      if (repError) {
-        failed.push({
-          row: sheetRowNumber,
-          invoice: invoiceNo,
-          error: repError.message,
-        });
-        continue;
-      }
-      customer.sales_rep_name = salesRep;
-    }
-
     const sign = documentType === "CR_NOTE" ? -1 : 1;
     const calculatedTotal = Math.round((Math.abs(salesItemTotal) + Math.abs(tax)) * 100) / 100;
     const sourceTotal = suppliedTotal ? Math.abs(suppliedTotal) : calculatedTotal;
+    const existingMatches = (priorSales ?? []).filter(
+      (sale) =>
+        String(sale.invoice_no).trim() === invoiceNo &&
+        (sale.document_type ?? "INVOICE") === documentType &&
+        String(sale.sales_date ?? "").slice(0, 4) === salesDate.slice(0, 4)
+    );
+    const existing = existingMatches[0];
     const payload = {
       invoice_no: invoiceNo,
       sales_date: salesDate,
@@ -924,15 +905,10 @@ async function syncInvoices() {
       original_invoice_no:
         documentType === "INVOICE" ? null : originalInvoiceNo,
       note_reason: documentType === "INVOICE" ? null : noteReason,
-      sales_rep_name: salesRep || null,
+      // Google Sheets is only a sales-document source. Representative assignments
+      // are managed in the dashboard and must never be overwritten by a sync.
+      sales_rep_name: existing?.sales_rep || customer.sales_rep_name || null,
     };
-    const existingMatches = (priorSales ?? []).filter(
-      (sale) =>
-        String(sale.invoice_no).trim() === invoiceNo &&
-        (sale.document_type ?? "INVOICE") === documentType &&
-        String(sale.sales_date ?? "").slice(0, 4) === salesDate.slice(0, 4)
-    );
-    const existing = existingMatches[0];
     const query = existing
       ? supabase.from("sales").update(payload).eq("id", existing.id)
       : supabase.from("sales").insert(payload);
@@ -1117,7 +1093,6 @@ async function syncInvoices() {
     protectedOutside2026,
     deletionSkipped,
     deletionSkipReason,
-    invalidRepValuesIgnored,
     cleanedCustomers,
     cleanedCustomerReps,
     cleanedSalesReps,
