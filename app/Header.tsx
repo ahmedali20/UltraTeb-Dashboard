@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { normalizePermissions, type DashboardModule, type DashboardPermissions } from "../lib/dashboard-permissions";
 
 type Props = {
-  active: "home" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "collections" | "cheques" | "cogs" | "profitLoss" | "bankReconciliation" | "purchaseVariance" | "vat" | "incomeStatement" | "authorization" | "users" | "activity";
+  active: "home" | "assistant" | "customers" | "sales" | "reps" | "teams" | "reports" | "wht" | "collections" | "cheques" | "cogs" | "profitLoss" | "bankReconciliation" | "purchaseVariance" | "vat" | "incomeStatement" | "authorization" | "users" | "activity";
   lang: "en" | "ar";
   onToggleLang: () => void;
 };
@@ -12,6 +12,7 @@ type Props = {
 const labels = {
   en: {
     home: "Home",
+    assistant: "AI Assistant",
     customers: "Customers",
     addRecord: "Add Record",
     sales: "Invoices",
@@ -39,6 +40,7 @@ const labels = {
   },
   ar: {
     home: "الرئيسية",
+    assistant: "المساعد الذكي",
     customers: "العملاء",
     addRecord: "إضافة فاتورة",
     sales: "الفواتير",
@@ -260,6 +262,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
         <nav className="app-sidebar__nav" aria-label="Main navigation">
           <span className="app-sidebar__section">{t.workspace}</span>
           {canView("home") && <NavLink href="/" page="home" label={t.home} icon="home" className={linkClass("home")} />}
+          <NavLink href="/assistant" page="assistant" label={t.assistant} icon="assistant" className={linkClass("assistant")} />
           {canView("customers") && <NavLink href="/customers" page="customers" label={t.customers} icon="customers" className={linkClass("customers")} />}
           {canView("sales") && <NavLink href="/sales#all-records" page="sales" label={t.sales} icon="records" className={linkClass("sales")} />}
           {canView("reps") && <NavLink href="/sales-reps" page="reps" label={t.reps} icon="reps" className={linkClass("reps")} />}
@@ -306,7 +309,7 @@ function NavLink({
   href: string;
   page: string;
   label: string;
-  icon: "home" | "customers" | "add" | "records" | "reps" | "teams" | "reports" | "users" | "activity";
+  icon: "home" | "assistant" | "customers" | "add" | "records" | "reps" | "teams" | "reports" | "users" | "activity";
   className: string;
 }) {
   return (
@@ -320,10 +323,11 @@ function NavLink({
 function SidebarIcon({
   name,
 }: {
-  name: "home" | "customers" | "add" | "records" | "reps" | "teams" | "reports" | "users" | "activity";
+  name: "home" | "assistant" | "customers" | "add" | "records" | "reps" | "teams" | "reports" | "users" | "activity";
 }) {
   const paths = {
     home: <><path d="m3 11 9-8 9 8" /><path d="M5 10v10h14V10" /><path d="M9 20v-6h6v6" /></>,
+    assistant: <><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" /><rect x="7" y="8" width="10" height="9" rx="3" /><path d="M9.5 12h.01M14.5 12h.01M10 15h4M10 20h4" /></>,
     customers: <><circle cx="9" cy="8" r="3" /><path d="M3 20v-2a6 6 0 0 1 12 0v2" /><circle cx="17" cy="9" r="2" /><path d="M16 14a5 5 0 0 1 5 5v1" /></>,
     add: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M12 12v6M9 15h6" /></>,
     records: <><path d="M6 3h12v18H6z" /><path d="M9 8h6M9 12h6M9 16h4" /></>,
@@ -375,4 +379,3 @@ function MoonIcon() {
     </svg>
   );
 }
-
