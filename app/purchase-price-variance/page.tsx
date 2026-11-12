@@ -19,5 +19,25 @@ export default async function PurchasePriceVariancePage() {
     return <main style={{ padding: 32, color: "red" }}>{error.message}<p>Run `supabase/purchase_price_variances.sql` in Supabase SQL Editor first.</p></main>;
   }
 
-  return <PurchasePriceVarianceClient initialRows={data ?? []} />;
+  const invoiceNumbers = Array.from(new Set(
+    (data ?? []).flatMap((row) => (row.invoice_numbers ?? []).map((value: string) => String(value).trim())).filter(Boolean)
+  ));
+  const invoiceDates: Record<string, string> = {};
+
+  for (let index = 0; index < invoiceNumbers.length; index += 200) {
+    const { data: invoices, error: invoicesError } = await supabase
+      .from("sales_view")
+      .select("invoice_no, sales_date")
+      .eq("document_type", "INVOICE")
+      .in("invoice_no", invoiceNumbers.slice(index, index + 200));
+
+    if (invoicesError) {
+      return <main style={{ padding: 32, color: "red" }}>{invoicesError.message}</main>;
+    }
+    for (const invoice of invoices ?? []) {
+      if (invoice.invoice_no && invoice.sales_date) invoiceDates[String(invoice.invoice_no).trim()] = invoice.sales_date;
+    }
+  }
+
+  return <PurchasePriceVarianceClient initialRows={data ?? []} invoiceDates={invoiceDates} />;
 }

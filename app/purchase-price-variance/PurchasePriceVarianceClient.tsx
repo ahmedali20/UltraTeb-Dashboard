@@ -30,7 +30,7 @@ type FormState = {
 const emptyForm: FormState = { itemCode: "", productName: "", quantity: "", invoicePrice: "", actualPrice: "", invoiceNumbers: [], notes: "" };
 const money = (value: number) => value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function PurchasePriceVarianceClient({ initialRows }: { initialRows: VarianceRow[] }) {
+export default function PurchasePriceVarianceClient({ initialRows, invoiceDates }: { initialRows: VarianceRow[]; invoiceDates: Record<string, string> }) {
   const [lang, setLang] = useState<"en" | "ar">("en");
   const [rows, setRows] = useState(initialRows);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -174,10 +174,16 @@ export default function PurchasePriceVarianceClient({ initialRows }: { initialRo
       });
 
       const monthGroups = Array.from(filtered.reduce((groups, row) => {
-        const date = new Date(row.created_at);
+        const relatedDates = (row.invoice_numbers ?? [])
+          .map((invoiceNo) => invoiceDates[String(invoiceNo).trim()])
+          .filter(Boolean)
+          .map((value) => new Date(value))
+          .filter((value) => !Number.isNaN(value.getTime()))
+          .sort((a, b) => a.getTime() - b.getTime());
+        const date = relatedDates[0] ?? new Date(Number.NaN);
         const key = Number.isNaN(date.getTime()) ? "unknown" : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
         const label = Number.isNaN(date.getTime())
-          ? "Orders Without Date"
+          ? "Orders Without Invoice Date"
           : `${new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date)} Orders`;
         const group = groups.get(key) ?? { key, label, rows: [] as VarianceRow[] };
         group.rows.push(row);
