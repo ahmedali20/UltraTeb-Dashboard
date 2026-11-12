@@ -12,6 +12,7 @@ type VarianceRow = {
   quantity: number;
   invoice_price: number;
   actual_price: number;
+  prices_include_vat: boolean;
   invoice_numbers: string[];
   notes: string | null;
   created_at: string;
@@ -23,11 +24,12 @@ type FormState = {
   quantity: string;
   invoicePrice: string;
   actualPrice: string;
+  pricesIncludeVat: boolean;
   invoiceNumbers: string[];
   notes: string;
 };
 
-const emptyForm: FormState = { itemCode: "", productName: "", quantity: "", invoicePrice: "", actualPrice: "", invoiceNumbers: [], notes: "" };
+const emptyForm: FormState = { itemCode: "", productName: "", quantity: "", invoicePrice: "", actualPrice: "", pricesIncludeVat: false, invoiceNumbers: [], notes: "" };
 const money = (value: number) => value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function PurchasePriceVarianceClient({ initialRows, invoiceDates }: { initialRows: VarianceRow[]; invoiceDates: Record<string, string> }) {
@@ -99,7 +101,7 @@ export default function PurchasePriceVarianceClient({ initialRows, invoiceDates 
   }
 
   function startEdit(row: VarianceRow) {
-    setForm({ itemCode: row.item_code, productName: row.product_name, quantity: String(row.quantity), invoicePrice: String(row.invoice_price), actualPrice: String(row.actual_price), invoiceNumbers: row.invoice_numbers || [], notes: row.notes || "" });
+    setForm({ itemCode: row.item_code, productName: row.product_name, quantity: String(row.quantity), invoicePrice: String(row.invoice_price), actualPrice: String(row.actual_price), pricesIncludeVat: Boolean(row.prices_include_vat), invoiceNumbers: row.invoice_numbers || [], notes: row.notes || "" });
     setEditingId(row.id);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -206,20 +208,20 @@ export default function PurchasePriceVarianceClient({ initialRows, invoiceDates 
         autoTable(doc, {
         startY: tableStartY,
         margin: { left: 10, right: 10, bottom: 17 },
-        head: [["Item Code", "Product", "Invoices", "Qty", "Invoice Price", "Actual Price", "Unit Var.", "Total Var."]],
+        head: [["Item Code", "Product", "Invoices", "Qty", "Invoice Price", "Actual Price", "VAT Basis", "Unit Var.", "Total Var."]],
         body: group.rows.map((row) => {
           const unit = Number(row.actual_price) - Number(row.invoice_price);
-          return [row.item_code, `${row.product_name}${row.notes ? `\n${row.notes}` : ""}`, (row.invoice_numbers || []).join(", "), Number(row.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 }), money(Number(row.invoice_price)), money(Number(row.actual_price)), money(unit), money(Number(row.quantity) * unit)];
+          return [row.item_code, `${row.product_name}${row.notes ? `\n${row.notes}` : ""}`, (row.invoice_numbers || []).join(", "), Number(row.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 }), money(Number(row.invoice_price)), money(Number(row.actual_price)), row.prices_include_vat ? "VAT Included" : "VAT Excluded", money(unit), money(Number(row.quantity) * unit)];
         }),
         theme: "grid",
         styles: { font: "Amiri", fontSize: 7.4, cellPadding: 2, lineColor: [226, 232, 240], lineWidth: 0.2, textColor: [30, 41, 59], valign: "middle" },
         headStyles: { font: "helvetica", fillColor: [76, 29, 149], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
         alternateRowStyles: { fillColor: [248, 250, 252] },
-        columnStyles: { 0: { cellWidth: 19 }, 1: { cellWidth: 39 }, 2: { cellWidth: 29 }, 3: { cellWidth: 13, halign: "right" }, 4: { cellWidth: 22, halign: "right" }, 5: { cellWidth: 22, halign: "right" }, 6: { cellWidth: 21, halign: "right" }, 7: { cellWidth: 25, halign: "right", fontStyle: "bold" } },
+        columnStyles: { 0: { cellWidth: 18 }, 1: { cellWidth: 32 }, 2: { cellWidth: 25 }, 3: { cellWidth: 12, halign: "right" }, 4: { cellWidth: 20, halign: "right" }, 5: { cellWidth: 20, halign: "right" }, 6: { cellWidth: 17, halign: "center" }, 7: { cellWidth: 20, halign: "right" }, 8: { cellWidth: 26, halign: "right", fontStyle: "bold" } },
         didParseCell(data) {
-          if (data.section === "body" && (data.column.index === 6 || data.column.index === 7)) {
+          if (data.section === "body" && (data.column.index === 7 || data.column.index === 8)) {
             const row = group.rows[data.row.index];
-            const value = data.column.index === 6 ? Number(row.actual_price) - Number(row.invoice_price) : Number(row.quantity) * (Number(row.actual_price) - Number(row.invoice_price));
+            const value = data.column.index === 7 ? Number(row.actual_price) - Number(row.invoice_price) : Number(row.quantity) * (Number(row.actual_price) - Number(row.invoice_price));
             data.cell.styles.textColor = value > 0 ? [220, 38, 38] : [5, 150, 105];
           }
         },
@@ -275,6 +277,7 @@ export default function PurchasePriceVarianceClient({ initialRows, invoiceDates 
           <label><span>Quantity</span><input type="number" min="0.001" step="0.001" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} /></label>
           <label><span>Invoiced Unit Price</span><input type="number" min="0" step="0.0001" value={form.invoicePrice} onChange={(event) => setForm({ ...form, invoicePrice: event.target.value })} /></label>
           <label><span>Actual Unit Price</span><input type="number" min="0" step="0.0001" value={form.actualPrice} onChange={(event) => setForm({ ...form, actualPrice: event.target.value })} /></label>
+          <label><span>Price VAT Basis</span><select value={form.pricesIncludeVat ? "included" : "excluded"} onChange={(event) => setForm({ ...form, pricesIncludeVat: event.target.value === "included" })}><option value="excluded">VAT Excluded</option><option value="included">VAT Included</option></select></label>
           <div className="purchase-variance-preview"><span>Unit Variance</span><strong className={preview.unit > 0 ? "bad" : "good"}>EGP {money(preview.unit)}</strong><small>Total: EGP {money(preview.total)}</small></div>
           <label className="invoice-picker wide"><span>Invoice Numbers</span><div><input value={invoiceDraft} onChange={(event) => setInvoiceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addInvoice(); } }} placeholder="Write one or more invoice numbers" /><button type="button" onClick={addInvoice}>Add Invoice</button></div><small>Separate multiple invoice numbers with commas, then click Add Invoice.</small></label>
           <div className="invoice-tags wide">{form.invoiceNumbers.map((invoice) => <span key={invoice}>Invoice {invoice}<button type="button" aria-label={`Remove invoice ${invoice}`} onClick={() => removeInvoice(invoice)}>×</button></span>)}{!form.invoiceNumbers.length && <em>No invoices selected.</em>}</div>
@@ -287,8 +290,8 @@ export default function PurchasePriceVarianceClient({ initialRows, invoiceDates 
         <div className="purchase-variance-toolbar"><div><h2>Recorded Differences</h2><span>{filtered.length} lines</span></div><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search item, product or invoice..." /></div>
         {monthGroups.map((group) => <div className="purchase-variance-month" key={group.key}>
           <div className="purchase-variance-month-heading"><h3>{group.label}</h3><span>{group.rows.length} line{group.rows.length === 1 ? "" : "s"}</span></div>
-          <div className="table-scroll"><table><thead><tr><th>Item Code</th><th>Product</th><th>Invoices</th><th>Qty</th><th>Invoice Price</th><th>Actual Price</th><th>Unit Variance</th><th>Total Variance</th><th>Actions</th></tr></thead><tbody>
-            {group.rows.map((row) => { const unit = Number(row.actual_price) - Number(row.invoice_price); const total = Number(row.quantity) * unit; return <tr key={row.id}><td><strong>{row.item_code}</strong></td><td><span>{row.product_name}</span>{row.notes && <small>{row.notes}</small>}</td><td><div className="table-invoice-tags">{(row.invoice_numbers || []).map((invoice) => <span key={invoice}>{invoice}</span>)}</div></td><td className="number">{Number(row.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 })}</td><td className="number">{money(Number(row.invoice_price))}</td><td className="number">{money(Number(row.actual_price))}</td><td className={`number ${unit > 0 ? "variance-bad" : "variance-good"}`}>{money(unit)}</td><td className={`number ${total > 0 ? "variance-bad" : "variance-good"}`}><strong>{money(total)}</strong></td><td><div className="purchase-variance-row-actions"><button onClick={() => startEdit(row)}>Edit</button><button className="danger" onClick={() => remove(row)}>Delete</button></div></td></tr>; })}
+          <div className="table-scroll"><table><thead><tr><th>Item Code</th><th>Product</th><th>Invoices</th><th>Qty</th><th>Invoice Price</th><th>Actual Price</th><th>VAT Basis</th><th>Unit Variance</th><th>Total Variance</th><th>Actions</th></tr></thead><tbody>
+            {group.rows.map((row) => { const unit = Number(row.actual_price) - Number(row.invoice_price); const total = Number(row.quantity) * unit; return <tr key={row.id}><td><strong>{row.item_code}</strong></td><td><span>{row.product_name}</span>{row.notes && <small>{row.notes}</small>}</td><td><div className="table-invoice-tags">{(row.invoice_numbers || []).map((invoice) => <span key={invoice}>{invoice}</span>)}</div></td><td className="number">{Number(row.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 })}</td><td className="number">{money(Number(row.invoice_price))}</td><td className="number">{money(Number(row.actual_price))}</td><td><span className={`purchase-variance-vat-badge ${row.prices_include_vat ? "included" : "excluded"}`}>{row.prices_include_vat ? "Included" : "Excluded"}</span></td><td className={`number ${unit > 0 ? "variance-bad" : "variance-good"}`}>{money(unit)}</td><td className={`number ${total > 0 ? "variance-bad" : "variance-good"}`}><strong>{money(total)}</strong></td><td><div className="purchase-variance-row-actions"><button onClick={() => startEdit(row)}>Edit</button><button className="danger" onClick={() => remove(row)}>Delete</button></div></td></tr>; })}
           </tbody></table></div>
         </div>)}
         {!filtered.length && <div className="data-table-empty">No purchase price differences found.</div>}
