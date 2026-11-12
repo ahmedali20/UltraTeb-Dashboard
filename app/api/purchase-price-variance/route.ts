@@ -25,6 +25,7 @@ function values(body: Record<string, unknown>) {
     quantity: Number(body.quantity ?? 0),
     invoice_price: Number(body.invoicePrice ?? 0),
     actual_price: Number(body.actualPrice ?? 0),
+    prices_include_vat: body.pricesIncludeVat === true,
     invoice_numbers: invoiceNumbers,
     notes: String(body.notes ?? "").trim() || null,
     updated_at: new Date().toISOString(),
