@@ -118,6 +118,17 @@ export default function PurchasePriceVarianceClient({ initialRows }: { initialRo
     try {
       const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const fontResponse = await fetch("/fonts/Amiri-Regular.ttf");
+      if (!fontResponse.ok) throw new Error("Unable to load the Arabic PDF font.");
+      const fontBytes = new Uint8Array(await fontResponse.arrayBuffer());
+      let fontBinary = "";
+      const fontChunkSize = 0x8000;
+      for (let offset = 0; offset < fontBytes.length; offset += fontChunkSize) {
+        fontBinary += String.fromCharCode(...fontBytes.subarray(offset, offset + fontChunkSize));
+      }
+      doc.addFileToVFS("Amiri-Regular.ttf", btoa(fontBinary));
+      doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
+      doc.addFont("Amiri-Regular.ttf", "Amiri", "bold");
       const reportTotals = filtered.reduce((result, row) => {
         const variance = Number(row.quantity) * (Number(row.actual_price) - Number(row.invoice_price));
         result.net += variance;
@@ -136,7 +147,9 @@ export default function PurchasePriceVarianceClient({ initialRows }: { initialRo
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.text(`UltraTeb Tegara  |  Generated ${generatedAt}`, 14, 22);
+      doc.setFont("Amiri", "normal");
       doc.text(`${filtered.length} line item${filtered.length === 1 ? "" : "s"}${search.trim() ? `  |  Filter: ${search.trim()}` : ""}`, 196, 22, { align: "right" });
+      doc.setFont("helvetica", "normal");
 
       const summary = [
         { label: "Favorable Saving", value: reportTotals.favorable, color: [5, 150, 105] as [number, number, number] },
@@ -167,8 +180,8 @@ export default function PurchasePriceVarianceClient({ initialRows }: { initialRo
           return [row.item_code, `${row.product_name}${row.notes ? `\n${row.notes}` : ""}`, (row.invoice_numbers || []).join(", "), Number(row.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 }), money(Number(row.invoice_price)), money(Number(row.actual_price)), money(unit), money(Number(row.quantity) * unit)];
         }),
         theme: "grid",
-        styles: { font: "helvetica", fontSize: 6.8, cellPadding: 2, lineColor: [226, 232, 240], lineWidth: 0.2, textColor: [30, 41, 59], valign: "middle" },
-        headStyles: { fillColor: [76, 29, 149], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
+        styles: { font: "Amiri", fontSize: 7.4, cellPadding: 2, lineColor: [226, 232, 240], lineWidth: 0.2, textColor: [30, 41, 59], valign: "middle" },
+        headStyles: { font: "helvetica", fillColor: [76, 29, 149], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
         alternateRowStyles: { fillColor: [248, 250, 252] },
         columnStyles: { 0: { cellWidth: 19 }, 1: { cellWidth: 39 }, 2: { cellWidth: 29 }, 3: { cellWidth: 13, halign: "right" }, 4: { cellWidth: 22, halign: "right" }, 5: { cellWidth: 22, halign: "right" }, 6: { cellWidth: 21, halign: "right" }, 7: { cellWidth: 25, halign: "right", fontStyle: "bold" } },
         didParseCell(data) {
