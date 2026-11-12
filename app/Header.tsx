@@ -262,7 +262,7 @@ export default function Header({ active, lang, onToggleLang }: Props) {
         <nav className="app-sidebar__nav" aria-label="Main navigation">
           <span className="app-sidebar__section">{t.workspace}</span>
           {canView("home") && <NavLink href="/" page="home" label={t.home} icon="home" className={linkClass("home")} />}
-          <NavLink href="/assistant" page="assistant" label={t.assistant} icon="assistant" className={linkClass("assistant")} />
+          
           {canView("customers") && <NavLink href="/customers" page="customers" label={t.customers} icon="customers" className={linkClass("customers")} />}
           {canView("sales") && <NavLink href="/sales#all-records" page="sales" label={t.sales} icon="records" className={linkClass("sales")} />}
           {canView("reps") && <NavLink href="/sales-reps" page="reps" label={t.reps} icon="reps" className={linkClass("reps")} />}
