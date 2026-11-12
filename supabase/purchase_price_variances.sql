@@ -5,12 +5,16 @@ create table if not exists public.purchase_price_variances (
   quantity numeric(14,3) not null check (quantity > 0),
   invoice_price numeric(14,4) not null check (invoice_price >= 0),
   actual_price numeric(14,4) not null check (actual_price >= 0),
+  prices_include_vat boolean not null default false,
   invoice_numbers text[] not null default '{}',
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (cardinality(invoice_numbers) > 0)
 );
+
+alter table public.purchase_price_variances
+  add column if not exists prices_include_vat boolean not null default false;
 
 create index if not exists purchase_price_variances_item_code_idx
   on public.purchase_price_variances (item_code);
