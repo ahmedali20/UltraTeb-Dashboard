@@ -53,6 +53,25 @@ export default function PurchasePriceVarianceClient({ initialRows, invoiceDates 
     return rows.filter((row) => [row.item_code, row.product_name, ...(row.invoice_numbers || [])].some((value) => String(value).toLowerCase().includes(query)));
   }, [rows, search]);
 
+  const monthGroups = useMemo(() => Array.from(filtered.reduce((groups, row) => {
+    const relatedDates = (row.invoice_numbers ?? [])
+      .map((invoiceNo) => invoiceDates[String(invoiceNo).trim()])
+      .filter(Boolean)
+      .map((value) => new Date(value))
+      .filter((value) => !Number.isNaN(value.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
+    const date = relatedDates[0] ?? new Date(Number.NaN);
+    const key = Number.isNaN(date.getTime()) ? "unknown" : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const label = Number.isNaN(date.getTime())
+      ? "Orders Without Invoice Date"
+      : `${new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date)} Orders`;
+    const group = groups.get(key) ?? { key, label, rows: [] as VarianceRow[] };
+    group.rows.push(row);
+    groups.set(key, group);
+    return groups;
+  }, new Map<string, { key: string; label: string; rows: VarianceRow[] }>()).values())
+    .sort((a, b) => b.key.localeCompare(a.key)), [filtered, invoiceDates]);
+
   const totals = useMemo(() => rows.reduce((result, row) => {
     const variance = Number(row.quantity) * (Number(row.actual_price) - Number(row.invoice_price));
     result.net += variance;
@@ -173,25 +192,6 @@ export default function PurchasePriceVarianceClient({ initialRows, invoiceDates 
         doc.setFont("helvetica", "normal");
       });
 
-      const monthGroups = Array.from(filtered.reduce((groups, row) => {
-        const relatedDates = (row.invoice_numbers ?? [])
-          .map((invoiceNo) => invoiceDates[String(invoiceNo).trim()])
-          .filter(Boolean)
-          .map((value) => new Date(value))
-          .filter((value) => !Number.isNaN(value.getTime()))
-          .sort((a, b) => a.getTime() - b.getTime());
-        const date = relatedDates[0] ?? new Date(Number.NaN);
-        const key = Number.isNaN(date.getTime()) ? "unknown" : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-        const label = Number.isNaN(date.getTime())
-          ? "Orders Without Invoice Date"
-          : `${new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date)} Orders`;
-        const group = groups.get(key) ?? { key, label, rows: [] as VarianceRow[] };
-        group.rows.push(row);
-        groups.set(key, group);
-        return groups;
-      }, new Map<string, { key: string; label: string; rows: VarianceRow[] }>()).values())
-        .sort((a, b) => b.key.localeCompare(a.key));
-
       let tableStartY = 67;
       monthGroups.forEach((group) => {
         if (tableStartY > 258) {
@@ -285,9 +285,12 @@ export default function PurchasePriceVarianceClient({ initialRows, invoiceDates 
 
       <section className="purchase-variance-table-card">
         <div className="purchase-variance-toolbar"><div><h2>Recorded Differences</h2><span>{filtered.length} lines</span></div><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search item, product or invoice..." /></div>
-        <div className="table-scroll"><table><thead><tr><th>Item Code</th><th>Product</th><th>Invoices</th><th>Qty</th><th>Invoice Price</th><th>Actual Price</th><th>Unit Variance</th><th>Total Variance</th><th>Actions</th></tr></thead><tbody>
-          {filtered.map((row) => { const unit = Number(row.actual_price) - Number(row.invoice_price); const total = Number(row.quantity) * unit; return <tr key={row.id}><td><strong>{row.item_code}</strong></td><td><span>{row.product_name}</span>{row.notes && <small>{row.notes}</small>}</td><td><div className="table-invoice-tags">{(row.invoice_numbers || []).map((invoice) => <span key={invoice}>{invoice}</span>)}</div></td><td className="number">{Number(row.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 })}</td><td className="number">{money(Number(row.invoice_price))}</td><td className="number">{money(Number(row.actual_price))}</td><td className={`number ${unit > 0 ? "variance-bad" : "variance-good"}`}>{money(unit)}</td><td className={`number ${total > 0 ? "variance-bad" : "variance-good"}`}><strong>{money(total)}</strong></td><td><div className="purchase-variance-row-actions"><button onClick={() => startEdit(row)}>Edit</button><button className="danger" onClick={() => remove(row)}>Delete</button></div></td></tr>; })}
-        </tbody></table></div>
+        {monthGroups.map((group) => <div className="purchase-variance-month" key={group.key}>
+          <div className="purchase-variance-month-heading"><h3>{group.label}</h3><span>{group.rows.length} line{group.rows.length === 1 ? "" : "s"}</span></div>
+          <div className="table-scroll"><table><thead><tr><th>Item Code</th><th>Product</th><th>Invoices</th><th>Qty</th><th>Invoice Price</th><th>Actual Price</th><th>Unit Variance</th><th>Total Variance</th><th>Actions</th></tr></thead><tbody>
+            {group.rows.map((row) => { const unit = Number(row.actual_price) - Number(row.invoice_price); const total = Number(row.quantity) * unit; return <tr key={row.id}><td><strong>{row.item_code}</strong></td><td><span>{row.product_name}</span>{row.notes && <small>{row.notes}</small>}</td><td><div className="table-invoice-tags">{(row.invoice_numbers || []).map((invoice) => <span key={invoice}>{invoice}</span>)}</div></td><td className="number">{Number(row.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 })}</td><td className="number">{money(Number(row.invoice_price))}</td><td className="number">{money(Number(row.actual_price))}</td><td className={`number ${unit > 0 ? "variance-bad" : "variance-good"}`}>{money(unit)}</td><td className={`number ${total > 0 ? "variance-bad" : "variance-good"}`}><strong>{money(total)}</strong></td><td><div className="purchase-variance-row-actions"><button onClick={() => startEdit(row)}>Edit</button><button className="danger" onClick={() => remove(row)}>Delete</button></div></td></tr>; })}
+          </tbody></table></div>
+        </div>)}
         {!filtered.length && <div className="data-table-empty">No purchase price differences found.</div>}
       </section>
     </main>
