@@ -116,7 +116,9 @@ export default function PurchasePriceVarianceClient({ initialRows }: { initialRo
     if (!filtered.length) return;
     setGeneratingPdf(true);
     try {
-      const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+      const [{ jsPDF }, autoTableModule] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+      const autoTable = (autoTableModule.default as unknown as { default?: typeof autoTableModule.default }).default
+        ?? autoTableModule.default;
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const fontResponse = await fetch("/fonts/Amiri-Regular.ttf");
       if (!fontResponse.ok) throw new Error("Unable to load the Arabic PDF font.");
@@ -210,6 +212,9 @@ export default function PurchasePriceVarianceClient({ initialRows }: { initialRo
 
       const stamp = new Date().toISOString().slice(0, 10);
       doc.save(`Purchase-Price-Variance-Report-${stamp}.pdf`);
+    } catch (error) {
+      console.error("Unable to generate the purchase price variance PDF.", error);
+      alert(error instanceof Error ? error.message : "Unable to generate the PDF report. Please try again.");
     } finally {
       setGeneratingPdf(false);
     }
