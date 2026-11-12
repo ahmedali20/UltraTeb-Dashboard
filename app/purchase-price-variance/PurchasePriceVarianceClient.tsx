@@ -173,11 +173,35 @@ export default function PurchasePriceVarianceClient({ initialRows }: { initialRo
         doc.setFont("helvetica", "normal");
       });
 
-      autoTable(doc, {
-        startY: 61,
+      const monthGroups = Array.from(filtered.reduce((groups, row) => {
+        const date = new Date(row.created_at);
+        const key = Number.isNaN(date.getTime()) ? "unknown" : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        const label = Number.isNaN(date.getTime())
+          ? "Orders Without Date"
+          : `${new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date)} Orders`;
+        const group = groups.get(key) ?? { key, label, rows: [] as VarianceRow[] };
+        group.rows.push(row);
+        groups.set(key, group);
+        return groups;
+      }, new Map<string, { key: string; label: string; rows: VarianceRow[] }>()).values())
+        .sort((a, b) => b.key.localeCompare(a.key));
+
+      let tableStartY = 67;
+      monthGroups.forEach((group) => {
+        if (tableStartY > 258) {
+          doc.addPage();
+          tableStartY = 22;
+        }
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(76, 29, 149);
+        doc.text(group.label, 10, tableStartY - 4);
+
+        autoTable(doc, {
+        startY: tableStartY,
         margin: { left: 10, right: 10, bottom: 17 },
         head: [["Item Code", "Product", "Invoices", "Qty", "Invoice Price", "Actual Price", "Unit Var.", "Total Var."]],
-        body: filtered.map((row) => {
+        body: group.rows.map((row) => {
           const unit = Number(row.actual_price) - Number(row.invoice_price);
           return [row.item_code, `${row.product_name}${row.notes ? `\n${row.notes}` : ""}`, (row.invoice_numbers || []).join(", "), Number(row.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 }), money(Number(row.invoice_price)), money(Number(row.actual_price)), money(unit), money(Number(row.quantity) * unit)];
         }),
@@ -188,7 +212,7 @@ export default function PurchasePriceVarianceClient({ initialRows }: { initialRo
         columnStyles: { 0: { cellWidth: 19 }, 1: { cellWidth: 39 }, 2: { cellWidth: 29 }, 3: { cellWidth: 13, halign: "right" }, 4: { cellWidth: 22, halign: "right" }, 5: { cellWidth: 22, halign: "right" }, 6: { cellWidth: 21, halign: "right" }, 7: { cellWidth: 25, halign: "right", fontStyle: "bold" } },
         didParseCell(data) {
           if (data.section === "body" && (data.column.index === 6 || data.column.index === 7)) {
-            const row = filtered[data.row.index];
+            const row = group.rows[data.row.index];
             const value = data.column.index === 6 ? Number(row.actual_price) - Number(row.invoice_price) : Number(row.quantity) * (Number(row.actual_price) - Number(row.invoice_price));
             data.cell.styles.textColor = value > 0 ? [220, 38, 38] : [5, 150, 105];
           }
@@ -208,6 +232,8 @@ export default function PurchasePriceVarianceClient({ initialRows }: { initialRo
             doc.text("Purchase Price Variance Report", data.settings.margin.left, 9);
           }
         },
+        });
+        tableStartY = ((doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? tableStartY) + 13;
       });
 
       const stamp = new Date().toISOString().slice(0, 10);
