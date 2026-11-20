@@ -16,6 +16,7 @@ function requestedModule(pathname: string): DashboardModule | null {
   if (pathname.startsWith("/profit-loss")) return "profitLoss";
   if (pathname.startsWith("/bank-reconciliation")) return "bankReconciliation";
   if (pathname.startsWith("/purchase-price-variance") || pathname.startsWith("/api/purchase-price-variance")) return "purchaseVariance";
+  if (pathname.startsWith("/bonus-items") || pathname.startsWith("/api/bonus-items")) return "bonusItems";
   if (pathname.startsWith("/vat-report") || pathname.startsWith("/api/vat-report")) return "vat";
   if (pathname.startsWith("/income-statement-data") || pathname.startsWith("/api/income-statement-data")) return "incomeStatement";
   if (pathname.startsWith("/authorization") || pathname.startsWith("/api/authorized-employees")) return "authorization";
@@ -56,4 +57,3 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = { matcher: ["/((?!.*\\.[\\w]+$).*)"] };
-
